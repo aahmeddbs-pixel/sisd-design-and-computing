@@ -276,7 +276,7 @@ function speak(text, onend){
     speechSynthesis.speak(u); };
   next(); return true;
 }
-const SKIP = ".nav,.actions,.counter,.dots,.steps,.pts,.tag,#stepBody > div.muted,.sdcPageBar,button,.sdcListen,.sdcLang,input,select,textarea,svg,img,canvas,video,script,style,.console,.editor,.ed-wrap,.gutter,.snip,.listen,[aria-hidden=true],.hidden,[hidden]";
+const SKIP = ".sdcNoRead,.nav,.actions,.counter,.dots,.steps,.pts,.tag,#stepBody > div.muted,.sdcPageBar,button,.sdcListen,.sdcLang,input,select,textarea,svg,img,canvas,video,script,style,.console,.editor,.ed-wrap,.gutter,.snip,.listen,[aria-hidden=true],.hidden,[hidden]";
 function textOf(el){
   const c = el.cloneNode(true); c.querySelectorAll(SKIP).forEach(n => n.remove());
   const box = document.createElement("div"); box.className = "sdcTmp notranslate"; box.setAttribute("translate", "no"); box.setAttribute("aria-hidden", "true");
