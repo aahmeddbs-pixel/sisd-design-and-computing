@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Platform Admin · SISD Design and Computing</title>
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
+<script src="sdc.js"></script>
+<style>
+:root{
+  --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
+  --ok:#1E8A55; --okbg:#E3F4EA; --warn:#8A4B00; --warnbg:#FFF2DC; --bad:#A3172A; --badbg:#FBE5E8; --r:14px;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0E1626; --card:#16213A; --ink:#E7ECF6; --muted:#9AA7C2; --line:#2A3858; --soft:#1D2A47; --okbg:#143326; --ok:#47C487; --warnbg:#3A2C10; --warn:#F0B44C; --badbg:#3E1820; --bad:#FF8A98; color-scheme:dark}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 Arial,Helvetica,sans-serif;min-height:100vh}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+.top{background:var(--navy);color:#fff;border-bottom:4px solid var(--red)}
+.top .in{max-width:1180px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.logo{background:var(--red);border-radius:7px;padding:4px 9px;font-weight:900;letter-spacing:.06em;font-size:.9rem}
+.brand{font-weight:900;font-size:1.1rem}
+.top a,.top button{color:#fff;font-weight:700;font-size:.85rem;background:none;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:4px 12px;text-decoration:none}
+.top .sp{margin-left:auto}
+main{max-width:1180px;margin:0 auto;padding:20px 16px 50px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;box-shadow:0 2px 10px rgba(11,33,73,.06);margin-bottom:18px}
+h1{font-size:1.6rem;font-weight:900}
+h2{font-size:1.2rem;font-weight:900;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+h2 .n{font-size:.8rem;background:var(--soft);border-radius:999px;padding:2px 9px;color:var(--muted)}
+.muted{color:var(--muted)}
+.small{font-size:.86rem}
+label.f{display:block;font-weight:800;margin:12px 0 5px;font-size:.92rem}
+input.t,select.t{width:100%;padding:9px 12px;border:2px solid var(--line);border-radius:10px;background:var(--card)}
+input.t:focus,select.t:focus{outline:none;border-color:var(--navy)}
+.btn{border:none;border-radius:10px;padding:9px 16px;font-weight:800;background:var(--navy);color:#fff;display:inline-flex;gap:6px;align-items:center}
+.btn:hover{background:var(--navy-d)}
+.btn.red{background:var(--red)}
+.btn.ghost{background:var(--card);color:var(--ink);border:2px solid var(--line)}
+.btn.sm{padding:5px 11px;font-size:.85rem}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:760px){.grid2{grid-template-columns:1fr}}
+.notice{border-radius:10px;padding:10px 13px;margin-top:12px;font-size:.92rem}
+.notice.ok{background:var(--okbg);color:var(--ok)} .notice.warn{background:var(--warnbg);color:var(--warn)} .notice.bad{background:var(--badbg);color:var(--bad)}
+.notice ol{margin:6px 0 0 20px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 18px}
+.tabs button{border:2px solid var(--line);background:var(--card);border-radius:999px;padding:7px 15px;font-weight:800}
+.tabs button[aria-selected="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+.tbl{width:100%;border-collapse:collapse;font-size:.9rem}
+.tbl th{text-align:left;font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px;border-bottom:2px solid var(--line)}
+.tbl td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl tr:hover td{background:color-mix(in srgb,var(--soft) 60%,transparent)}
+.scroll{overflow-x:auto}
+.pill{display:inline-block;border-radius:999px;padding:1px 9px;font-size:.78rem;font-weight:800;background:var(--soft);white-space:nowrap}
+.pill.cs{background:#e3e9f6;color:#1B2D4E} .pill.design{background:#fbe5e8;color:#A3172A} .pill.it{background:#e3f4ea;color:#1E6B45}
+@media (prefers-color-scheme: dark){.pill.cs{background:#22375E;color:#cfe0ff}.pill.design{background:#4a1c25;color:#ffc2cb}.pill.it{background:#143326;color:#9be3bd}}
+.pill.bad{background:var(--badbg);color:var(--bad)} .pill.ok{background:var(--okbg);color:var(--ok)} .pill.warn{background:var(--warnbg);color:var(--warn)}
+.em{color:var(--muted);font-size:.82rem}
+.lesson{border:2px solid var(--line);border-radius:12px;padding:14px;margin-top:12px}
+.lesson.live{border-color:var(--red)}
+.lesson h3{font-size:1.02rem;font-weight:900;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.top5{margin:10px 0 0 0;list-style:none;display:grid;gap:6px;counter-reset:r}
+.top5 li{counter-increment:r;display:flex;gap:10px;align-items:center;background:var(--soft);border-radius:9px;padding:7px 10px}
+.top5 li::before{content:counter(r);width:24px;height:24px;border-radius:50%;background:var(--red);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;flex:none;font-size:.85rem}
+.top5 li b{flex:1}
+.modal-bg{position:fixed;inset:0;background:rgba(8,15,30,.55);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
+.modal{background:var(--card);border-radius:var(--r);max-width:520px;width:100%;padding:22px;max-height:92vh;overflow:auto}
+.login{max-width:420px;margin:40px auto}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-weight:700;z-index:60;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+</style>
+</head>
+<body>
+<header class="top"><div class="in"><span class="logo">SISD</span><span class="brand">Design and Computing · Admin</span>
+  <a class="sp" href="./">Student sign-in page</a><a href="/python-pathways/admin.html">CS admin</a><button id="outBtn" class="hidden">Lock</button></div></header>
+<main>
+  <!-- LOCKED -->
+  <div id="locked" class="card login">
+    <h1>Platform admin</h1>
+    <p class="muted" style="margin-top:4px">Enter the admin recovery password (the same one used in Sync tools).</p>
+    <label class="f" for="pw">Admin password</label>
+    <input class="t" id="pw" type="password" autocomplete="current-password">
+    <div id="pwMsg"></div>
+    <button class="btn" id="pwGo" style="margin-top:14px;width:100%;justify-content:center">Unlock</button>
+  </div>
+
+  <!-- UNLOCKED -->
+  <div id="app" class="hidden">
+    <div class="row" style="justify-content:space-between;margin-bottom:4px"><h1>Admin</h1><div class="row"><span class="muted small" id="loadState"></span><button class="btn ghost sm" id="refresh">↻ Refresh</button></div></div>
+    <div class="tabs" role="tablist">
+      <button data-t="hp" aria-selected="true">🏠 House Points</button><button data-t="students">👥 Students</button><button data-t="log">📋 Sign-in log</button><button data-t="setup">⚙️ Setup</button>
+    </div>
+
+    <section id="t-hp">
+      <div class="card">
+        <h2>House Points after each lesson</h2>
+        <p class="muted small" style="margin-top:4px">A lesson ends when nobody in that class has done any work for 15 minutes (at least 3 students must have worked, so home learning isn't counted). While this page is open it checks every 2 minutes and emails you the top 5 for each lesson that has ended. Lessons that ended while it was closed (in the last 24 hours) are emailed when you next open it.</p>
+        <p class="muted small" style="margin-top:6px"><b>How the top 5 is chosen:</b> new tasks completed in that lesson, weighted by difficulty. Python: Beginner ×1, Intermediate ×1.5, Advanced ×3 per exercise. Design and IT: practice passed ×1, criterion submitted ×2, strand completed ×3. Ties go to the student with more tasks.</p>
+        <div id="hpWarn"></div>
+      </div>
+      <div id="hpList"></div>
+    </section>
+
+    <section id="t-students" class="hidden">
+      <div class="card">
+        <h2>Students <span class="n" id="stCount">0</span></h2>
+        <p class="muted small" style="margin-top:4px">Only you can change a student's course, grade, level or teacher. Changes apply the next time the student signs in, on any computer.</p>
+        <div class="row" style="margin-top:12px"><input class="t" id="stQ" placeholder="Search name or email" style="max-width:280px">
+          <select class="t" id="stC" style="max-width:190px"><option value="">All courses</option><option value="cs">Computer Science</option><option value="design">Design</option><option value="it">IT</option></select>
+          <button class="btn ghost sm" id="stAdd">＋ Set up a student by email</button></div>
+        <div class="scroll" style="margin-top:12px"><table class="tbl" id="stTbl"></table></div>
+      </div>
+    </section>
+
+    <section id="t-log" class="hidden">
+      <div class="card">
+        <h2>Sign-in log <span class="n" id="lgCount">0</span></h2>
+        <p class="muted small" style="margin-top:4px">Every sign-in and sign-up through the platform, with the course the student chose. Wrong-course attempts are marked in red and included in the lesson email.</p>
+        <div class="row" style="margin-top:12px"><select class="t" id="lgF" style="max-width:240px"><option value="">Everything</option><option value="wrongcourse">Wrong-course attempts only</option><option value="signup">Sign-ups only</option></select></div>
+        <div class="scroll" style="margin-top:12px"><table class="tbl" id="lgTbl"></table></div>
+      </div>
+    </section>
+
+    <section id="t-setup" class="hidden">
+      <div class="card">
+        <h2>1 · Teacher log sheet</h2>
+        <p class="muted small" style="margin-top:4px">The Google Sheet linked to your <b>Python Pathways Log</b> form. All three courses now send sign-ins and completed tasks there. In the sheet, <b>Share → General access → Anyone with the link: Viewer</b>, then paste its link here.</p>
+        <label class="f" for="setSheet">Log sheet link</label><input class="t" id="setSheet" placeholder="https://docs.google.com/spreadsheets/d/…">
+        <div id="sheetMsg"></div>
+      </div>
+      <div class="card">
+        <h2>2 · Email alerts form</h2>
+        <p class="muted small" style="margin-top:4px">The lesson emails are sent through a Google Form that emails you each response, so your Gmail stays hidden.</p>
+        <div class="notice warn"><b>Not made yet?</b> It takes about 3 minutes:<ol>
+          <li>In Google Forms, create a new form called <b>SDC Alerts</b>.</li>
+          <li>Add five <b>Paragraph</b> questions named <b>type</b>, <b>student</b>, <b>email</b>, <b>teacher</b>, <b>data</b>, in that order.</li>
+          <li><b>Responses</b> → three dots → turn on <b>Get email notifications for new responses</b> (signed in with your personal Gmail).</li>
+          <li>Three dots at the top → <b>Get pre-filled link</b> → type <b>x</b> in every question → <b>Get link</b> → copy it and paste it below.</li></ol></div>
+        <label class="f" for="setNotify">Alerts form pre-filled link</label><input class="t" id="setNotify" placeholder="https://docs.google.com/forms/d/e/…/viewform?usp=pp_url&entry.…">
+        <div id="notifyMsg"></div>
+      </div>
+      <div class="row"><button class="btn" id="saveSet">Save setup</button><button class="btn ghost" id="testMail">Send a test email</button></div>
+      <p class="muted small" style="margin-top:12px">These links are saved on this computer only. To use the admin page on another computer, paste them there too.</p>
+    </section>
+  </div>
+</main>
+
+<script>
+(function(){
+"use strict";
+const $ = id => document.getElementById(id), esc = SDC.esc, C = SDC.COURSES, X = SDC._internal;
+const TE = new TextEncoder();
+const QUIET_MIN = 15, MIN_STUDENTS = 3, POLL_MS = 120000, CATCHUP_H = 24;
+const WRAP = {"iter":600000,"salt":"MVkn8WJRApLor1E8Nn+0fw==","iv":"sH/H8GF0OfhpDWaF","ct":"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"};
+const PATHS = { beginner:"Beginner", intermediate:"Intermediate", advanced:"Advanced", dp_beginner:"IB DP Beginner", dp_intermediate:"IB DP Intermediate", dp_advanced:"IB DP Advanced" };
+const CLASSES = { "6":[["6","DES 6"]], "7":[["7X","7X (DES 1)"],["7Y","7Y (DES 6)"]] };
+const TEACHERS = { cs:["Mr. Ahmed","Mr. French","Ms. Abdelaziz"], design:["Mr. Ahmed","Miss Abdelaziz","Mr. French"], it:["Mr. Ahmed","Miss Abdelaziz","Mr. French"] };
+const pathsFor = g => Object.keys(PATHS).filter(p => (p.indexOf("dp_") === 0) === (+g >= 11));
+const levelName = (c, l) => c === "cs" ? (PATHS[l] || l || "") : "";
+const load = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch(e){ return d; } };
+const store = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} };
+const toast = t => { const d = document.createElement("div"); d.className = "toast"; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 3500); };
+const fmtT = ms => new Date(ms).toLocaleTimeString("en-GB", { hour:"2-digit", minute:"2-digit" });
+const fmtD = ms => new Date(ms).toLocaleDateString("en-GB", { weekday:"short", day:"numeric", month:"short" });
+const fmtDT = ms => fmtD(ms) + ", " + fmtT(ms);
+const pill = c => C[c] ? `<span class="pill ${c}">${esc(C[c].short)}</span>` : `<span class="pill">${esc(c || "?")}</span>`;
+
+/* ---------------- unlock with the admin recovery password ---------------- */
+let KEYS = null;
+async function unlock(pw){
+  const d64 = X.d64;
+  const base = await crypto.subtle.importKey("raw", TE.encode(pw), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey({ name:"PBKDF2", salt:d64(WRAP.salt), iterations:WRAP.iter, hash:"SHA-256" }, base, { name:"AES-GCM", length:256 }, false, ["decrypt"]);
+  const priv = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name:"AES-GCM", iv:d64(WRAP.iv) }, key, d64(WRAP.ct))));
+  return { sig: await crypto.subtle.importKey("jwk", priv.sig, { name:"ECDSA", namedCurve:"P-256" }, false, ["sign"]) };
+}
+const fails = () => load("sdc_admin_fail", { n:0, until:0 });
+$("pwGo").onclick = async () => {
+  const f = fails(); if (f.until > Date.now()){ $("pwMsg").innerHTML = `<div class="notice bad">Too many wrong tries. Wait ${Math.ceil((f.until - Date.now()) / 60000)} minute(s).</div>`; return; }
+  $("pwGo").disabled = true; $("pwMsg").innerHTML = `<div class="notice ok">Checking…</div>`;
+  try { KEYS = await unlock($("pw").value); store("sdc_admin_fail", { n:0, until:0 }); }
+  catch(e){ KEYS = null; f.n++; if (f.n >= 5) f.until = Date.now() + Math.min(30, Math.pow(2, f.n - 5)) * 60000; store("sdc_admin_fail", f);
+    SDC.log("adminfail", { name:"(unknown)", course:"" }, { tries:f.n });
+    $("pwMsg").innerHTML = `<div class="notice bad">That password is not right.</div>`; }
+  $("pwGo").disabled = false; $("pw").value = "";
+  if (KEYS){ $("locked").classList.add("hidden"); $("app").classList.remove("hidden"); $("outBtn").classList.remove("hidden"); start(); }
+};
+$("pw").addEventListener("keydown", e => { if (e.key === "Enter") $("pwGo").click(); });
+$("outBtn").onclick = () => location.reload();
+
+/* ---------------- tabs ---------------- */
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
+  ["hp","students","log","setup"].forEach(t => $("t-" + t).classList.toggle("hidden", t !== b.dataset.t));
+});
+
+/* ---------------- setup ---------------- */
+const SHEET_KEY = "sdc_admin_sheet", NOTIFY_KEY = "sdc_admin_notify";
+function sheetLink(){ return load(SHEET_KEY, "") || load("pyl_admin_sheet", ""); }   // falls back to the Python admin's saved link
+const sheetId = l => (String(l || "").match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})/) || [])[1] || null;
+function parseForm(link){
+  const m = String(link || "").match(/docs\.google\.com\/forms\/(?:u\/\d+\/)?d\/(e\/)?([^/]+)\//); if (!m) return null;
+  const ent = []; const re = /entry\.(\d+)=/g; let x; while ((x = re.exec(link))) ent.push("entry." + x[1]);
+  return ent.length >= 5 ? { action:`https://docs.google.com/forms/d/${m[1] || ""}${m[2]}/formResponse`, ent } : null;
+}
+function paintSetup(){
+  $("setSheet").value = sheetLink(); $("setNotify").value = load(NOTIFY_KEY, "");
+  $("sheetMsg").innerHTML = sheetId(sheetLink()) ? `<div class="notice ok">Connected.</div>` : `<div class="notice warn">Not connected yet: the House Points, Students and Sign-in log tabs need this.</div>`;
+  $("notifyMsg").innerHTML = parseForm(load(NOTIFY_KEY, "")) ? `<div class="notice ok">Connected: lesson emails will be sent.</div>` : `<div class="notice warn">Not connected yet: lesson results show here but can't be emailed.</div>`;
+  $("hpWarn").innerHTML = !sheetId(sheetLink()) ? `<div class="notice warn">Connect your log sheet in <b>Setup</b> first.</div>` : !parseForm(load(NOTIFY_KEY, "")) ? `<div class="notice warn">Emails are off until you add the alerts form in <b>Setup</b>. Results still appear below.</div>` : "";
+}
+$("saveSet").onclick = () => {
+  const s = $("setSheet").value.trim(), n = $("setNotify").value.trim();
+  if (s && !sheetId(s)) return toast("The sheet link should contain docs.google.com/spreadsheets/d/…");
+  if (n && !parseForm(n)) return toast("The form link should be a pre-filled link with five entry.… parts.");
+  store(SHEET_KEY, s); store(NOTIFY_KEY, n); paintSetup(); toast("Saved."); refresh();
+};
+async function sendMail(type, student, teacher, text){
+  const f = parseForm(load(NOTIFY_KEY, "")); if (!f) return false;
+  const p = new URLSearchParams(); [type, student, "", teacher, text].forEach((v, i) => p.append(f.ent[i], v));
+  try { await fetch(f.action, { method:"POST", mode:"no-cors", body:p }); return true; } catch(e){ return false; }
+}
+$("testMail").onclick = async () => {
+  if (!parseForm($("setNotify").value.trim())) return toast("Paste the alerts form link first, then Save.");
+  store(NOTIFY_KEY, $("setNotify").value.trim());
+  const ok = await sendMail("Test", "SISD Design and Computing", "Admin", "This is a test from the platform admin page. If you can read this, lesson House Points emails will reach you.");
+  toast(ok ? "Test sent. Check your Gmail in a minute." : "Could not reach Google Forms from here.");
+};
+
+/* ---------------- reading the log sheet ---------------- */
+let ROWS = [], PYACCTS = {};
+function parseCSV(t){
+  const R = []; let row = [], cur = "", q = false;
+  for (let i = 0; i < t.length; i++){ const c = t[i];
+    if (q){ if (c === '"'){ if (t[i + 1] === '"'){ cur += '"'; i++; } else q = false; } else cur += c; }
+    else if (c === '"') q = true; else if (c === ","){ row.push(cur); cur = ""; } else if (c === "\n" || c === "\r"){ if (c === "\r" && t[i + 1] === "\n") i++; row.push(cur); R.push(row); row = []; cur = ""; } else cur += c; }
+  if (cur || row.length){ row.push(cur); R.push(row); }
+  return R;
+}
+async function refresh(){
+  const id = sheetId(sheetLink()); paintSetup();
+  if (!id){ renderAll(); return; }
+  $("loadState").textContent = "Loading…";
+  const urls = [`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&headers=1&t=${Date.now()}`, `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&t=${Date.now()}`];
+  let text = null;
+  for (const u of urls){ try { const r = await fetch(u, { cache:"no-store" }); if (!r.ok) continue; const t = await r.text(); if (/<html/i.test(t.slice(0, 300))) continue; text = t; break; } catch(e){} }
+  if (text == null){ $("loadState").textContent = ""; $("hpWarn").innerHTML = `<div class="notice bad">Couldn't read the log sheet. In the sheet, set <b>Share → Anyone with the link: Viewer</b>.</div>`; renderAll(); return; }
+  const R = parseCSV(text), head = (R[0] || []).map(x => x.trim().toLowerCase()), di = head.findIndex(x => x === "data" || x.indexOf("data") === 0);
+  ROWS = []; PYACCTS = {};
+  R.slice(1).forEach(r => {
+    let d = null; try { d = JSON.parse(r[di] || ""); } catch(e){ return; }
+    if (!d || !d.acct) return;
+    if (d.sdc){ d.when = Date.parse(d.at) || 0; ROWS.push(d); return; }
+    const a = d.acct, k = SDC.keyOf(a.email, a.name), when = Date.parse(d.at) || 0;   // older Python Pathways rows: known CS students
+    if (!PYACCTS[k] || PYACCTS[k].when <= when) PYACCTS[k] = { when, name:a.name, email:a.email || "", grade:String(a.grade || ""), teacher:a.teacher || "", course:"cs", level:a.path || "" };
+  });
+  ROWS.sort((a, b) => a.when - b.when);
+  $("loadState").textContent = "Updated " + fmtT(Date.now());
+  renderAll(); await autoSend();
+}
+$("refresh").onclick = refresh;
+
+/* ---------------- House Points lessons ---------------- */
+const classKey = a => [a.course, a.grade, a.teacher, a.cls || ""].join("|");
+const classLabel = a => `G${a.grade} ${C[a.course] ? C[a.course].name : a.course}${a.cls ? " · " + a.cls : ""} (${a.teacher || "no teacher"})`;
+function lessons(){
+  const byClass = {}, out = [], forced = load("sdc_forced", {});
+  ROWS.filter(r => r.type === "task" && r.task).forEach(r => { const k = classKey(r.acct); (byClass[k] = byClass[k] || []).push(r); });
+  Object.keys(byClass).forEach(k => {
+    let cur = null;
+    const close = () => { if (cur) out.push(cur); cur = null; };
+    byClass[k].forEach(r => {
+      if (cur && (r.when - cur.last > QUIET_MIN * 60000 || (forced[cur.key] && r.when > forced[cur.key]))) close();
+      if (!cur) cur = { key: k + "|" + new Date(r.when).toISOString().slice(0, 16), cls: r.acct, start: r.when, last: r.when, students: {} };
+      cur.last = r.when;
+      const sk = SDC.keyOf(r.acct.email, r.acct.name), st = cur.students[sk] = cur.students[sk] || { name: r.acct.name, level: r.acct.level, course: r.acct.course, tasks: 0, score: 0, last: 0, seen: {} };
+      const tk = r.task.t; if (st.seen[tk]) return; st.seen[tk] = 1;     // each task counts once
+      st.tasks++; st.score += +r.task.w || 1; st.last = r.when;
+    });
+    close();
+  });
+  const now = Date.now(), sent = sentSet();
+  out.forEach(L => {
+    L.n = Object.keys(L.students).length;
+    L.ended = !!forced[L.key] || now - L.last >= QUIET_MIN * 60000;
+    L.end = forced[L.key] ? Math.max(L.last, Math.min(forced[L.key], now)) : L.last;
+    L.top = Object.values(L.students).sort((a, b) => b.score - a.score || b.tasks - a.tasks || a.last - b.last).slice(0, 5);
+    L.sent = sent[L.key] || null;
+    L.lesson = L.n >= MIN_STUDENTS || !!forced[L.key];
+    L.wrong = ROWS.filter(r => r.type === "wrongcourse" && r.when >= L.start - 10 * 60000 && r.when <= L.end + 60000 && (r.acct.teacher === L.cls.teacher || Object.values(L.students).some(s => s.name === r.acct.name)));
+    L.signins = new Set(ROWS.filter(r => (r.type === "signin" || r.type === "signup") && r.when >= L.start - 15 * 60000 && r.when <= L.end && classKey(r.acct).split("|").slice(0, 3).join("|") === L.key.split("|").slice(0, 3).join("|")).map(r => SDC.keyOf(r.acct.email, r.acct.name))).size;
+  });
+  return out.sort((a, b) => b.last - a.last);
+}
+function sentSet(){
+  const s = Object.assign({}, load("sdc_hpsent", {}));
+  ROWS.filter(r => r.type === "hpsent" && r.lesson).forEach(r => { s[r.lesson] = s[r.lesson] || r.when; });
+  return s;
+}
+const fmtScore = n => Math.round(n * 10) / 10;
+function emailText(L){
+  const lines = [];
+  lines.push("🏠 House Points: " + classLabel(L.cls));
+  lines.push("Lesson: " + fmtD(L.start) + ", " + fmtT(L.start) + "–" + fmtT(L.end) + " · " + L.n + " student" + (L.n === 1 ? "" : "s") + " completed work" + (L.signins ? " · " + L.signins + " signed in" : ""));
+  lines.push("");
+  lines.push("Top " + L.top.length + " (most new tasks, weighted by difficulty):");
+  L.top.forEach((s, i) => lines.push((i + 1) + ". " + s.name + ": " + s.tasks + " task" + (s.tasks === 1 ? "" : "s") + ", score " + fmtScore(s.score) + (levelName(s.course, s.level) ? " (" + levelName(s.course, s.level) + ")" : "")));
+  if (L.wrong.length){
+    lines.push(""); lines.push("⚠️ Wrong-course sign-in attempts:");
+    L.wrong.forEach(r => lines.push("• " + fmtT(r.when) + " " + (r.acct.name || r.acct.email || "Unknown") + " tried " + (C[r.acct.course] ? C[r.acct.course].name : r.acct.course) + (r.registered ? ", registered for " + (C[r.registered] ? C[r.registered].name : r.registered) : "") + (r.reason === "grade" ? " (not Grade 10)" : "")));
+  }
+  lines.push(""); lines.push("Scoring: Python Beginner ×1, Intermediate ×1.5, Advanced ×3 per exercise. Design/IT practice ×1, criterion submitted ×2, strand ×3.");
+  return lines.join("\n");
+}
+async function sendLesson(L, manual){
+  const ok = await sendMail("House Points", classLabel(L.cls), L.cls.teacher || "", emailText(L));
+  if (!ok){ if (manual) toast("Could not reach Google Forms. Try again."); return false; }
+  const s = load("sdc_hpsent", {}); s[L.key] = Date.now(); store("sdc_hpsent", s);
+  SDC.log("hpsent", { name:"(admin)", course:L.cls.course, grade:L.cls.grade, teacher:L.cls.teacher }, { lesson:L.key });
+  if (manual) toast("Emailed: " + classLabel(L.cls));
+  return true;
+}
+let sending = false;
+async function autoSend(){
+  if (sending || !parseForm(load(NOTIFY_KEY, ""))) return; sending = true;
+  try { for (const L of lessons()) if (L.lesson && L.ended && !L.sent && Date.now() - L.end < CATCHUP_H * 3600000 && L.top.length){ await sendLesson(L, false); await new Promise(r => setTimeout(r, 800)); } }
+  finally { sending = false; }
+  renderHP();
+}
+function renderHP(){
+  const all = lessons().filter(L => L.lesson || !L.ended).slice(0, 40);
+  if (!all.length){ $("hpList").innerHTML = `<div class="card muted">No lessons yet. Once students complete tasks through the platform, each class's lesson appears here.</div>`; return; }
+  const canMail = !!parseForm(load(NOTIFY_KEY, ""));
+  $("hpList").innerHTML = all.map((L, i) => {
+    const state = !L.ended ? `<span class="pill bad">● Live, last work ${fmtT(L.last)}</span>` : L.sent ? `<span class="pill ok">✓ Emailed ${fmtT(L.sent)}</span>` : !L.lesson ? `<span class="pill">Fewer than ${MIN_STUDENTS} students</span>` : `<span class="pill warn">Not emailed yet</span>`;
+    const btn = !L.ended ? `<button class="btn red sm" data-end="${i}">End lesson now and email</button>` : `<button class="btn ghost sm" data-send="${i}" ${canMail ? "" : "disabled"}>${L.sent ? "Email again" : "Email now"}</button>`;
+    return `<div class="card lesson ${L.ended ? "" : "live"}"><h3>${pill(L.cls.course)} ${esc(classLabel(L.cls))} ${state}</h3>
+      <div class="muted small">${esc(fmtD(L.start))}, ${esc(fmtT(L.start))}–${esc(fmtT(L.end))} · ${L.n} student${L.n === 1 ? "" : "s"} completed work${L.signins ? " · " + L.signins + " signed in" : ""}${L.wrong.length ? ` · <b style="color:var(--bad)">${L.wrong.length} wrong-course attempt${L.wrong.length === 1 ? "" : "s"}</b>` : ""}</div>
+      <ol class="top5">${L.top.map(s => `<li><b>${esc(s.name)}</b><span class="small">${s.tasks} task${s.tasks === 1 ? "" : "s"} · score ${fmtScore(s.score)}${levelName(s.course, s.level) ? " · " + esc(levelName(s.course, s.level)) : ""}</span></li>`).join("")}</ol>
+      <div class="row" style="margin-top:10px">${btn}</div></div>`;
+  }).join("");
+  $("hpList").querySelectorAll("[data-send]").forEach(b => b.onclick = async () => { b.disabled = true; await sendLesson(all[+b.dataset.send], true); renderHP(); });
+  $("hpList").querySelectorAll("[data-end]").forEach(b => b.onclick = async () => {
+    const L = all[+b.dataset.end]; const f = load("sdc_forced", {}); f[L.key] = Date.now(); store("sdc_forced", f);
+    const L2 = lessons().find(x => x.key === L.key) || L;
+    if (canMail) await sendLesson(L2, true); else toast("Lesson ended. Add the alerts form in Setup to email it.");
+    renderHP();
+  });
+}
+
+/* ---------------- students ---------------- */
+function students(){
+  const S = {};
+  Object.keys(PYACCTS).forEach(k => { S[k] = Object.assign({ key:k, last:0, signins:0 }, PYACCTS[k]); });
+  ROWS.forEach(r => {
+    if (["signin","signup","task","wrongcourse"].indexOf(r.type) < 0 || !r.acct.name || r.acct.name === "(admin)") return;
+    const k = SDC.keyOf(r.acct.email, r.acct.name), s = S[k] = S[k] || { key:k, last:0, signins:0 };
+    if (r.type !== "wrongcourse"){ Object.assign(s, { name:r.acct.name, email:r.acct.email || s.email || "", grade:r.acct.grade || s.grade, teacher:r.acct.teacher || s.teacher, course:r.acct.course || s.course, level:r.acct.level || s.level, cls:r.acct.cls || s.cls || "" }); }
+    else { s.name = s.name || r.acct.name; s.email = s.email || r.acct.email; s.wrong = (s.wrong || 0) + 1; }
+    if (r.type === "signin" || r.type === "signup"){ s.signins++; s.last = Math.max(s.last, r.when); }
+  });
+  return Object.values(S).filter(s => s.name).sort((a, b) => (a.course || "").localeCompare(b.course || "") || String(a.grade).localeCompare(String(b.grade), undefined, { numeric:true }) || a.name.localeCompare(b.name));
+}
+function renderStudents(){
+  const q = $("stQ").value.trim().toLowerCase(), cf = $("stC").value;
+  const list = students().filter(s => (!cf || s.course === cf) && (!q || (s.name + " " + (s.email || "")).toLowerCase().indexOf(q) >= 0));
+  $("stCount").textContent = list.length;
+  $("stTbl").innerHTML = `<tr><th>Student</th><th>Course</th><th>Grade</th><th>Level / class</th><th>Teacher</th><th>Last sign-in</th><th></th></tr>` +
+    (list.length ? list.map((s, i) => `<tr><td><b>${esc(s.name)}</b><div class="em">${esc(s.email || "no email on record")}</div>${s.wrong ? `<span class="pill bad">${s.wrong} wrong-course</span>` : ""}</td>
+      <td>${pill(s.course)}</td><td>${s.grade ? "G" + esc(s.grade) : ""}</td><td>${esc(s.course === "cs" ? levelName("cs", s.level) : s.cls || "")}</td><td>${esc(s.teacher || "")}</td>
+      <td class="small">${s.last ? esc(fmtDT(s.last)) : "<span class='muted'>not yet through the platform</span>"}</td>
+      <td><button class="btn ghost sm" data-ed="${i}">Change</button></td></tr>`).join("") : `<tr><td colspan="7" class="muted">No students yet. They appear here after signing in through the platform.</td></tr>`);
+  $("stTbl").querySelectorAll("[data-ed]").forEach(b => b.onclick = () => editStudent(list[+b.dataset.ed]));
+}
+$("stQ").oninput = renderStudents; $("stC").onchange = renderStudents;
+$("stAdd").onclick = () => editStudent({ name:"", email:"", course:"cs", grade:"", teacher:"", level:"", cls:"", isNew:true });
+
+async function signAssign(o){
+  const json = JSON.stringify(o);
+  const sig = new Uint8Array(await crypto.subtle.sign({ name:"ECDSA", hash:"SHA-256" }, KEYS.sig, TE.encode(json)));
+  return X.u8ToB64Text(json) + "." + X.e64(sig);
+}
+function editStudent(s){
+  const bg = document.createElement("div"); bg.className = "modal-bg";
+  bg.innerHTML = `<div class="modal" role="dialog" aria-label="Change student"><h2>${s.isNew ? "Set up a student" : esc(s.name)}</h2>
+    <p class="muted small" style="margin-top:4px">${s.isNew ? "Use this before a student signs up, to put them in the right course and grade. Use the exact school email they will sign up with." : esc(s.email || "Older Python account without an email: matched by name.")}</p>
+    ${s.isNew ? `<label class="f">Full name<input class="t" id="eName"></label><label class="f">School email<input class="t" id="eEmail" type="email" placeholder="name@sisd.ae"></label>` : ""}
+    <div id="eNow" class="notice ok small">Checking current settings…</div>
+    <div class="grid2"><label class="f">Course<select class="t" id="eC">${Object.keys(C).map(c => `<option value="${c}">${esc(C[c].name)}</option>`).join("")}</select></label>
+      <label class="f">Grade<select class="t" id="eG"></select></label></div>
+    <div class="grid2"><label class="f" id="eLRow">Level<select class="t" id="eL"></select></label>
+      <label class="f">Teacher<select class="t" id="eT"></select></label></div>
+    <div id="eWarn"></div><div id="eMsg"></div>
+    <div class="row" style="margin-top:16px"><button class="btn" id="eSave">Save change</button><button class="btn ghost" id="eCancel">Cancel</button></div></div>`;
+  document.body.appendChild(bg);
+  const q = sel => bg.querySelector(sel), close = () => bg.remove();
+  bg.onclick = e => { if (e.target === bg) close(); }; q("#eCancel").onclick = close;
+  const fill = () => {
+    const c = q("#eC").value, g = q("#eG").value;
+    q("#eG").innerHTML = C[c].grades.map(x => `<option value="${x}">Grade ${x}</option>`).join("");
+    if (C[c].grades.indexOf(g) >= 0) q("#eG").value = g;
+    const G = q("#eG").value, l = q("#eL").value;
+    let opts = [];
+    if (c === "cs") opts = pathsFor(G).map(p => [p, PATHS[p]]);
+    else if (c === "design" && CLASSES[G] && CLASSES[G].length > 1) opts = CLASSES[G];
+    q("#eLRow").classList.toggle("hidden", !opts.length);
+    q("#eLRow").firstChild.textContent = c === "cs" ? "Level" : "Class";
+    q("#eL").innerHTML = opts.map(o => `<option value="${o[0]}">${esc(o[1])}</option>`).join("");
+    if (opts.some(o => o[0] === l)) q("#eL").value = l;
+    const t = q("#eT").value; q("#eT").innerHTML = TEACHERS[c].map(x => `<option>${esc(x)}</option>`).join("");
+    const tn = TEACHERS[c].find(x => x.split(" ").pop() === String(t || "").split(" ").pop()); if (tn) q("#eT").value = tn;
+    const from = s.course;
+    q("#eWarn").innerHTML = !s.isNew && from && from !== c ? `<div class="notice warn small"><b>Changing course.</b> ${esc(s.name)} will be stopped from ${esc(C[from].name)} and can only sign into ${esc(C[c].name)}.` +
+      ((from === "cs") !== (c === "cs") ? ` These are separate courses, so they will need to <b>sign up</b> for ${esc(C[c].name)} once. Their ${esc(C[from].name)} work is kept.` : ` Their account and work move with them.`) + `</div>` : "";
+  };
+  q("#eC").value = C[s.course] ? s.course : "cs"; fill();
+  if (s.grade) { q("#eG").value = String(s.grade); } fill();
+  if (s.course === "cs" && s.level) q("#eL").value = s.level; if (s.course !== "cs" && s.cls) q("#eL").value = s.cls;
+  q("#eT").value = TEACHERS[q("#eC").value].indexOf(s.teacher) >= 0 ? s.teacher : q("#eT").value; fill();
+  ["#eC", "#eG", "#eL"].forEach(x => q(x).onchange = fill);
+  if (!s.isNew) SDC.lookup(s.email, s.name).then(L => {
+    const A = L.assign, R = L.reg;
+    q("#eNow").innerHTML = A ? `Set by you: <b>${esc(C[A.c] ? C[A.c].name : A.c)}, Grade ${esc(A.g)}</b>${A.l ? " · " + esc(PATHS[A.l] || A.l) : ""}${A.t ? " · " + esc(A.t) : ""} (${esc(fmtDT(A.at))})`
+      : R ? `Registered at sign-up: <b>${esc(C[R.c] ? C[R.c].name : R.c)}${R.g ? ", Grade " + esc(R.g) : ""}</b>. Not changed by you yet.` : "Not registered through the platform yet (registers at their next sign-in).";
+  }).catch(() => { q("#eNow").className = "notice warn small"; q("#eNow").textContent = "Couldn't check the current settings (no connection). You can still save."; });
+  else q("#eNow").classList.add("hidden");
+  q("#eSave").onclick = async () => {
+    const name = s.isNew ? q("#eName").value.trim().replace(/\s+/g, " ") : s.name, email = s.isNew ? q("#eEmail").value.trim().toLowerCase() : (s.email || "");
+    if (s.isNew && (name.split(" ").length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))){ q("#eMsg").innerHTML = `<div class="notice bad">Type the student's full name and school email.</div>`; return; }
+    const c = q("#eC").value, g = q("#eG").value, lv = q("#eL").value || "", t = q("#eT").value;
+    const id = await SDC.idOf(email, name);
+    const o = { k:id, c, g, t, l: c === "cs" ? lv : "", cls: c === "design" ? lv : "", at: Date.now() };
+    q("#eSave").disabled = true;
+    try { SDC.sendRow("S", id, await signAssign(o)); }
+    catch(e){ q("#eMsg").innerHTML = `<div class="notice bad">Could not sign the change: ${esc(e.message)}</div>`; q("#eSave").disabled = false; return; }
+    SDC.log("adminchange", { name:"(admin)", course:c, grade:g, teacher:t }, { student:{ name, email }, to:{ c, g, l:o.l, cls:o.cls, t }, from:{ c:s.course || "", g:s.grade || "", l:s.level || "", t:s.teacher || "" } });
+    close(); toast("Saved. " + name.split(" ")[0] + " gets this at their next sign-in.");
+  };
+}
+
+/* ---------------- sign-in log ---------------- */
+function renderLog(){
+  const f = $("lgF").value;
+  const list = ROWS.filter(r => ["signin","signup","wrongcourse"].indexOf(r.type) >= 0 && (!f || r.type === f)).slice().reverse().slice(0, 400);
+  $("lgCount").textContent = list.length;
+  const what = r => r.type === "wrongcourse" ? `<span class="pill bad">⛔ Stopped</span> tried ${esc(C[r.acct.course] ? C[r.acct.course].name : r.acct.course)}${r.registered ? `, registered for <b>${esc(C[r.registered] ? C[r.registered].name : r.registered)}</b>` : r.reason === "grade" ? " (not Grade 10)" : ""}${r.signup ? " (sign-up)" : ""}`
+    : r.type === "signup" ? `<span class="pill ok">New</span> signed up` : `signed in${r.unchecked ? ` <span class="pill warn">offline: not checked</span>` : ""}`;
+  $("lgTbl").innerHTML = `<tr><th>When</th><th>Student</th><th>Course chosen</th><th>What happened</th></tr>` +
+    (list.length ? list.map(r => `<tr><td class="small">${esc(fmtDT(r.when))}</td><td><b>${esc(r.acct.name || "Unknown")}</b><div class="em">${esc([r.acct.email, r.acct.grade ? "G" + r.acct.grade : "", r.acct.teacher].filter(Boolean).join(" · "))}</div></td><td>${pill(r.acct.course)}</td><td>${what(r)}</td></tr>`).join("")
+      : `<tr><td colspan="4" class="muted">No sign-ins yet.</td></tr>`);
+}
+$("lgF").onchange = renderLog;
+
+function renderAll(){ renderHP(); renderStudents(); renderLog(); }
+let timer = null;
+function start(){ paintSetup(); renderAll(); refresh(); clearInterval(timer); timer = setInterval(refresh, POLL_MS); }
+})();
+</script>
+</body>
+</html>

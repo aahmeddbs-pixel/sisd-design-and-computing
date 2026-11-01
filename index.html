@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SISD Design and Computing</title>
+<meta name="referrer" content="no-referrer">
+<script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
+<script src="sdc.js"></script>
+<style>
+:root{
+  --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --red-d:#b81f30; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
+  --ok:#1E8A55; --okbg:#E3F4EA; --warn:#8A4B00; --warnbg:#FFF2DC; --bad:#A3172A; --badbg:#FBE5E8; --r:14px;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0E1626; --card:#16213A; --ink:#E7ECF6; --muted:#9AA7C2; --line:#2A3858; --soft:#1D2A47; --okbg:#143326; --ok:#47C487; --warnbg:#3A2C10; --warn:#F0B44C; --badbg:#3E1820; --bad:#FF8A98; color-scheme:dark}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 Arial,Helvetica,sans-serif;min-height:100vh}
+button{font:inherit;cursor:pointer;color:inherit}
+.hidden{display:none!important}
+.top{background:var(--navy);color:#fff;border-bottom:4px solid var(--red)}
+.top .in{max-width:1080px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:12px}
+.logo{background:var(--red);border-radius:7px;padding:4px 9px;font-weight:900;letter-spacing:.06em;font-size:.9rem}
+.brand{font-weight:900;font-size:1.15rem}
+.top .staff{margin-left:auto;background:none;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:4px 12px;color:#fff;font-weight:700;font-size:.85rem}
+main{max-width:1080px;margin:0 auto;padding:22px 16px 40px}
+.hero{display:grid;grid-template-columns:1fr 1.15fr;gap:22px;align-items:start}
+@media(max-width:860px){.hero{grid-template-columns:1fr}}
+.art{background:linear-gradient(140deg,var(--navy) 58%,var(--red));color:#fff;border-radius:var(--r);padding:28px}
+.art h1{font-size:2.1rem;line-height:1.12;font-weight:900}
+.art p{opacity:.92;margin-top:12px;font-size:1.05rem}
+.art ul{list-style:none;margin-top:18px;display:grid;gap:10px}
+.art li{display:flex;gap:10px;align-items:flex-start;background:rgba(0,0,0,.18);border-radius:10px;padding:10px 12px}
+.art li b{display:block}
+.art .ic{width:34px;height:34px;flex:none;border-radius:9px;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;font-weight:900;font-family:Menlo,Consolas,monospace}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:22px;box-shadow:0 2px 10px rgba(11,33,73,.07)}
+.tabs{display:flex;gap:6px;background:var(--soft);border-radius:12px;padding:5px;margin-bottom:18px}
+.tabs button{flex:1;border:none;background:none;border-radius:9px;padding:10px;font-weight:800;color:var(--muted)}
+.tabs button[aria-selected="true"]{background:var(--card);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+h2{font-size:1.35rem;font-weight:900}
+.step{font-size:.78rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--red);margin:18px 0 8px}
+.courses{display:grid;gap:10px}
+.course{display:flex;gap:12px;align-items:center;text-align:left;border:2px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--card);width:100%}
+.course:hover{border-color:var(--navy)}
+.course[aria-pressed="true"]{border-color:var(--red);background:color-mix(in srgb,var(--red) 7%,var(--card))}
+.course .ic{width:44px;height:44px;flex:none;border-radius:11px;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-family:Menlo,Consolas,monospace}
+.course[aria-pressed="true"] .ic{background:var(--red)}
+.course b{display:block;font-size:1.05rem}
+.course small{color:var(--muted)}
+.course .tag{margin-left:auto;font-size:.75rem;font-weight:800;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 8px;white-space:nowrap}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:2px solid var(--line);background:var(--card);border-radius:999px;padding:8px 16px;font-weight:800}
+.chip[aria-pressed="true"]{border-color:var(--red);background:var(--red);color:#fff}
+.notice{border-radius:12px;padding:12px 14px;margin-top:16px;font-size:.95rem}
+.notice.warn{background:var(--warnbg);color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 35%,transparent)}
+.notice.bad{background:var(--badbg);color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 35%,transparent)}
+.notice.ok{background:var(--okbg);color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 35%,transparent)}
+.notice b{font-weight:900}
+.notice ul{margin:6px 0 0 18px}
+.agree{display:flex;gap:10px;align-items:flex-start;margin-top:14px;font-weight:700;cursor:pointer}
+.agree input{width:20px;height:20px;margin-top:2px;accent-color:var(--red);flex:none}
+.go{width:100%;margin-top:16px;border:none;border-radius:12px;padding:14px 18px;background:var(--navy);color:#fff;font-weight:900;font-size:1.08rem}
+.go:hover{background:var(--navy-d)}
+.go:disabled{opacity:.45;cursor:not-allowed}
+.summary{margin-top:14px;border:2px dashed var(--line);border-radius:12px;padding:12px 14px;font-weight:700}
+.summary span{color:var(--red)}
+.foot{text-align:center;color:var(--muted);font-size:.85rem;margin-top:26px}
+.modal-bg{position:fixed;inset:0;background:rgba(8,15,30,.55);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
+.modal{background:var(--card);border-radius:var(--r);max-width:440px;width:100%;padding:22px;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.modal h3{font-size:1.15rem;font-weight:900;margin-bottom:6px}
+.modal a,.modal button.link{display:flex;gap:10px;align-items:center;border:2px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:10px;color:var(--ink);text-decoration:none;font-weight:800;background:var(--card);width:100%;text-align:left}
+.modal a:hover,.modal button.link:hover{border-color:var(--navy)}
+.modal small{display:block;color:var(--muted);font-weight:400}
+.modal .close{margin-top:14px;border:none;background:none;color:var(--muted);font-weight:800;text-decoration:underline}
+</style>
+</head>
+<body>
+<header class="top"><div class="in"><span class="logo">SISD</span><span class="brand">Design and Computing</span><button class="staff" id="staffBtn">Staff</button></div></header>
+<main>
+  <div class="hero">
+    <section class="art">
+      <h1>One place for Computer Science, Design and IT</h1>
+      <p>Sign in to the course you are registered for and carry on exactly where you stopped, on any computer.</p>
+      <ul>
+        <li><span class="ic">&lt;/&gt;</span><span><b>Computer Science</b>Python lessons, exercises and unlimited practice. Grades 6, 7, 8, 11 and 12.</span></li>
+        <li><span class="ic">✎</span><span><b>Design</b>IB MYP Design projects, Criteria A to D. Grades 6, 7, 8 and 10.</span></li>
+        <li><span class="ic">⇄</span><span><b>IT</b>Networks and network security. Grade 10 only.</span></li>
+      </ul>
+    </section>
+    <section class="card">
+      <div class="tabs" role="tablist"><button role="tab" id="tIn" aria-selected="true">Sign in</button><button role="tab" id="tUp" aria-selected="false">New here? Sign up</button></div>
+      <div id="msg"></div>
+
+      <!-- SIGN IN -->
+      <div id="paneIn">
+        <h2>Welcome back</h2>
+        <div class="step">Which course are you signing into?</div>
+        <div class="courses" id="inCourses"></div>
+        <div class="notice warn"><b>⚠️ Be careful when you choose.</b>
+          <ul>
+            <li>You will <b>only</b> see the course you choose here.</li>
+            <li>Your teacher gets a log of every sign-in showing <b>which course you signed into</b>.</li>
+            <li>If you choose a course you are not registered for, you will be stopped and your teacher will see it.</li>
+          </ul></div>
+        <button class="go" id="inGo" disabled>Choose your course</button>
+      </div>
+
+      <!-- SIGN UP -->
+      <div id="paneUp" class="hidden">
+        <h2>Create your account</h2>
+        <div class="step">1 · Choose your course</div>
+        <div class="courses" id="upCourses"></div>
+        <div id="gradeBox" class="hidden">
+          <div class="step">2 · Choose your grade</div>
+          <div class="chips" id="upGrades"></div>
+        </div>
+        <div id="confirmBox" class="hidden">
+          <div class="summary" id="upSummary"></div>
+          <div class="notice warn"><b>⚠️ Check this carefully.</b> After you sign up you will <b>only</b> see this course. You cannot change your course or grade yourself: <b>only your teacher (the admin) can</b>. Your teacher gets a log showing what you signed up for.</div>
+          <label class="agree"><input type="checkbox" id="upAgree"> This is my course and my grade.</label>
+        </div>
+        <button class="go" id="upGo" disabled>Choose your course</button>
+      </div>
+    </section>
+  </div>
+  <p class="foot">Swiss International Scientific School Dubai · SISD Design and Computing</p>
+</main>
+
+<script>
+(function(){
+"use strict";
+const $ = id => document.getElementById(id), esc = SDC.esc, C = SDC.COURSES;
+let inCourse = null, upCourse = null, upGrade = null;
+
+function courseBtn(c, pressed){
+  const k = C[c], only = c === "it" ? "Grade 10 only" : "G" + k.grades.join(", ");
+  return `<button class="course" data-c="${c}" aria-pressed="${pressed ? "true" : "false"}"><span class="ic">${esc(k.icon)}</span><span><b>${esc(k.name)}</b><small>${esc(k.blurb)}</small></span><span class="tag">${esc(only)}</span></button>`;
+}
+function paint(){
+  $("inCourses").innerHTML = Object.keys(C).map(c => courseBtn(c, c === inCourse)).join("");
+  $("upCourses").innerHTML = Object.keys(C).map(c => courseBtn(c, c === upCourse)).join("");
+  $("inCourses").querySelectorAll(".course").forEach(b => b.onclick = () => { inCourse = b.dataset.c; paint(); });
+  $("upCourses").querySelectorAll(".course").forEach(b => b.onclick = () => { upCourse = b.dataset.c; if (upGrade && C[upCourse].grades.indexOf(upGrade) < 0) upGrade = null; if (upCourse === "it") upGrade = "10"; $("upAgree").checked = false; paint(); });
+  $("inGo").disabled = !inCourse;
+  $("inGo").textContent = inCourse ? "Continue to " + C[inCourse].name + " sign-in →" : "Choose your course";
+  $("gradeBox").classList.toggle("hidden", !upCourse);
+  if (upCourse){
+    $("upGrades").innerHTML = C[upCourse].grades.map(g => `<button class="chip" data-g="${g}" aria-pressed="${g === upGrade}">Grade ${g}</button>`).join("");
+    $("upGrades").querySelectorAll(".chip").forEach(b => b.onclick = () => { upGrade = b.dataset.g; $("upAgree").checked = false; paint(); });
+  }
+  const ready = upCourse && upGrade;
+  $("confirmBox").classList.toggle("hidden", !ready);
+  if (ready) $("upSummary").innerHTML = `You are signing up for <span>${esc(C[upCourse].name)}</span>, <span>Grade ${esc(upGrade)}</span>.`;
+  $("upGo").disabled = !(ready && $("upAgree").checked);
+  $("upGo").textContent = !upCourse ? "Choose your course" : !upGrade ? "Choose your grade" : !$("upAgree").checked ? "Tick the box to confirm" : "Create my " + C[upCourse].name + " account →";
+}
+$("upAgree").onchange = paint;
+function tab(which){
+  $("tIn").setAttribute("aria-selected", which === "in"); $("tUp").setAttribute("aria-selected", which === "up");
+  $("paneIn").classList.toggle("hidden", which !== "in"); $("paneUp").classList.toggle("hidden", which !== "up");
+}
+$("tIn").onclick = () => tab("in"); $("tUp").onclick = () => tab("up");
+
+function goTo(gate){ SDC.setGate(gate); location.href = C[gate.course].app; }
+$("inGo").onclick = () => { if (inCourse) goTo({ mode:"signin", course:inCourse }); };
+$("upGo").onclick = () => { if (upCourse && upGrade && $("upAgree").checked) goTo({ mode:"signup", course:upCourse, grade:upGrade }); };
+
+/* messages coming back from a course page */
+(function(){
+  let note = ""; try { note = sessionStorage.getItem("sdc_msg") || ""; sessionStorage.removeItem("sdc_msg"); } catch(e){}
+  const m = new URLSearchParams(location.search).get("m");
+  const show = (html, kind) => $("msg").innerHTML = `<div class="notice ${kind}" style="margin:0 0 14px">${html}</div>`;
+  if (note) show(note, "bad");
+  else if (m === "out") show("You have signed out. Choose your course to sign in again.", "ok");
+  else if (m === "wrongapp") show("That page belongs to a different course. Choose your course below.", "warn");
+  if (m) history.replaceState(null, "", location.pathname);
+  SDC.clearGate();
+})();
+
+/* staff */
+$("staffBtn").onclick = () => {
+  const bg = document.createElement("div"); bg.className = "modal-bg";
+  bg.innerHTML = `<div class="modal" role="dialog" aria-label="Staff"><h3>Staff</h3><p style="color:var(--muted)">Teachers and the course admin.</p>
+    <a href="admin.html"><span>🔐</span><span>Platform admin<small>Students, courses and grades, sign-in log, House Points emails</small></span></a>
+    <button class="link" id="stDesign"><span>✎</span><span>Design and IT teacher tools<small>Criteria switches, live work, marking</small></span></button>
+    <a href="${C.cs.app}admin.html"><span>&lt;/&gt;</span><span>Computer Science admin<small>Python progress, PINs, answer key</small></span></a>
+    <button class="close">Close</button></div>`;
+  document.body.appendChild(bg);
+  bg.onclick = e => { if (e.target === bg || e.target.classList.contains("close")) bg.remove(); };
+  bg.querySelector("#stDesign").onclick = () => goTo({ mode:"staff", course:"design" });
+};
+paint();
+})();
+</script>
+</body>
+</html>
