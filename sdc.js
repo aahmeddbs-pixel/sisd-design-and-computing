@@ -219,7 +219,7 @@ function bindPickers(){ document.querySelectorAll(".sdcLang select").forEach(x =
   document.head.appendChild(css);
   const start = () => {
     protect(); bindPickers();
-    new MutationObserver(ms => { ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1){ if (n.matches && n.matches(KEEP)) protect(n.parentNode || n); else protect(n); } })); bindPickers(); }).observe(document.body, { childList:true, subtree:true });
+    new MutationObserver(ms => { ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1 && !(n.classList && n.classList.contains("sdcTmp"))){ if (n.matches && n.matches(KEEP)) protect(n.parentNode || n); else protect(n); } })); bindPickers(); }).observe(document.body, { childList:true, subtree:true });
     if (!window.SDC_ownLang && getLang() !== "en") setLang(getLang(), true);
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
@@ -246,7 +246,7 @@ function chunksOf(text){
   if (cur.trim()) out.push(cur); return out;
 }
 let readTok = 0, readBtn = null;
-function setBtn(b, on){ if (!b) return; b.setAttribute("aria-pressed", on ? "true" : "false"); const t = b.querySelector(".sdcLt"); if (t) t.textContent = on ? "Stop" : (b.dataset.label || "Listen"); }
+function setBtn(b, on){ if (!b) return; b.setAttribute("aria-pressed", on ? "true" : "false"); b.title = on ? "Stop reading" : (b.dataset.label || "Read this aloud"); const t = b.querySelector(".sdcLt"); if (t) t.textContent = on ? "Stop" : (b.dataset.label || "Listen"); }
 function stopReading(){ readTok++; try { speechSynthesis.cancel(); } catch(e){} setBtn(readBtn, false); readBtn = null; }
 function speak(text, onend){
   if (!canSpeak()) return false;
@@ -261,7 +261,8 @@ function speak(text, onend){
 const SKIP = "button,.sdcListen,.sdcLang,input,select,textarea,svg,img,canvas,video,script,style,pre,code,.console,.editor,.ed-wrap,.gutter,.snip,.listen,[aria-hidden=true],.hidden,[hidden]";
 function textOf(el){
   const c = el.cloneNode(true); c.querySelectorAll(SKIP).forEach(n => n.remove());
-  const box = document.createElement("div"); box.style.cssText = "position:absolute;left:-10000px;top:0;width:700px"; box.appendChild(c); document.body.appendChild(box);
+  const box = document.createElement("div"); box.className = "sdcTmp notranslate"; box.setAttribute("translate", "no"); box.setAttribute("aria-hidden", "true");
+  box.style.cssText = "position:absolute;left:-10000px;top:0;width:700px"; box.appendChild(c); document.body.appendChild(box);
   const t = box.innerText; box.remove(); return t.replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu, " ");
 }
 function readEl(el, b){
@@ -271,29 +272,42 @@ function readEl(el, b){
   readBtn = b; setBtn(b, true);
   if (!speak(t, () => { setBtn(b, false); if (readBtn === b) readBtn = null; })) setBtn(b, false);
 }
-function listenButton(label){
-  const b = document.createElement("button"); b.type = "button"; b.className = "sdcListen notranslate"; b.setAttribute("translate", "no"); b.setAttribute("aria-pressed", "false"); b.dataset.label = label || "Listen";
-  b.title = "Read this aloud"; b.innerHTML = `<span aria-hidden="true">🔊</span> <span class="sdcLt">${label || "Listen"}</span>`;
-  return b;
+const SPEAKER = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>';
+function listenButton(inButton){
+  // inside a clickable card the speaker is a span, so it never opens the card
+  const b = document.createElement(inButton ? "span" : "button"); if (!inButton) b.type = "button"; else { b.setAttribute("role", "button"); b.tabIndex = 0; }
+  b.className = "sdcListen notranslate"; b.setAttribute("translate", "no"); b.setAttribute("aria-pressed", "false"); b.setAttribute("aria-label", "Read this aloud"); b.title = "Read this aloud";
+  b.innerHTML = SPEAKER; return b;
 }
 let LISTEN_SEL = null;
+let scanning = false;
 function addListen(root){
-  if (!LISTEN_SEL || !canSpeak()) return;
-  const els = [...(root.querySelectorAll ? root.querySelectorAll(LISTEN_SEL) : [])]; if (root.matches && root.matches(LISTEN_SEL)) els.push(root);
-  els.forEach(el => {
-    if (el.tagName === "BUTTON" || el.closest("button") || el.querySelector(":scope > .sdcListen") || el.querySelector(":scope > .listen")) return;
-    if (el.closest("[data-read]") || el.querySelector("[data-read]")) return;   // the Design course reads these itself
-    if (textOf(el).trim().length < 25) return;
-    const b = listenButton(); b.onclick = e => { e.stopPropagation(); readEl(el, b); }; el.prepend(b);
-  });
+  if (!LISTEN_SEL || !canSpeak() || scanning) return;
+  scanning = true;
+  try {
+    const els = new Set();
+    LISTEN_SEL.split(",").map(x => x.trim()).filter(Boolean).forEach(sel => { try { root.querySelectorAll(sel).forEach(e => els.add(e)); } catch(e){} });   // one bad selector never stops the rest
+    els.forEach(el => {
+      if (el.closest("#sdcStrip,.sdcTmp,pre,code,textarea") || el.querySelector(":scope > .sdcListen") || el.querySelector(":scope > .listen")) return;
+      if (el.closest("[data-read]") || el.querySelector("[data-read]")) return;   // the Design course reads these with its own speaker
+      if (String(el.textContent || "").replace(/\s+/g, " ").trim().length < 25) return;
+      const inBtn = el.tagName === "BUTTON" || !!el.closest("button"), b = listenButton(inBtn);
+      const go = e => { e.stopPropagation(); e.preventDefault(); readEl(el, b); };
+      b.addEventListener("click", go); b.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") go(e); });
+      el.prepend(b);
+    });
+  } finally { scanning = false; }
 }
 /* sels: CSS selectors of text sections that get their own Listen button */
 function listen(sels){
   LISTEN_SEL = sels;
   const css = document.createElement("style");
-  css.textContent = ".sdcListen{float:right;margin:0 0 6px 10px;display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(27,45,78,.25);background:#E9EDF5;color:#1B2D4E;border-radius:999px;padding:4px 11px;font:700 12.5px Arial,Helvetica,sans-serif;cursor:pointer;line-height:1.2;position:relative;z-index:2}.sdcListen[aria-pressed=true]{background:#DC2B3E;border-color:#DC2B3E;color:#fff}@media (prefers-color-scheme: dark){.sdcListen{background:#1D2A47;color:#E7ECF6;border-color:#2A3858}}";
+  css.textContent = ".sdcListen{float:right;margin:0 0 6px 10px;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;border:1px solid rgba(27,45,78,.25);background:#E9EDF5;color:#1B2D4E;border-radius:50%;cursor:pointer;line-height:1;position:relative;z-index:2;flex:none}.sdcListen:hover{background:#1B2D4E;color:#fff}.sdcListen:focus-visible{outline:3px solid #DC2B3E;outline-offset:2px}.sdcListen[aria-pressed=true]{background:#DC2B3E;border-color:#DC2B3E;color:#fff}@media (prefers-color-scheme: dark){.sdcListen{background:#1D2A47;color:#E7ECF6;border-color:#2A3858}}";
   document.head.appendChild(css);
-  const run = () => { addListen(document); let t = null; new MutationObserver(() => { clearTimeout(t); t = setTimeout(() => addListen(document), 150); }).observe(document.body, { childList:true, subtree:true }); };
+  const ours = n => n.nodeType !== 1 || (n.classList && (n.classList.contains("sdcTmp") || n.classList.contains("sdcListen")));
+  const run = () => { addListen(document); let t = null;
+    new MutationObserver(ms => { if (scanning || ms.every(m => [...m.addedNodes, ...m.removedNodes].every(ours))) return;   // ignore our own changes
+      clearTimeout(t); t = setTimeout(() => addListen(document), 250); }).observe(document.body, { childList:true, subtree:true }); };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", run); else run();
   window.addEventListener("pagehide", stopReading);
 }
