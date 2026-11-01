@@ -246,7 +246,7 @@ function chunksOf(text){
   if (cur.trim()) out.push(cur); return out;
 }
 let readTok = 0, readBtn = null;
-function setBtn(b, on){ if (!b) return; b.setAttribute("aria-pressed", on ? "true" : "false"); b.title = on ? "Stop reading" : (b.dataset.label || "Read this aloud"); const t = b.querySelector(".sdcLt"); if (t) t.textContent = on ? "Stop" : (b.dataset.label || "Listen"); }
+function setBtn(b, on){ if (!b) return; b.setAttribute("aria-pressed", on ? "true" : "false"); if (b.classList.contains("sdcListen")) b.innerHTML = (on ? STOP_ICON : SPEAKER) + (b.classList.contains("sdcPage") ? `<span class="sdcLt">${on ? "Stop" : "Read to me"}</span>` : ""); b.title = on ? "Stop reading" : (b.dataset.label || "Read this aloud"); const t = b.querySelector(".sdcLt"); if (t && !b.classList.contains("sdcPage")) t.textContent = on ? "Stop" : (b.dataset.label || "Listen"); }
 function stopReading(){ readTok++; try { speechSynthesis.cancel(); } catch(e){} setBtn(readBtn, false); readBtn = null; }
 function speak(text, onend){
   if (!canSpeak()) return false;
@@ -258,7 +258,7 @@ function speak(text, onend){
     speechSynthesis.speak(u); };
   next(); return true;
 }
-const SKIP = "button,.sdcListen,.sdcLang,input,select,textarea,svg,img,canvas,video,script,style,pre,code,.console,.editor,.ed-wrap,.gutter,.snip,.listen,[aria-hidden=true],.hidden,[hidden]";
+const SKIP = "button,.sdcListen,.sdcLang,input,select,textarea,svg,img,canvas,video,script,style,.console,.editor,.ed-wrap,.gutter,.snip,.listen,[aria-hidden=true],.hidden,[hidden]";
 function textOf(el){
   const c = el.cloneNode(true); c.querySelectorAll(SKIP).forEach(n => n.remove());
   const box = document.createElement("div"); box.className = "sdcTmp notranslate"; box.setAttribute("translate", "no"); box.setAttribute("aria-hidden", "true");
@@ -268,10 +268,13 @@ function textOf(el){
 function readEl(el, b){
   if (b && b.getAttribute("aria-pressed") === "true"){ stopReading(); return; }
   try { if (typeof window.SDC_beforeRead === "function") window.SDC_beforeRead(); } catch(e){}
-  stopReading(); const t = textOf(el); if (!t.trim()) return;
+  stopReading();
+  const h = el.previousElementSibling, head = h && /^H[1-4]$/.test(h.tagName) && !h.querySelector(".sdcListen") ? textOf(h).trim() : "";
+  const t = (head ? head + ". " : "") + textOf(el); if (!t.trim()) return;
   readBtn = b; setBtn(b, true);
   if (!speak(t, () => { setBtn(b, false); if (readBtn === b) readBtn = null; })) setBtn(b, false);
 }
+const STOP_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/></svg>';
 const SPEAKER = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>';
 function listenButton(inButton){
   // inside a clickable card the speaker is a span, so it never opens the card
@@ -279,32 +282,40 @@ function listenButton(inButton){
   b.className = "sdcListen notranslate"; b.setAttribute("translate", "no"); b.setAttribute("aria-pressed", "false"); b.setAttribute("aria-label", "Read this aloud"); b.title = "Read this aloud";
   b.innerHTML = SPEAKER; return b;
 }
-let LISTEN_SEL = null;
+let LISTEN_SEL = null, LISTEN_FINE = "", LISTEN_WHOLE = false;
 let scanning = false;
 function addListen(root){
   if (!LISTEN_SEL || !canSpeak() || scanning) return;
   scanning = true;
   try {
-    const els = new Set();
-    LISTEN_SEL.split(",").map(x => x.trim()).filter(Boolean).forEach(sel => { try { root.querySelectorAll(sel).forEach(e => els.add(e)); } catch(e){} });   // one bad selector never stops the rest
-    els.forEach(el => {
+    const els = new Map();   // element -> fine (allowed inside a section that already reads itself, e.g. one question of a task)
+    const add = (list, fine) => String(list || "").split(",").map(x => x.trim()).filter(Boolean).forEach(sel => { try { root.querySelectorAll(sel).forEach(e => { if (!els.has(e) || fine) els.set(e, fine); }); } catch(e){} });   // one bad selector never stops the rest
+    add(LISTEN_SEL, false); add(LISTEN_FINE, true);
+    els.forEach((fine, el) => {
       if (el.closest("#sdcStrip,.sdcTmp,pre,code,textarea") || el.querySelector(":scope > .sdcListen") || el.querySelector(":scope > .listen")) return;
-      if (el.closest("[data-read]") || el.querySelector("[data-read]")) return;   // the Design course reads these with its own speaker
-      if (String(el.textContent || "").replace(/\s+/g, " ").trim().length < 25) return;
+      if (el.previousElementSibling && el.previousElementSibling.classList.contains("sdcPageBar")) return;
+      if (!LISTEN_WHOLE && (el.hasAttribute("data-read") || el.querySelector("[data-read]"))) return;   // the Design course reads these sections with its own speaker
+      if (!LISTEN_WHOLE && !fine && el.closest("[data-read]")) return;
+      if (String(el.textContent || "").replace(/\s+/g, " ").trim().length < (fine ? 12 : 25)) return;
       const inBtn = el.tagName === "BUTTON" || !!el.closest("button"), b = listenButton(inBtn);
+      if (LISTEN_WHOLE){ b.classList.add("sdcPage"); b.dataset.label = "Read this page to me"; b.innerHTML = SPEAKER + '<span class="sdcLt">Read to me</span>'; }
       const go = e => { e.stopPropagation(); e.preventDefault(); readEl(el, b); };
       b.addEventListener("click", go); b.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") go(e); });
+      if (LISTEN_WHOLE === "bar"){   // a page button sits in its own row just above the page content, so it never squeezes the layout
+        const bar = document.createElement("div"); bar.className = "sdcPageBar notranslate"; bar.setAttribute("translate", "no"); bar.appendChild(b);
+        if (el.parentNode) el.parentNode.insertBefore(bar, el); return; }
       el.prepend(b);
     });
   } finally { scanning = false; }
 }
 /* sels: CSS selectors of text sections that get their own Listen button */
-function listen(sels){
-  LISTEN_SEL = sels;
+/* whole = true: one speaker per page (the selectors name each page's main content) */
+function listen(sels, fine, whole){
+  LISTEN_SEL = sels; LISTEN_FINE = fine || ""; LISTEN_WHOLE = whole === "bar" ? "bar" : !!whole;
   const css = document.createElement("style");
-  css.textContent = ".sdcListen{float:right;margin:0 0 6px 10px;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;border:1px solid rgba(27,45,78,.25);background:#E9EDF5;color:#1B2D4E;border-radius:50%;cursor:pointer;line-height:1;position:relative;z-index:2;flex:none}.sdcListen:hover{background:#1B2D4E;color:#fff}.sdcListen:focus-visible{outline:3px solid #DC2B3E;outline-offset:2px}.sdcListen[aria-pressed=true]{background:#DC2B3E;border-color:#DC2B3E;color:#fff}@media (prefers-color-scheme: dark){.sdcListen{background:#1D2A47;color:#E7ECF6;border-color:#2A3858}}";
+  css.textContent = ".sdcListen{float:right;margin:0 0 6px 10px;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;border:1px solid rgba(27,45,78,.25);background:#E9EDF5;color:#1B2D4E;border-radius:50%;cursor:pointer;line-height:1;position:relative;z-index:2;flex:none}.sdcPageBar{display:flex;justify-content:flex-end;margin:0 0 8px}.sdcPageBar .sdcListen{float:none;margin:0}.sdcListen.sdcPage{width:auto;height:36px;padding:0 14px 0 12px;border-radius:999px;gap:7px;font:800 13.5px Arial,Helvetica,sans-serif;background:#1B2D4E;color:#fff;border-color:#1B2D4E}.sdcListen.sdcPage .sdcLt{display:inline}.sdcListen:hover{background:#1B2D4E;color:#fff}.sdcListen[aria-pressed=true]{background:#DC2B3E;border-color:#DC2B3E;color:#fff;animation:sdcPulse 1.2s ease-in-out infinite}@keyframes sdcPulse{50%{box-shadow:0 0 0 6px rgba(220,43,62,.18)}}.sdcListen:focus-visible{outline:3px solid #DC2B3E;outline-offset:2px}.sdcListen[aria-pressed=true]{background:#DC2B3E;border-color:#DC2B3E;color:#fff}@media (prefers-color-scheme: dark){.sdcListen{background:#1D2A47;color:#E7ECF6;border-color:#2A3858}}";
   document.head.appendChild(css);
-  const ours = n => n.nodeType !== 1 || (n.classList && (n.classList.contains("sdcTmp") || n.classList.contains("sdcListen")));
+  const ours = n => n.nodeType !== 1 || (n.classList && (n.classList.contains("sdcTmp") || n.classList.contains("sdcListen") || n.classList.contains("sdcPageBar")));
   const run = () => { addListen(document); let t = null;
     new MutationObserver(ms => { if (scanning || ms.every(m => [...m.addedNodes, ...m.removedNodes].every(ours))) return;   // ignore our own changes
       clearTimeout(t); t = setTimeout(() => addListen(document), 250); }).observe(document.body, { childList:true, subtree:true }); };
