@@ -175,19 +175,69 @@ async function canSignUp(email, name, c){
   return { ok:true, assign:L.assign };
 }
 
+/* ---------- language: one choice for the portal, both courses and the admin pages ----------
+   Uses Google's website translator. The choice is shared across all pages of the site (cookie on path /). */
+const LANGS = { en:"English", fr:"Français", ru:"Русский", es:"Español" };
+function getLang(){
+  let c = null; try { c = localStorage.getItem("sdc_lang"); } catch(e){}
+  if (!LANGS[c]){ const m = document.cookie.match(/googtrans=\/en\/([a-z]+)/); c = m && LANGS[m[1]] ? m[1] : "en"; }
+  return c;
+}
+function langCookie(code){
+  const exp = code === "en" ? "; expires=Thu, 01 Jan 1970 00:00:00 GMT" : "", v = code === "en" ? "" : "/en/" + code;
+  document.cookie = `googtrans=${v}; path=/${exp}`;
+  try { document.cookie = `googtrans=${v}; path=/; domain=${location.hostname}${exp}`; } catch(e){}
+}
+let gtLoaded = false;
+function loadTranslator(){
+  if (gtLoaded || offline()) return; gtLoaded = true;
+  let host = document.getElementById("gtHost"); if (!host){ host = document.createElement("div"); host.id = "gtHost"; document.body.appendChild(host); }
+  window.googleTranslateElementInit = () => { try { new google.translate.TranslateElement({ pageLanguage:"en", includedLanguages:"en,fr,ru,es", autoDisplay:false }, "gtHost"); } catch(e){} };
+  const sc = document.createElement("script"); sc.src = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"; document.body.appendChild(sc);
+}
+function setLang(code, first){
+  if (!LANGS[code]) code = "en";
+  try { localStorage.setItem("sdc_lang", code); } catch(e){}
+  document.documentElement.lang = code; langCookie(code);
+  document.querySelectorAll(".sdcLang select").forEach(x => { x.value = code; });
+  if (code === "en"){ if (!first && gtLoaded) location.reload(); return; }
+  loadTranslator();
+  let tries = 0; const t = setInterval(() => { const sel = document.querySelector(".goog-te-combo");
+    if (sel){ if (sel.value !== code){ sel.value = code; sel.dispatchEvent(new Event("change")); } clearInterval(t); } else if (++tries > 40) clearInterval(t); }, 250);
+}
+/* never translate code, program output, names typed by students or the language list itself */
+const KEEP = "code,pre,textarea,.editor,.ed-wrap,.console,.gutter,.snip,#whoPill,.sdcLang,.notranslate-auto";
+function protect(root){ (root || document).querySelectorAll(KEEP).forEach(e => { if (!e.classList.contains("notranslate")){ e.classList.add("notranslate"); e.setAttribute("translate", "no"); } }); }
+function langPicker(dark){
+  const c = dark ? "#fff" : "inherit", bd = dark ? "rgba(255,255,255,.35)" : "var(--line,#D8DEEA)";
+  return `<label class="sdcLang notranslate" translate="no" title="Language" style="display:inline-flex;align-items:center;gap:5px;border:1px solid ${bd};border-radius:999px;padding:3px 10px;font:700 13px Arial,Helvetica,sans-serif;color:${c};cursor:pointer"><span aria-hidden="true">🌐</span><select aria-label="Language" style="background:transparent;border:0;color:${c};font:inherit;cursor:pointer;outline:none">${Object.keys(LANGS).map(k => `<option value="${k}" style="color:#16223A" ${k === getLang() ? "selected" : ""}>${LANGS[k]}</option>`).join("")}</select></label>`;
+}
+function bindPickers(){ document.querySelectorAll(".sdcLang select").forEach(x => { if (!x.dataset.b){ x.dataset.b = 1; x.onchange = () => { if (typeof window.SDC_onLang === "function") window.SDC_onLang(x.value); else setLang(x.value); }; } }); }
+(function initLang(){
+  const css = document.createElement("style");
+  css.textContent = "#gtHost,.goog-te-banner-frame,.skiptranslate>iframe,#goog-gt-tt,.goog-te-balloon-frame,.VIpgJd-ZVi9od-ORHb-OEVmcd,.VIpgJd-ZVi9od-aZ2wEe-wOHMyf{display:none!important}body{top:0!important}.goog-text-highlight{background:none!important;box-shadow:none!important}";
+  document.head.appendChild(css);
+  const start = () => {
+    protect(); bindPickers();
+    new MutationObserver(ms => { ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1){ if (n.matches && n.matches(KEEP)) protect(n.parentNode || n); else protect(n); } })); bindPickers(); }).observe(document.body, { childList:true, subtree:true });
+    if (!window.SDC_ownLang && getLang() !== "en") setLang(getLang(), true);
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
+})();
+
 /* ---------- the strip at the top of each course page ---------- */
-function strip(c, onSignOut){
+function strip(c, onSignOut, noLang){
   if (document.getElementById("sdcStrip")) return;
   const C = course(c); if (!C) return;
   const d = document.createElement("div"); d.id = "sdcStrip";
   d.setAttribute("style", "background:#0f1c33;color:#fff;font:600 13px/1.3 Arial,Helvetica,sans-serif;padding:6px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;position:relative;z-index:30");
   d.innerHTML = `<span style="background:#DC2B3E;border-radius:5px;padding:2px 7px;font-weight:900;letter-spacing:.04em">SISD</span><span>Design and Computing</span><span style="opacity:.6">·</span><span>You are in: <b>${esc(C.name)}</b></span>
-    <button type="button" id="sdcLeave" style="margin-left:auto;background:none;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:999px;padding:3px 10px;font:inherit;cursor:pointer">Change course / sign out</button>`;
-  document.body.insertBefore(d, document.body.firstChild);
+    ${noLang ? "" : `<span style="margin-left:auto">${langPicker(true)}</span>`}<button type="button" id="sdcLeave" style="${noLang ? "margin-left:auto;" : ""}background:none;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:999px;padding:3px 10px;font:inherit;cursor:pointer">Change course / sign out</button>`;
+  document.body.insertBefore(d, document.body.firstChild); bindPickers();
   document.getElementById("sdcLeave").onclick = () => { if (onSignOut) onSignOut(); else leave("out"); };
 }
 function signedOutNotice(msg){ try { sessionStorage.setItem("sdc_msg", msg); } catch(e){} }
 
 return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, confirm, canSignUp, lookup, register,
-  log, task, strip, signedOutNotice, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
+  log, task, strip, signedOutNotice, LANGS, getLang, setLang, langPicker, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();

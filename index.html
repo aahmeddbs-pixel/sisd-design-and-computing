@@ -75,7 +75,7 @@ h2{font-size:1.35rem;font-weight:900}
 </style>
 </head>
 <body>
-<header class="top"><div class="in"><span class="logo">SISD</span><span class="brand">Design and Computing</span><button class="staff" id="staffBtn">Staff</button></div></header>
+<header class="top"><div class="in"><span class="logo">SISD</span><span class="brand">Design and Computing</span><span id="langSlot" style="margin-left:auto"></span><button class="staff" id="staffBtn" style="margin-left:0">Staff</button></div></header>
 <main>
   <div class="hero">
     <section class="art">
@@ -189,6 +189,7 @@ $("staffBtn").onclick = () => {
   bg.onclick = e => { if (e.target === bg || e.target.classList.contains("close")) bg.remove(); };
   bg.querySelector("#stDesign").onclick = () => goTo({ mode:"staff", course:"design" });
 };
+$("langSlot").innerHTML = SDC.langPicker(true);
 paint();
 })();
 </script>

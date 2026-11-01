@@ -24,6 +24,7 @@ button{cursor:pointer}
 .top .in{max-width:1180px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .logo{background:var(--red);border-radius:7px;padding:4px 9px;font-weight:900;letter-spacing:.06em;font-size:.9rem}
 .brand{font-weight:900;font-size:1.1rem}
+.top .sdcLang{padding:3px 10px!important}
 .top a,.top button{color:#fff;font-weight:700;font-size:.85rem;background:none;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:4px 12px;text-decoration:none}
 .top .sp{margin-left:auto}
 main{max-width:1180px;margin:0 auto;padding:20px 16px 50px}
@@ -76,7 +77,7 @@ input.t:focus,select.t:focus{outline:none;border-color:var(--navy)}
 </head>
 <body>
 <header class="top"><div class="in"><span class="logo">SISD</span><span class="brand">Design and Computing · Admin</span>
-  <a class="sp" href="./">Student sign-in page</a><a href="/python-pathways/admin.html">CS admin</a><button id="outBtn" class="hidden">Lock</button></div></header>
+  <span class="sp" id="langSlot"></span><a href="./">Student sign-in page</a><a href="/python-pathways/admin.html">CS admin</a><button id="outBtn" class="hidden">Lock</button></div></header>
 <main>
   <!-- LOCKED -->
   <div id="locked" class="card login">
@@ -457,6 +458,7 @@ $("lgF").onchange = renderLog;
 
 function renderAll(){ renderHP(); renderStudents(); renderLog(); }
 let timer = null;
+document.getElementById("langSlot").innerHTML = SDC.langPicker(true);
 function start(){ paintSetup(); renderAll(); refresh(); clearInterval(timer); timer = setInterval(refresh, POLL_MS); }
 })();
 </script>
