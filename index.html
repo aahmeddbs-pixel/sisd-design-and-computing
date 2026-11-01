@@ -190,6 +190,7 @@ $("staffBtn").onclick = () => {
   bg.querySelector("#stDesign").onclick = () => goTo({ mode:"staff", course:"design" });
 };
 $("langSlot").innerHTML = SDC.langPicker(true);
+SDC.listen(".art, .notice, .summary");
 paint();
 })();
 </script>
