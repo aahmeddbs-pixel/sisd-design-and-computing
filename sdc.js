@@ -234,10 +234,28 @@ try { speechSynthesis.onvoiceschanged = () => { voices = {}; }; speechSynthesis.
 function voiceFor(code){
   try { if (voices[code] !== undefined) return voices[code];
     const want = VOICE[code] || "en-GB", base = want.slice(0, 2), vs = speechSynthesis.getVoices();
-    const score = v => { const l = String(v.lang || "").replace("_", "-"); let n = l === want ? 10 : l.slice(0, 2) === base ? 6 : -99;
-      if (/natural|neural|premium|enhanced|google/i.test(v.name)) n += 3; if (!v.localService) n += 1; return n; };
+    // the most human-sounding voice this device offers: neural/natural voices first (Edge, Windows 11, Android),
+    // then premium/enhanced Apple voices and Google's voices; robotic engines last
+    const score = v => { const l = String(v.lang || "").replace("_", "-"), nm = String(v.name || ""); let n = l === want ? 20 : l.slice(0, 2) === base ? 12 : -999;
+      if (/natural|neural|online/i.test(nm)) n += 40;
+      if (/premium|enhanced|siri/i.test(nm)) n += 30;
+      if (/^google/i.test(nm)) n += 22;
+      if (/(samantha|daniel|serena|kate|karen|moira|tessa|libby|sonia|ryan|thomas|amelie|monica|jorge|paulina|milena|yuri)/i.test(nm)) n += 12;
+      if (/espeak|robot|compact|novelty|whisper|bad news|bells|zarvox|trinoids|albert|bahh|boing|bubbles|cellos|deranged|hysterical|organ|superstar|jester|wobble|fred|junior|ralph|kathy|grandma|grandpa|eddy|flo|reed|rocko|sandy|shelley/i.test(nm)) n -= 60;
+      if (!v.localService) n += 4;
+      return n; };
     const best = vs.map(v => [score(v), v]).filter(x => x[0] > 0).sort((a, b) => b[0] - a[0])[0];
     return (voices[code] = best ? best[1] : null); } catch(e){ return null; }
+}
+function humanise(t){
+  return String(t)
+    .replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFE0F]/gu, " ")   // emoji
+    .replace(/([A-Za-z_][\w.]*)\(\)/g, "$1")                       // print() -> print
+    .replace(/[→←↑↓•·|▶✓✔✗✘⬜⬛#*_~^`]+/g, ", ")
+    .replace(/\s*[-–—]\s+/g, ", ").replace(/\.{3}|…/g, ". ")
+    .replace(/\(([^)]*)\)/g, ", $1, ")                                // brackets become a short pause
+    .replace(/\s*,\s*(,\s*)+/g, ", ").replace(/,\s*([.!?])/g, "$1")
+    .replace(/\s+/g, " ").replace(/\s+([,.!?;:])/g, "$1").replace(/^[,\s]+/, "").trim();
 }
 function chunksOf(text){
   const parts = String(text).replace(/\s+/g, " ").trim().match(/[^.!?;:]+[.!?;:]*\s*/g) || [];
@@ -251,19 +269,38 @@ function stopReading(){ readTok++; try { speechSynthesis.cancel(); } catch(e){} 
 function speak(text, onend){
   if (!canSpeak()) return false;
   const my = ++readTok; try { speechSynthesis.cancel(); } catch(e){}
-  const code = getLang(), v = voiceFor(code), list = chunksOf(text); let i = 0;
+  const code = getLang(), v = voiceFor(code), list = chunksOf(humanise(text)); let i = 0;
   const next = () => { if (my !== readTok) return; if (i >= list.length){ onend && onend(); return; }
-    const u = new SpeechSynthesisUtterance(list[i++]); u.lang = VOICE[code] || "en-GB"; if (v) u.voice = v; u.rate = 0.97;
-    let done = false; const fin = () => { if (!done){ done = true; next(); } }; u.onend = fin; u.onerror = fin; setTimeout(fin, Math.max(6000, u.text.length * 110));
+    const u = new SpeechSynthesisUtterance(list[i++]); u.lang = VOICE[code] || "en-GB"; if (v) u.voice = v; u.rate = /natural|neural|online|premium|enhanced/i.test(v ? v.name : "") ? 1 : 0.93; u.pitch = 1;
+    let done = false; const fin = () => { if (!done){ done = true; setTimeout(next, 220); } }; u.onend = fin; u.onerror = fin; setTimeout(fin, Math.max(8000, u.text.length * 120));   // a short breath between sentences
     speechSynthesis.speak(u); };
   next(); return true;
 }
-const SKIP = "button,.sdcListen,.sdcLang,input,select,textarea,svg,img,canvas,video,script,style,.console,.editor,.ed-wrap,.gutter,.snip,.listen,[aria-hidden=true],.hidden,[hidden]";
+const SKIP = ".nav,.actions,.counter,.dots,.steps,.pts,.tag,#stepBody > div.muted,.sdcPageBar,button,.sdcListen,.sdcLang,input,select,textarea,svg,img,canvas,video,script,style,.console,.editor,.ed-wrap,.gutter,.snip,.listen,[aria-hidden=true],.hidden,[hidden]";
 function textOf(el){
   const c = el.cloneNode(true); c.querySelectorAll(SKIP).forEach(n => n.remove());
   const box = document.createElement("div"); box.className = "sdcTmp notranslate"; box.setAttribute("translate", "no"); box.setAttribute("aria-hidden", "true");
   box.style.cssText = "position:absolute;left:-10000px;top:0;width:700px"; box.appendChild(c); document.body.appendChild(box);
   const t = box.innerText; box.remove(); return t.replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu, " ");
+}
+/* Speak in the chosen language: the text is translated first (not just read in English with a foreign voice).
+   Uses Google's translation service directly, so it works even if the page itself hasn't finished translating. */
+const TCACHE = new Map();
+async function translateText(text, code){
+  if (code === "en" || !text.trim()) return text;
+  const parts = String(text).replace(/\s+/g, " ").match(/[^.!?]+[.!?]*\s*/g) || [text], batches = []; let cur = "";
+  parts.forEach(p => { if ((cur + p).length > 1200 && cur){ batches.push(cur); cur = ""; } cur += p; }); if (cur) batches.push(cur);
+  const out = [];
+  for (const q of batches){
+    const key = code + "|" + q;
+    if (!TCACHE.has(key)){
+      const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${code}&dt=t&q=${encodeURIComponent(q)}`);
+      if (!r.ok) throw new Error("translate");
+      const j = await r.json(); TCACHE.set(key, ((j && j[0]) || []).map(x => x && x[0] || "").join(""));
+    }
+    out.push(TCACHE.get(key));
+  }
+  return out.join(" ");
 }
 function readEl(el, b){
   if (b && b.getAttribute("aria-pressed") === "true"){ stopReading(); return; }
@@ -272,7 +309,8 @@ function readEl(el, b){
   const h = el.previousElementSibling, head = h && /^H[1-4]$/.test(h.tagName) && !h.querySelector(".sdcListen") ? textOf(h).trim() : "";
   const t = (head ? head + ". " : "") + textOf(el); if (!t.trim()) return;
   readBtn = b; setBtn(b, true);
-  if (!speak(t, () => { setBtn(b, false); if (readBtn === b) readBtn = null; })) setBtn(b, false);
+  const my = readTok, code = getLang(), done = () => { setBtn(b, false); if (readBtn === b) readBtn = null; };
+  translateText(humanise(t), code).catch(() => t).then(tt => { if (my !== readTok) return; if (!speak(tt, done)) done(); });
 }
 const STOP_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/></svg>';
 const SPEAKER = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>';
@@ -291,6 +329,9 @@ function addListen(root){
     const els = new Map();   // element -> fine (allowed inside a section that already reads itself, e.g. one question of a task)
     const add = (list, fine) => String(list || "").split(",").map(x => x.trim()).filter(Boolean).forEach(sel => { try { root.querySelectorAll(sel).forEach(e => { if (!els.has(e) || fine) els.set(e, fine); }); } catch(e){} });   // one bad selector never stops the rest
     add(LISTEN_SEL, false); add(LISTEN_FINE, true);
+    const matches = el => String(LISTEN_SEL || "").split(",").some(x => { try { return x.trim() && el.matches(x.trim()); } catch(e){ return false; } });
+    document.querySelectorAll(".sdcPageBar").forEach(bar => { const t = bar.nextElementSibling; if (!t || !matches(t)){ if (readBtn && bar.contains(readBtn)) stopReading(); bar.remove(); } });
+    document.querySelectorAll(".sdcListen.sdcPage").forEach(b => { if (b.closest(".sdcPageBar")) return; const t = b.parentElement; if (t && !matches(t)){ if (readBtn === b) stopReading(); b.remove(); } });
     els.forEach((fine, el) => {
       if (el.closest("#sdcStrip,.sdcTmp,pre,code,textarea") || el.querySelector(":scope > .sdcListen") || el.querySelector(":scope > .listen")) return;
       if (el.previousElementSibling && el.previousElementSibling.classList.contains("sdcPageBar")) return;
@@ -330,7 +371,7 @@ function strip(c, onSignOut, noLang, mainSel){
   const d = document.createElement("div"); d.id = "sdcStrip";
   d.setAttribute("style", "background:#0f1c33;color:#fff;font:600 13px/1.3 Arial,Helvetica,sans-serif;padding:6px 14px;display:flex;gap:8px 10px;align-items:center;flex-wrap:wrap;position:fixed;top:0;left:0;right:0;z-index:2147483000;box-shadow:0 1px 4px rgba(0,0,0,.25)");
   d.innerHTML = `<style>@media(max-width:560px){#sdcStrip .sdcHide{display:none}}</style><span style="background:#DC2B3E;border-radius:5px;padding:2px 7px;font-weight:900;letter-spacing:.04em">SISD</span><span class="sdcHide">Design and Computing</span><span class="sdcHide" style="opacity:.6">·</span><span>You are in: <b>${esc(C.name)}</b></span>
-    <span style="margin-left:auto;display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap">${canSpeak() ? `<button type="button" id="sdcReadPage" class="notranslate" translate="no" aria-pressed="false" data-label="Read page" style="background:none;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:999px;padding:3px 10px;font:inherit;cursor:pointer"><span aria-hidden="true">🔊</span> <span class="sdcLt">Read page</span></button>` : ""}${noLang ? "" : langPicker(true)}</span><button type="button" id="sdcLeave" style="background:none;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:999px;padding:3px 10px;font:inherit;cursor:pointer">Change course / sign out</button>`;
+    <span style="margin-left:auto;display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap">${noLang ? "" : langPicker(true)}</span><button type="button" id="sdcLeave" style="background:none;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:999px;padding:3px 10px;font:inherit;cursor:pointer">Change course / sign out</button>`;
   document.body.insertBefore(d, document.body.firstChild); bindPickers();
   const rp = document.getElementById("sdcReadPage");
   if (rp) rp.onclick = () => { const m = [...document.querySelectorAll(mainSel || "main, #app")].find(e => e.offsetParent !== null) || document.body; readEl(m, rp); };
