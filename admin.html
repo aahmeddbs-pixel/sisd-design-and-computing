@@ -7,7 +7,8 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="sdc.js?v=20261102c"></script>
+<script src="/python-pathways/answers-view.js?v=20261102d"></script>
+<script src="sdc.js?v=20261102d"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -320,7 +321,31 @@ async function openFor(t, pw){
   const key = await crypto.subtle.deriveKey({ name:"ECDH", public:epk }, pk, { name:"AES-GCM", length:256 }, false, ["decrypt"]);
   return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name:"AES-GCM", iv:unb64(t.cfg.iv) }, key, unb64(t.cfg.ct))));
 }
-const staffCfg = () => ({ py: sheetLink() || "", ds: load(DS_KEY, "") || "" });
+let AKEY = "";   // the Python answer key's data key (base64), never stored
+const staffCfg = () => ({ py: sheetLink() || "", ds: load(DS_KEY, "") || "", ak: AKEY || "" });
+async function vaultFile(){ const t = await (await fetch("/python-pathways/answers.enc.js?v=" + Date.now(), { cache:"no-store" })).text(); return JSON.parse(t.replace(/^\s*window\.PP_ENC\s*=\s*/, "").replace(/;\s*$/, "")); }
+const VAAD = t => TE.encode("pp-vault-v2|" + t);
+async function vaultKeyFromPassword(pw){
+  const E = await vaultFile(), w = E.pw;
+  const base = await crypto.subtle.importKey("raw", TE.encode(pw), "PBKDF2", false, ["deriveKey"]);
+  const k = await crypto.subtle.deriveKey({ name:"PBKDF2", salt:unb64(w.salt), iterations:w.iter, hash:"SHA-512" }, base, { name:"AES-GCM", length:256 }, false, ["decrypt"]);
+  return b64(new Uint8Array(await crypto.subtle.decrypt({ name:"AES-GCM", iv:unb64(w.iv), additionalData:VAAD("pw") }, k, unb64(w.ct))));
+}
+async function openAnswers(ak){
+  if (!ak || window.PPAnswers) return !!window.PPAnswers;
+  const E = await vaultFile(), key = await crypto.subtle.importKey("raw", unb64(ak), "AES-GCM", false, ["decrypt"]);
+  const code = new TextDecoder().decode(await crypto.subtle.decrypt({ name:"AES-GCM", iv:unb64(E.iv), additionalData:VAAD("data") }, key, unb64(E.ct)));
+  (0, eval)(code); return !!window.PPAnswers;
+}
+/* lock the current links and answer key for every approved teacher (their own public key) and publish */
+async function shareWithTeachers(){
+  await loadCourseState();
+  if (!STATE.teachers.some(t => t.pub)) return null;
+  const teachers = await Promise.all(STATE.teachers.map(async t => t.pub ? Object.assign({}, t, { cfg: await lockFor(t.pub, staffCfg()) }) : t));
+  const ok = await publishCourseState(Object.assign({}, STATE, { teachers }));
+  if (ok && AKEY) store("sdc_ak_shared", AKEY.slice(0, 12));
+  return ok;
+}
 
 /* ---- sign-in screens ---- */
 const fails = k => load("sdc_admin_fail_" + k, { n:0, until:0 });
@@ -334,11 +359,15 @@ $("knownTeachers").innerHTML = [...new Set(Object.values(TEACHERS).flat())].map(
 
 $("pwGo").onclick = async () => {
   const f = fails("super"); if (f.until > Date.now()) return note("pwMsg", "bad", `Too many wrong tries. Wait ${Math.ceil((f.until - Date.now()) / 60000)} minute(s).`);
-  $("pwGo").disabled = true; note("pwMsg", "ok", "Checking…");
-  try { KEYS = await unlock($("pw").value); store("sdc_admin_fail_super", { n:0, until:0 }); }
+  $("pwGo").disabled = true; note("pwMsg", "ok", "Checking…"); const pwTyped = $("pw").value;
+  try { KEYS = await unlock(pwTyped); store("sdc_admin_fail_super", { n:0, until:0 }); }
   catch(e){ KEYS = null; failNote("super", f); SDC.log("adminfail", { name:"(unknown)", course:"" }, { tries:f.n }); note("pwMsg", "bad", "That password is not right."); }
   $("pwGo").disabled = false; $("pw").value = "";
-  if (KEYS){ ROLE = "super"; ME = { name:"Super admin" }; enter(); }
+  if (KEYS){ ROLE = "super"; ME = { name:"Super admin" };
+    try { AKEY = await vaultKeyFromPassword(pwTyped); await openAnswers(AKEY); } catch(e){ AKEY = ""; }
+    enter();
+    if (AKEY && load("sdc_ak_shared", "") !== AKEY.slice(0, 12)) shareWithTeachers().catch(() => {});   // give teachers the answer key once
+  }
 };
 $("pw").addEventListener("keydown", e => { if (e.key === "Enter") $("pwGo").click(); });
 
@@ -358,6 +387,7 @@ $("tGo").onclick = async () => {
     if (vm){ SDC.log("unverified", { name:t.name, email, course:"" }, { teacher:true }); return note("tMsg", "warn", vm); }
     ROLE = "teacher"; ME = { name:t.name, email, names: (t.names && t.names.length ? t.names : [t.name]) };
     if (t.wpriv && t.cfg){ try { CFG = await openFor(t, pw); } catch(e){ CFG = { py:"", ds:"" }; } }
+    if (CFG.ak){ try { await openAnswers(CFG.ak); } catch(e){} }
     else {
       CFG = { py:"", ds:"" };
       if (!t.pub && !REQS.some(r => r.email === email && r.pub)){   // approved in the Design course before this dashboard existed: ask for data access once
@@ -439,11 +469,8 @@ $("saveSet").onclick = async () => {
   if (n && !parseForm(n)) return toast("The form link should be a pre-filled link with five entry.… parts.");
   const changed = s !== sheetLink() || d !== load(DS_KEY, "");
   store(SHEET_KEY, s); store(NOTIFY_KEY, n); store(DS_KEY, d); paintSetup(); refresh();
-  await loadCourseState();
-  if (STATE.teachers.some(t => t.pub)){   // pass the links, locked, to every teacher
-    const teachers = await Promise.all(STATE.teachers.map(async t => t.pub ? Object.assign({}, t, { cfg: await lockFor(t.pub, staffCfg()) }) : t));
-    toast((await publishCourseState(Object.assign({}, STATE, { teachers }))) ? "Saved and shared with teachers." : "Saved here, but Google Forms couldn't be reached.");
-  } else toast(changed ? "Saved." : "Saved.");
+  const r = await shareWithTeachers();   // pass the links and answer key, locked, to every teacher
+  toast(r === null ? "Saved." : r ? "Saved and shared with teachers." : "Saved here, but Google Forms couldn't be reached.");
 };
 async function sendMail(type, student, teacher, text){
   const f = parseForm(load(NOTIFY_KEY, "")); if (!f) return false;
@@ -745,7 +772,7 @@ async function openProgress(s){
     : ["A","B","C","D"].map(c => `<option value="Criterion ${c}" ${crits[crits.length - 1] === c ? "selected" : ""}>Criterion ${c}</option>`).join("") + `<option>General</option>`;
   bg.innerHTML = `<div class="modal wide" role="dialog" aria-label="Student progress">
     <div class="row" style="justify-content:space-between"><div><h2>${esc(s.name)} ${pill(s.course)}</h2><div class="em">${esc([s.email, s.grade ? "Grade " + s.grade : "", s.course === "cs" ? levelName("cs", s.level) : s.cls, s.teacher].filter(Boolean).join(" · "))}</div></div><button class="btn ghost sm" data-x>Close</button></div>
-    <div style="margin-top:10px">${s.course === "cs" ? pyDetail(s) : dsDetail(s)}</div>
+    <div style="margin-top:10px">${s.course === "cs" ? pyDetail(s) + `<h2 style="margin-top:18px">Exercises and exact answers</h2><p class="muted small">Each exercise as this student sees it, their latest code, and the exact answer to their own version.</p>` + (window.PPAnswerView ? PPAnswerView.render(s.py, window.PPAnswers) : "") : dsDetail(s)}</div>
     <div class="card fbform" style="margin:18px 0 0;background:var(--soft)">
       <h2>Send feedback to ${esc(s.name.split(" ")[0])}</h2>
       <p class="muted small" style="margin-top:4px">${esc(s.name.split(" ")[0])} sees it in their course (a red <b>Feedback from your teacher</b> button at the top) the next time they sign in.</p>
@@ -759,6 +786,7 @@ async function openProgress(s){
       <h3 style="margin-top:16px">Feedback already sent</h3><div id="fHist" class="small muted">Loading…</div>
     </div></div>`;
   document.body.appendChild(bg);
+  if (window.PPAnswerView) PPAnswerView.bind(bg);
   const q = sel => bg.querySelector(sel);
   bg.onclick = e => { if (e.target === bg || e.target.hasAttribute("data-x")) bg.remove(); };
   const hist = async () => { try { const l = await SDC.getFeedback(s.email, s.name);
