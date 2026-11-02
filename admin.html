@@ -7,7 +7,7 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="sdc.js?v=20261102b"></script>
+<script src="sdc.js?v=20261102c"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -204,6 +204,19 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
         <label class="f" for="setNotify">Alerts form pre-filled link</label><input class="t" id="setNotify" placeholder="https://docs.google.com/forms/d/e/…/viewform?usp=pp_url&entry.…">
         <div id="notifyMsg"></div>
       </div>
+      <div class="card">
+        <h2>4 · Email verification <span class="n" id="vState"></span></h2>
+        <p class="muted small" style="margin-top:4px">New students and teachers must press a link sent to their <b>@sisd.ae</b> email before they can get in. Personal emails can't be used. Accounts that already existed keep working. The emails are sent from your Gmail by a small script you set up once:</p>
+        <ol class="small" style="margin:8px 0 0 20px;line-height:1.7">
+          <li>Go to <b>sheets.new</b> to create a Google Sheet, and name it <b>SDC Verification</b>.</li>
+          <li>Click <b>Extensions → Apps Script</b>. Delete what's there and paste the script below (use <b>Copy script</b>), then click 💾 <b>Save</b>.</li>
+          <li>Click <b>Deploy → New deployment</b> → the ⚙️ next to "Select type" → <b>Web app</b>. Set <b>Execute as: Me</b> and <b>Who has access: Anyone</b>, then <b>Deploy</b>.</li>
+          <li>Click <b>Authorize access</b>, choose your Gmail, then <b>Advanced → Go to … (unsafe) → Allow</b> (it's your own script).</li>
+          <li>Copy the <b>Web app URL</b> and send it to Claude to switch verification on.</li>
+          <li>Test first: sign up with your own @sisd.ae email and check the email arrives (look in Junk too).</li></ol>
+        <div class="row" style="margin-top:10px"><button class="btn ghost sm" id="vCopy">Copy script</button><button class="btn ghost sm" id="vTest" data-on>Send a test email to…</button><input class="t" id="vTo" type="email" placeholder="you@sisd.ae" style="max-width:240px" data-on></div>
+        <div id="vMsg"></div>
+      </div>
       <div class="row"><button class="btn" id="saveSet">Save setup</button><button class="btn ghost" id="testMail">Send a test email</button></div>
       <p class="muted small" style="margin-top:12px">Saving also passes the two sheet links, locked, to every approved teacher, so their dashboards work on any computer. Teachers never see the links themselves.</p>
     </section>
@@ -341,6 +354,8 @@ $("tGo").onclick = async () => {
     if (!t){ return note("tMsg", REQS.some(r => r.email === email) ? "warn" : "bad", REQS.some(r => r.email === email) ? "Your request is waiting for the super admin to approve it." : (STATE.declined.includes(email) ? "Your access was not approved. Speak to the super admin." : "No approved teacher account for that email. Use <b>Request teacher access</b> first.")); }
     if ((await pwHash(pw, t.salt)).hash !== t.hash){ failNote(email, f); SDC.log("adminfail", { name:t.name, email, course:"" }, { teacher:true, tries:f.n }); return note("tMsg", "bad", "That password is not right."); }
     store("sdc_admin_fail_" + email, { n:0, until:0 });
+    const vm = await SDC.verifyGate(email, "staff", !!t.req && Date.parse(t.req) >= SDC.sinceMs());
+    if (vm){ SDC.log("unverified", { name:t.name, email, course:"" }, { teacher:true }); return note("tMsg", "warn", vm); }
     ROLE = "teacher"; ME = { name:t.name, email, names: (t.names && t.names.length ? t.names : [t.name]) };
     if (t.wpriv && t.cfg){ try { CFG = await openFor(t, pw); } catch(e){ CFG = { py:"", ds:"" }; } }
     else {
@@ -373,7 +388,9 @@ $("rGo").onclick = async () => {
     await postRequest({ email, name: as, full: name, as, salt:h.salt, hash:h.hash, t:new Date().toISOString(), pub:k.pub, wpriv:k.wpriv });
     SDC.log("staffrequest", { name, email, course:"" }, { as });
     ["rName","rAs","rEmail","rPw","rPw2"].forEach(id => $(id).value = "");
-    note("rMsg", "ok", "Request sent. Once the super admin approves it, sign in on the <b>Teacher</b> tab.");
+    if (SDC.verifyOn()){ const v = await SDC.startVerify(email, "staff");
+      note("rMsg", "ok", "Request sent. " + SDC.verifyMsg(email, v) + " The super admin can approve you once your email is verified."); }
+    else note("rMsg", "ok", "Request sent. Once the super admin approves it, sign in on the <b>Teacher</b> tab.");
   } catch(e){ note("rMsg", "bad", "Couldn't send the request. Check the internet connection and try again."); }
   finally { $("rGo").disabled = false; }
 };
@@ -433,6 +450,14 @@ async function sendMail(type, student, teacher, text){
   const p = new URLSearchParams(); [type, student, "", teacher, text].forEach((v, i) => p.append(f.ent[i], v));
   try { await fetch(f.action, { method:"POST", mode:"no-cors", body:p }); return true; } catch(e){ return false; }
 }
+function paintVerify(){
+  $("vState").textContent = SDC.verifyOn() ? "on" : "off";
+  document.querySelectorAll("#t-setup [data-on]").forEach(e => e.classList.toggle("hidden", !SDC.verifyOn()));
+}
+$("vCopy").onclick = async () => { try { const t = await (await fetch("verify-script.gs?v=" + Date.now(), { cache:"no-store" })).text(); await navigator.clipboard.writeText(t); toast("Script copied. Paste it into Apps Script."); }
+  catch(e){ toast("Couldn't copy: open verify-script.gs in the GitHub repository and copy it from there."); } };
+$("vTest").onclick = async () => { const e = $("vTo").value.trim(); if (!/@sisd\.ae$/i.test(e)) return toast("Type an @sisd.ae address.");
+  const r = await SDC.startVerify(e, "staff"); $("vMsg").innerHTML = `<div class="notice ${r && r.ok ? "ok" : "warn"}">${r && r.ok ? (r.already ? "That address is already verified." : "Sent. Check that inbox (and Junk).") : esc("Not sent: " + ((r && r.reason) || "no answer"))}</div>`; };
 $("testMail").onclick = async () => {
   if (!parseForm($("setNotify").value.trim())) return toast("Paste the alerts form link first, then Save.");
   store(NOTIFY_KEY, $("setNotify").value.trim());
@@ -754,6 +779,7 @@ async function openProgress(s){
 }
 
 /* ---------------- teachers (super admin) ---------------- */
+let VSTAT = {};
 async function renderTeachers(){
   $("tqTbl").innerHTML = `<tr><td class="muted">Loading…</td></tr>`;
   await loadCourseState();
@@ -761,19 +787,24 @@ async function renderTeachers(){
   const pend = REQS.filter(r => r.pub ? !(known.has(r.email) && (STATE.teachers.find(t => t.email === r.email) || {}).pub) : !known.has(r.email)).filter(r => !STATE.declined.includes(r.email) || r.access);
   const latest = {}; pend.forEach(r => { if (!latest[r.email] || String(r.t) > String(latest[r.email].t)) latest[r.email] = r; });
   const P = Object.values(latest);
+  VSTAT = await SDC.verifyStatuses(P.map(r => r.email).concat(STATE.teachers.map(t => t.email)));
+  const vcell = e => !SDC.verifyOn() ? "" : VSTAT[e] === true ? `<div><span class="pill ok">✓ email verified</span></div>` : VSTAT[e] === false ? `<div><span class="pill warn">email not verified</span> <button class="btn ghost sm" data-vs="${esc(e)}">Send verification email</button></div>` : "";
   $("tqCount").textContent = P.length;
-  $("tqTbl").innerHTML = `<tr><th>Teacher</th><th>Email</th><th>Students pick them as</th><th>Requested</th><th></th></tr>` + (P.length ? P.map((r, i) => `<tr><td><b>${esc(r.full || r.name)}</b>${r.access ? `<div class="em">already approved: asking for dashboard access</div>` : ""}${r.pub ? "" : `<div class="em">requested in the Design course: dashboard data needs a request from this page</div>`}</td><td>${esc(r.email)}</td>
+  $("tqTbl").innerHTML = `<tr><th>Teacher</th><th>Email</th><th>Students pick them as</th><th>Requested</th><th></th></tr>` + (P.length ? P.map((r, i) => `<tr><td><b>${esc(r.full || r.name)}</b>${vcell(r.email)}${r.access ? `<div class="em">already approved: asking for dashboard access</div>` : ""}${r.pub ? "" : `<div class="em">requested in the Design course: dashboard data needs a request from this page</div>`}</td><td>${esc(r.email)}</td>
       <td><input class="t" data-as="${i}" value="${esc(r.as || r.name)}" list="knownTeachers" style="min-width:150px"><div class="em">Separate several names with commas</div></td><td class="small">${esc(r.t ? fmtDT(Date.parse(r.t)) : "")}</td>
-      <td style="white-space:nowrap"><button class="btn sm" data-ok="${i}">Approve</button> <button class="btn ghost sm" data-no="${i}">Decline</button></td></tr>`).join("") : `<tr><td colspan="5" class="muted">No requests.</td></tr>`);
+      <td style="white-space:nowrap"><button class="btn sm" data-ok="${i}" ${SDC.verifyOn() && VSTAT[r.email] !== true && !r.access ? 'title="Waiting for the teacher to verify their SISD email"' : ""}>Approve</button> <button class="btn ghost sm" data-no="${i}">Decline</button></td></tr>`).join("") : `<tr><td colspan="5" class="muted">No requests.</td></tr>`);
   $("taCount").textContent = STATE.teachers.length;
-  $("taTbl").innerHTML = `<tr><th>Teacher</th><th>Email</th><th>Sees students who chose</th><th>Dashboard</th><th></th></tr>` + (STATE.teachers.length ? STATE.teachers.map((t, i) => `<tr><td><b>${esc(t.full || t.name)}</b></td><td>${esc(t.email)}</td>
+  $("taTbl").innerHTML = `<tr><th>Teacher</th><th>Email</th><th>Sees students who chose</th><th>Dashboard</th><th></th></tr>` + (STATE.teachers.length ? STATE.teachers.map((t, i) => `<tr><td><b>${esc(t.full || t.name)}</b>${vcell(t.email)}</td><td>${esc(t.email)}</td>
       <td><input class="t" data-nm="${i}" value="${esc((t.names && t.names.length ? t.names : [t.name]).join(", "))}" style="min-width:150px"></td><td>${t.cfg ? "<span class='pill ok'>connected</span>" : t.pub ? "<span class='pill warn'>press Save setup</span>" : "<span class='pill warn'>waiting for their first sign-in here</span>"}</td>
       <td style="white-space:nowrap"><button class="btn sm" data-sv="${i}">Save</button> <button class="btn ghost sm" data-rm="${i}">Remove access</button></td></tr>`).join("") : `<tr><td colspan="5" class="muted">No teacher admins yet.</td></tr>`);
   const done = (ok, what) => { $("taMsg").innerHTML = `<div class="notice ${ok ? "ok" : "bad"}">${ok ? esc(what) + " Teachers' computers update within about 5 minutes." : "Google Forms couldn't be reached. Try again."}</div>`; renderTeachers(); };
+  document.querySelectorAll("#t-teachers [data-vs]").forEach(b => b.onclick = async () => { b.disabled = true; const r = await SDC.startVerify(b.dataset.vs, "staff");
+    toast(r && r.ok ? (r.already ? "Already verified." : "Verification email sent.") : r && r.reason === "wait" ? "An email was sent in the last hour. Ask them to check Junk." : "Couldn't send it just now."); });
   const names = v => v.split(",").map(x => x.trim().replace(/\s+/g, " ")).filter(Boolean).slice(0, 4);
   $("tqTbl").querySelectorAll("[data-ok]").forEach(b => b.onclick = async () => { const r = P[+b.dataset.ok], nm = names($("tqTbl").querySelector(`[data-as="${b.dataset.ok}"]`).value); if (!nm.length) return toast("Type the name students pick for this teacher.");
     b.disabled = true; const old = STATE.teachers.find(t => t.email === r.email) || {};
-    const entry = { email:r.email, name:nm[0], names:nm, full:String(r.full || old.full || r.name || "").slice(0, 80), salt: old.salt || r.salt, hash: old.hash || r.hash };
+    if (SDC.verifyOn() && VSTAT[r.email] !== true && !r.access){ b.disabled = false; return toast("Wait until " + (r.full || r.name) + " has verified their SISD email."); }
+    const entry = { email:r.email, name:nm[0], names:nm, full:String(r.full || old.full || r.name || "").slice(0, 80), salt: old.salt || r.salt, hash: old.hash || r.hash, req: old.req || r.t || "" };
     if (r.access && old.hash && r.hash !== old.hash){ entry.salt = old.salt; entry.hash = old.hash; }
     if (r.pub){ entry.pub = r.pub; entry.wpriv = r.wpriv; entry.cfg = await lockFor(r.pub, staffCfg()); }
     const teachers = STATE.teachers.filter(t => t.email !== r.email).concat([entry]);
@@ -884,7 +915,7 @@ $("lgF").onchange = renderLog;
 function renderAll(){ renderHP(); renderStudents(); renderLog(); }
 let timer = null;
 try { document.getElementById("langSlot").innerHTML = SDC.langPicker(true); } catch(e){}
-function start(){ paintSetup(); renderAll(); refresh(); clearInterval(timer); timer = setInterval(refresh, POLL_MS); }
+function start(){ paintSetup(); paintVerify(); renderAll(); refresh(); clearInterval(timer); timer = setInterval(refresh, POLL_MS); }
 })();
 </script>
 </body>

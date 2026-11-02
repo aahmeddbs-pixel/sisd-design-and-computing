@@ -6,7 +6,7 @@
 <title>SISD Design and Computing</title>
 <meta name="referrer" content="no-referrer">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="sdc.js?v=20261102b"></script>
+<script src="sdc.js?v=20261102c"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --red-d:#b81f30; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -170,7 +170,7 @@ $("upGo").onclick = () => { if (upCourse && upGrade && $("upAgree").checked) goT
   let note = ""; try { note = sessionStorage.getItem("sdc_msg") || ""; sessionStorage.removeItem("sdc_msg"); } catch(e){}
   const m = new URLSearchParams(location.search).get("m");
   const show = (html, kind) => $("msg").innerHTML = `<div class="notice ${kind}" style="margin:0 0 14px">${html}</div>`;
-  if (note) show(note, "bad");
+  if (note){ let o = { msg: note, kind: "bad" }; try { const j = JSON.parse(note); if (j && j.msg) o = j; } catch(e){} show(o.msg, o.kind); }
   else if (m === "out") show("You have signed out. Choose your course to sign in again.", "ok");
   else if (m === "wrongapp") show("That page belongs to a different course. Choose your course below.", "warn");
   if (m) history.replaceState(null, "", location.pathname);

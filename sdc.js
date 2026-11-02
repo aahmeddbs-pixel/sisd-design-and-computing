@@ -259,7 +259,8 @@ async function confirm(a, signup){
   if (offline()) return { ok:true, assign:null };
   let L = null;
   try { L = await lookup(a.email, a.name); } catch(e){ L = null; }
-  if (!L){ // sheet unreachable: let them in, it is checked again next time
+  if (!L){ // sheet unreachable: let them in, it is checked again next time (new sign-ups must still verify)
+    const vm = await verifyGate(a.email, "student", !!signup); if (vm){ log("unverified", Object.assign({}, a, { course:c }), { signup:!!signup }); return { ok:false, verify:true, msg:vm }; }
     patchGate({ who:{ email:normEmail(a.email), name:a.name } });
     if (!(g && g.logged)) { log("signin", Object.assign({}, a, { course:c }), { gate:g && g.mode, unchecked:true }); patchGate({ logged:true }); }
     return { ok:true, assign:null };
@@ -268,10 +269,57 @@ async function confirm(a, signup){
   if (A && A.c !== c){ log("wrongcourse", Object.assign({}, a, { course:c }), { registered:A.c, byAdmin:true }); return { ok:false, msg:MSG.other(A.c, true), registered:A.c }; }
   if (!A && L.reg && L.reg.c !== c){ log("wrongcourse", Object.assign({}, a, { course:c }), { registered:L.reg.c }); return { ok:false, msg:MSG.other(L.reg.c, false), registered:L.reg.c }; }
   if (!L.reg) register(a.email, a.name, c, (A && A.g) || a.grade);
+  const isNew = !!signup || (!!L.reg && L.reg.ver >= sinceMs());
+  const vm = await verifyGate(a.email, "student", isNew);
+  if (vm){ log("unverified", Object.assign({}, a, { course:c }), { signup:!!signup }); return { ok:false, verify:true, msg:vm }; }
   patchGate({ who:{ email:normEmail(a.email), name:a.name }, acct: acctOf(Object.assign({}, a, { course: c })) }); work(); setTimeout(showFeedbackButton, 800);
   if (!(g && g.logged)){ log(signup ? "signup" : "signin", Object.assign({}, a, { course:c }), { gate:g && g.mode }); patchGate({ logged:true }); }
   return { ok:true, assign:A };
 }
+/* ---------- email verification ----------
+   New accounts (students and staff) must click a link sent to their @sisd.ae email before they can get in.
+   The email is sent by the school's verification script (Google Apps Script). Accounts made before
+   verification was switched on (VERIFY.since) keep working. Off while VERIFY.url is empty. */
+const VERIFY = { url: "", since: "" };
+const verifyOn = () => !!VERIFY.url && !offline();
+const sinceMs = () => Date.parse(VERIFY.since) || 0;
+function jsonp(params, timeout){
+  return new Promise((res, rej) => {
+    const cb = "__sdv" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), sc = document.createElement("script");
+    const done = () => { clearTimeout(t); try { delete window[cb]; } catch(e){ window[cb] = undefined; } sc.remove(); };
+    const t = setTimeout(() => { done(); rej(new Error("timeout")); }, timeout || 20000);
+    window[cb] = r => { done(); res(r); }; sc.onerror = () => { done(); rej(new Error("reach")); };
+    sc.src = VERIFY.url + (VERIFY.url.includes("?") ? "&" : "?") + new URLSearchParams(Object.assign({}, params, { cb, _: Date.now() })).toString();
+    document.head.appendChild(sc);
+  });
+}
+const VKEY = e => "sdc_ver_" + normEmail(e);
+async function isVerified(email){
+  try { if (localStorage.getItem(VKEY(email)) === "1") return true; } catch(e){}
+  const r = await jsonp({ a:"status", e:normEmail(email) });
+  if (r && r.verified){ try { localStorage.setItem(VKEY(email), "1"); } catch(e){} return true; }
+  return false;
+}
+async function verifyStatuses(emails){ if (!verifyOn() || !emails.length) return {}; try { return await jsonp({ a:"statuses", list: emails.map(normEmail).slice(0, 60).join(",") }); } catch(e){ return {}; } }
+async function startVerify(email, kind){ try { return await jsonp({ a:"start", e:normEmail(email), k:kind || "student" }, 30000); } catch(e){ return { ok:false, reason:"reach" }; } }
+function verifyMsg(email, r){
+  const e = `<b>${esc(normEmail(email))}</b>`;
+  if (r && r.ok && r.sent) return `📧 <b>Check your SISD email.</b> We've sent a verification link to ${e}. Open it, press <b>Verify my email</b>, then come back and sign in. (Check your Junk folder if you can't see it.)`;
+  if (r && r.ok && r.already) return `Your email is verified. Please sign in again.`;
+  if (r && r.reason === "wait") return `📧 <b>Your email isn't verified yet.</b> A link was already sent to ${e} in the last hour. Open it and press <b>Verify my email</b>, then sign in.`;
+  if (r && r.reason === "quota") return `Your email isn't verified yet, and no more verification emails can be sent today. Try again tomorrow, or ask your teacher.`;
+  if (r && r.reason === "domain") return `Only SISD email addresses (ending in @sisd.ae) can be used.`;
+  return `Your email isn't verified yet, and the verification email couldn't be sent just now. Check your internet connection and try again.`;
+}
+/* returns null when the person may continue, or a message explaining what to do */
+async function verifyGate(email, kind, isNew){
+  if (!verifyOn() || !isNew) return null;
+  if (!/@sisd\.ae$/i.test(normEmail(email))) return verifyMsg(email, { reason:"domain" });
+  let v = false; try { v = await isVerified(email); } catch(e){ return `Your email verification couldn't be checked just now. Check your internet connection and try again.`; }
+  if (v) return null;
+  return verifyMsg(email, await startVerify(email, kind));
+}
+
 /* Before creating an account: is this email free to sign up for this course? */
 async function canSignUp(email, name, c){
   if (offline()) return { ok:true };
@@ -489,8 +537,8 @@ function strip(c, onSignOut, noLang, mainSel){
   fit(); try { new ResizeObserver(fit).observe(d); } catch(e){ window.addEventListener("resize", fit); }
   document.getElementById("sdcLeave").onclick = () => { if (onSignOut) onSignOut(); else leave("out"); };
 }
-function signedOutNotice(msg){ try { sessionStorage.setItem("sdc_msg", msg); } catch(e){} }
+function signedOutNotice(msg, kind){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg, kind: kind || "bad" })); } catch(e){} }
 
 return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, confirm, canSignUp, lookup, register,
-  log, task, strip, signedOutNotice, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
+  log, task, strip, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();
