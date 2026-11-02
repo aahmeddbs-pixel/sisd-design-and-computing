@@ -141,6 +141,88 @@ function log(type, a, extra){
 /* one completed task, for the end-of-lesson House Points ranking. w = difficulty weight */
 function task(a, title, w, kind){ log("task", a, { task:{ t:String(title || "").slice(0, 120), w:+w || 1, kind:kind || "task" } }); }
 
+/* ---------- staff: the signed course state (criteria switches + approved teachers) ----------
+   Published by the super admin to the Design Studio Switches form and signed with the admin key, so nobody else
+   can add a teacher or change a switch. The same state is used by the Design course. */
+const CONTROL = { csv:"https://docs.google.com/spreadsheets/d/e/2PACX-1vRDyFCmLL1Z2lWea0WLF5surkagyB_Ad6-Cij4lCBhpvCeybt_pQB15xClmQoIRg8LMUWeFwuCUYy0f/pub?gid=480761896&single=true&output=csv",
+  form:"https://docs.google.com/forms/d/e/1FAIpQLSeNJCgUXw7lCX1gPayZYtyZbmSyXnkDMGJzCpjtIYui_FnhTQ/formResponse", entry:"entry.1255814967" };
+function canon(v){ return Array.isArray(v) ? "[" + v.map(canon).join(",") + "]" : v && typeof v === "object" ? "{" + Object.keys(v).sort().map(k => JSON.stringify(k) + ":" + canon(v[k])).join(",") + "}" : JSON.stringify(v); }
+async function verifyState(d){
+  try { if (!d || !d.sig || !d.t) return false;
+    pubKey = pubKey || await crypto.subtle.importKey("jwk", SIG_PUB, { name:"ECDSA", namedCurve:"P-256" }, false, ["verify"]);
+    const body = { unlocks: d.unlocks, teachers: d.teachers || [], declined: d.declined || [], t: d.t };
+    return await crypto.subtle.verify({ name:"ECDSA", hash:"SHA-256" }, pubKey, d64(d.sig), TE.encode(canon(body)));
+  } catch(e){ return false; }
+}
+function csvRows(t){
+  const R = []; let row = [], cur = "", q = false;
+  for (let i = 0; i < t.length; i++){ const c = t[i];
+    if (q){ if (c === '"'){ if (t[i + 1] === '"'){ cur += '"'; i++; } else q = false; } else cur += c; }
+    else if (c === '"') q = true; else if (c === ","){ row.push(cur); cur = ""; } else if (c === "\n" || c === "\r"){ if (c === "\r" && t[i + 1] === "\n") i++; row.push(cur); R.push(row); row = []; cur = ""; } else cur += c; }
+  if (cur || row.length){ row.push(cur); R.push(row); }
+  return R;
+}
+/* latest admin-signed state + teacher access requests */
+async function loadState(csvUrl){
+  const url = csvUrl || CONTROL.csv, r = await fetch(url + (url.includes("?") ? "&" : "?") + "cb=" + Date.now(), { cache:"no-store" });
+  if (!r.ok) throw new Error("The switches sheet could not be read.");
+  const rows = csvRows(await r.text()); let state = null; const reqs = [];
+  for (let i = 1; i < rows.length; i++){
+    const cell = rows[i].slice(1).find(v => v && v.trim().startsWith("{")); if (!cell) continue;
+    try { const d = JSON.parse(cell);
+      if (d.unlocks){ if (await verifyState(d) && (!state || String(d.t) > String(state.t))) state = d; }
+      else if (d.request && /@sisd\.ae$/i.test(String(d.request.email || ""))) reqs.push(d.request);
+    } catch(e){}
+  }
+  return { state, requests: reqs };
+}
+/* which teacher a student chose: matched on surname, so "Ms. Abdelaziz" and "Miss Abdelaziz" are the same person */
+const surname = n => String(n || "").toLowerCase().replace(/[^a-z\s'-]/g, " ").trim().split(/\s+/).pop() || "";
+function sameTeacher(a, b){ const x = surname(a), y = surname(b); return !!x && x === y; }
+async function teacherNames(){
+  try { const { state } = await loadState(); return ((state && state.teachers) || []).map(t => t.name).filter(Boolean); } catch(e){ return []; }
+}
+
+/* ---------- teacher feedback to students ----------
+   Stored in the sync sheet under the student's scrambled ID (no names or emails). */
+function sendFeedback(student, fb){
+  return idOf(student.email, student.name).then(id => { sendRow("F", id, JSON.stringify(Object.assign({ at: Date.now() }, fb))); flush(); return true; });
+}
+async function getFeedback(email, name){
+  const id = await idOf(email, name), out = [];
+  (await rows("F", id, 60)).forEach(r => { try { const o = JSON.parse(r.text); if (o && (o.s || o.i || o.n || o.note)) out.push(Object.assign({ ver: r.ver }, o)); } catch(e){} });
+  return out.sort((a, b) => (b.at || b.ver) - (a.at || a.ver));
+}
+const SEEN_FB = "sdc_fb_seen";
+function fbButton(){ return document.getElementById("sdcFb"); }
+async function showFeedbackButton(){
+  const g = gate(); if (!g || !g.who || offline()) return;
+  let list = []; try { list = await getFeedback(g.who.email, g.who.name); } catch(e){ return; }
+  const mine = list.filter(f => !f.course || f.course === g.course || (f.course === "design" && g.course === "it") || (f.course === "it" && g.course === "design"));
+  const strip = document.getElementById("sdcStrip"); if (!strip || !mine.length) return;
+  let seen = {}; try { seen = JSON.parse(localStorage.getItem(SEEN_FB)) || {}; } catch(e){}
+  const unread = mine.filter(f => !seen[f.at]).length;
+  let b = fbButton();
+  if (!b){ b = document.createElement("button"); b.type = "button"; b.id = "sdcFb";
+    b.setAttribute("style", "background:#DC2B3E;border:0;color:#fff;border-radius:999px;padding:4px 12px;font:inherit;font-weight:800;cursor:pointer");
+    const slot = strip.querySelector("span[style*='margin-left:auto']"); (slot || strip).insertBefore(b, slot ? slot.firstChild : null); }
+  b.textContent = "📝 Feedback from your teacher" + (unread ? " (" + unread + " new)" : "");
+  b.onclick = () => {
+    mine.forEach(f => seen[f.at] = 1); try { localStorage.setItem(SEEN_FB, JSON.stringify(seen)); } catch(e){}
+    b.textContent = "📝 Feedback from your teacher";
+    const bg = document.createElement("div"); bg.setAttribute("style", "position:fixed;inset:0;background:rgba(8,15,30,.6);z-index:2147483600;display:flex;align-items:flex-start;justify-content:center;padding:60px 16px;overflow:auto");
+    const sec = (h, t) => t ? `<h4 style="margin:12px 0 4px;font-size:14px;color:#1B2D4E">${esc(h)}</h4><p style="margin:0;white-space:pre-wrap">${esc(t)}</p>` : "";
+    bg.innerHTML = `<div role="dialog" aria-label="Feedback" style="background:#fff;color:#16223A;border-radius:14px;max-width:640px;width:100%;padding:22px;font:15px/1.55 Arial,Helvetica,sans-serif">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><h3 style="margin:0;font-size:20px">Feedback from your teacher</h3><button type="button" data-x style="border:1px solid #D8DEEA;background:#fff;border-radius:8px;padding:6px 12px;font-weight:700;cursor:pointer">Close</button></div>
+      ${mine.map(f => `<div class="sdcFbItem" style="border:1px solid #D8DEEA;border-left:4px solid #DC2B3E;border-radius:10px;padding:12px 14px;margin-top:14px">
+        <div style="font-size:12.5px;color:#5B6782;font-weight:700">${esc(f.about || "")}${f.about ? " · " : ""}${esc(new Date(f.at || f.ver).toLocaleDateString("en-GB", { day:"numeric", month:"short" }))}${f.from ? " · " + esc(f.from) : ""}</div>
+        ${f.lvl ? `<div style="margin-top:6px;font-weight:800">Suggested level: ${esc(f.lvl)} / 8</div>` : ""}
+        ${sec("Strengths", f.s)}${sec("Improvements", f.i)}${sec("Next steps", f.n)}${sec("Note", f.note)}</div>`).join("")}</div>`;
+    document.body.appendChild(bg);
+    bg.onclick = e => { if (e.target === bg || e.target.hasAttribute("data-x")) bg.remove(); };
+  };
+}
+
 /* ---------- checks used by the course pages ---------- */
 const MSG = {
   other: (c, by) => `This account is registered for <b>${esc(courseLabel(c))}</b>${by ? " by your teacher" : ""}, not the course you chose. You can only see the course you are registered for. If this is wrong, ask your teacher: only they can change your course.`,
@@ -156,6 +238,7 @@ async function confirm(a, signup){
   let L = null;
   try { L = await lookup(a.email, a.name); } catch(e){ L = null; }
   if (!L){ // sheet unreachable: let them in, it is checked again next time
+    patchGate({ who:{ email:normEmail(a.email), name:a.name } });
     if (!(g && g.logged)) { log("signin", Object.assign({}, a, { course:c }), { gate:g && g.mode, unchecked:true }); patchGate({ logged:true }); }
     return { ok:true, assign:null };
   }
@@ -163,6 +246,7 @@ async function confirm(a, signup){
   if (A && A.c !== c){ log("wrongcourse", Object.assign({}, a, { course:c }), { registered:A.c, byAdmin:true }); return { ok:false, msg:MSG.other(A.c, true), registered:A.c }; }
   if (!A && L.reg && L.reg.c !== c){ log("wrongcourse", Object.assign({}, a, { course:c }), { registered:L.reg.c }); return { ok:false, msg:MSG.other(L.reg.c, false), registered:L.reg.c }; }
   if (!L.reg) register(a.email, a.name, c, (A && A.g) || a.grade);
+  patchGate({ who:{ email:normEmail(a.email), name:a.name } }); setTimeout(showFeedbackButton, 800);
   if (!(g && g.logged)){ log(signup ? "signup" : "signin", Object.assign({}, a, { course:c }), { gate:g && g.mode }); patchGate({ logged:true }); }
   return { ok:true, assign:A };
 }
@@ -372,7 +456,7 @@ function strip(c, onSignOut, noLang, mainSel){
   d.setAttribute("style", "background:#0f1c33;color:#fff;font:600 13px/1.3 Arial,Helvetica,sans-serif;padding:6px 14px;display:flex;gap:8px 10px;align-items:center;flex-wrap:wrap;position:fixed;top:0;left:0;right:0;z-index:2147483000;box-shadow:0 1px 4px rgba(0,0,0,.25)");
   d.innerHTML = `<style>@media(max-width:560px){#sdcStrip .sdcHide{display:none}}</style><span style="background:#DC2B3E;border-radius:5px;padding:2px 7px;font-weight:900;letter-spacing:.04em">SISD</span><span class="sdcHide">Design and Computing</span><span class="sdcHide" style="opacity:.6">·</span><span>You are in: <b>${esc(C.name)}</b></span>
     <span style="margin-left:auto;display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap">${noLang ? "" : langPicker(true)}</span><button type="button" id="sdcLeave" style="background:none;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:999px;padding:3px 10px;font:inherit;cursor:pointer">Change course / sign out</button>`;
-  document.body.insertBefore(d, document.body.firstChild); bindPickers();
+  document.body.insertBefore(d, document.body.firstChild); bindPickers(); setTimeout(showFeedbackButton, 1500);
   const rp = document.getElementById("sdcReadPage");
   if (rp) rp.onclick = () => { const m = [...document.querySelectorAll(mainSel || "main, #app")].find(e => e.offsetParent !== null) || document.body; readEl(m, rp); };
   // the strip stays fixed at the top of every page: push the page (and its own sticky header) down by its height
@@ -386,5 +470,5 @@ function strip(c, onSignOut, noLang, mainSel){
 function signedOutNotice(msg){ try { sessionStorage.setItem("sdc_msg", msg); } catch(e){} }
 
 return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, confirm, canSignUp, lookup, register,
-  log, task, strip, signedOutNotice, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
+  log, task, strip, signedOutNotice, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();

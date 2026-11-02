@@ -7,7 +7,7 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="sdc.js?v=20261101i"></script>
+<script src="sdc.js?v=20261102a"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -71,7 +71,15 @@ input.t:focus,select.t:focus{outline:none;border-color:var(--navy)}
 .top5 li b{flex:1}
 .modal-bg{position:fixed;inset:0;background:rgba(8,15,30,.55);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
 .modal{background:var(--card);border-radius:var(--r);max-width:520px;width:100%;padding:22px;max-height:92vh;overflow:auto}
-.login{max-width:420px;margin:40px auto}
+.login{max-width:460px;margin:40px auto}
+.modal.wide{max-width:900px}
+.prog{display:inline-block;min-width:110px}
+.prog .b{height:7px;border-radius:9px;background:var(--soft);overflow:hidden;margin-top:3px}.prog .b i{display:block;height:100%;background:var(--ok)}
+.ans{background:var(--soft);border-radius:8px;padding:8px 10px;white-space:pre-wrap;font-size:.88rem;margin-top:4px}
+.fbform textarea{width:100%;min-height:70px;padding:9px 12px;border:2px solid var(--line);border-radius:10px;background:var(--card);font:inherit;color:inherit}
+.sw{width:44px;height:24px;border-radius:99px;border:0;background:var(--line);position:relative}.sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
+.sw[aria-checked=true]{background:var(--ok)}.sw[aria-checked=true]::after{left:23px}
+details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-top:8px}details.blk summary{font-weight:800;cursor:pointer}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-weight:700;z-index:60;box-shadow:0 6px 20px rgba(0,0,0,.25)}
 </style>
 </head>
@@ -81,22 +89,43 @@ input.t:focus,select.t:focus{outline:none;border-color:var(--navy)}
 <main>
   <!-- LOCKED -->
   <div id="locked" class="card login">
-    <h1>Platform admin</h1>
-    <p class="muted" style="margin-top:4px">Enter the admin recovery password (the same one used in Sync tools).</p>
-    <label class="f" for="pw">Admin password</label>
-    <input class="t" id="pw" type="password" autocomplete="current-password">
-    <div id="pwMsg"></div>
-    <button class="btn" id="pwGo" style="margin-top:14px;width:100%;justify-content:center">Unlock</button>
+    <h1>Staff sign in</h1>
+    <div class="tabs" role="tablist" id="lgTabs" style="margin-top:12px"><button data-l="teacher" aria-selected="true">Teacher</button><button data-l="request" aria-selected="false">Request teacher access</button><button data-l="super" aria-selected="false">Super admin</button></div>
+    <div id="l-teacher">
+      <p class="muted small">See your own classes: progress, House Points, sign-ins, and send feedback to your students.</p>
+      <label class="f" for="tEmail">School email</label><input class="t" id="tEmail" type="email" autocomplete="username" placeholder="firstname.lastname@sisd.ae">
+      <label class="f" for="tPw">Password</label><input class="t" id="tPw" type="password" autocomplete="current-password">
+      <div id="tMsg"></div>
+      <button class="btn" id="tGo" style="margin-top:14px;width:100%;justify-content:center">Sign in</button>
+    </div>
+    <div id="l-request" class="hidden">
+      <p class="muted small">Teachers ask once. The super admin approves you and chooses which classes you see. The same email and password also work in the Design teacher tools.</p>
+      <label class="f" for="rName">Your full name</label><input class="t" id="rName" autocomplete="name" placeholder="First and last name">
+      <label class="f" for="rAs">Name students pick when they sign up</label><input class="t" id="rAs" placeholder="e.g. Mr. Ahmed" list="knownTeachers"><datalist id="knownTeachers"></datalist>
+      <label class="f" for="rEmail">School email</label><input class="t" id="rEmail" type="email" autocomplete="username" placeholder="firstname.lastname@sisd.ae">
+      <label class="f" for="rPw">Choose a password</label><input class="t" id="rPw" type="password" autocomplete="new-password">
+      <label class="f" for="rPw2">Type it again</label><input class="t" id="rPw2" type="password" autocomplete="new-password">
+      <p class="muted small" style="margin-top:6px">At least 10 characters, with letters and a number. Don't reuse your school email password.</p>
+      <div id="rMsg"></div>
+      <button class="btn" id="rGo" style="margin-top:14px;width:100%;justify-content:center">Send request</button>
+    </div>
+    <div id="l-super" class="hidden">
+      <p class="muted small">Full access: every student, criteria switches, teacher approvals, course changes and setup.</p>
+      <label class="f" for="pw">Super admin password</label>
+      <input class="t" id="pw" type="password" autocomplete="current-password">
+      <div id="pwMsg"></div>
+      <button class="btn" id="pwGo" style="margin-top:14px;width:100%;justify-content:center">Unlock</button>
+    </div>
   </div>
 
   <!-- UNLOCKED -->
   <div id="app" class="hidden">
-    <div class="row" style="justify-content:space-between;margin-bottom:4px"><h1>Admin</h1><div class="row"><span class="muted small" id="loadState"></span><button class="btn ghost sm" id="refresh">↻ Refresh</button></div></div>
+    <div class="row" style="justify-content:space-between;margin-bottom:4px"><div><h1 id="whoTitle">Admin</h1><div class="muted small" id="whoSub"></div></div><div class="row"><span class="muted small" id="loadState"></span><button class="btn ghost sm" id="refresh">↻ Refresh</button></div></div>
     <div class="tabs" role="tablist">
-      <button data-t="hp" aria-selected="true">🏠 House Points</button><button data-t="students">👥 Students</button><button data-t="log">📋 Sign-in log</button><button data-t="setup">⚙️ Setup</button>
+      <button data-t="students" aria-selected="true">👥 Students &amp; progress</button><button data-t="hp">🏠 House Points</button><button data-t="log">📋 Sign-in log</button><button data-t="teachers" data-super>🧑‍🏫 Teachers</button><button data-t="switches" data-super>🔀 Criteria switches</button><button data-t="setup" data-super>⚙️ Setup</button>
     </div>
 
-    <section id="t-hp">
+    <section id="t-hp" class="hidden">
       <div class="card">
         <h2>House Points after each lesson</h2>
         <p class="muted small" style="margin-top:4px">A lesson ends when nobody in that class has done any work for 15 minutes (at least 3 students must have worked, so home learning isn't counted). While this page is open it checks every 2 minutes and emails you the top 5 for each lesson that has ended. Lessons that ended while it was closed (in the last 24 hours) are emailed when you next open it.</p>
@@ -106,13 +135,14 @@ input.t:focus,select.t:focus{outline:none;border-color:var(--navy)}
       <div id="hpList"></div>
     </section>
 
-    <section id="t-students" class="hidden">
+    <section id="t-students">
       <div class="card">
-        <h2>Students <span class="n" id="stCount">0</span></h2>
-        <p class="muted small" style="margin-top:4px">Only you can change a student's course, grade, level or teacher. Changes apply the next time the student signs in, on any computer.</p>
+        <h2><span id="stTitle">Students</span> <span class="n" id="stCount">0</span></h2>
+        <p class="muted small" style="margin-top:4px" id="stIntro">Open a student to see their progress and send them feedback. Only the super admin can change a student's course, grade, level or teacher.</p>
+        <div id="stWarn"></div>
         <div class="row" style="margin-top:12px"><input class="t" id="stQ" placeholder="Search name or email" style="max-width:280px">
           <select class="t" id="stC" style="max-width:190px"><option value="">All courses</option><option value="cs">Computer Science</option><option value="design">Design</option><option value="it">IT</option></select>
-          <button class="btn ghost sm" id="stAdd">＋ Set up a student by email</button></div>
+          <button class="btn ghost sm" id="stAdd" data-super>＋ Set up a student by email</button></div>
         <div class="scroll" style="margin-top:12px"><table class="tbl" id="stTbl"></table></div>
       </div>
     </section>
@@ -126,6 +156,29 @@ input.t:focus,select.t:focus{outline:none;border-color:var(--navy)}
       </div>
     </section>
 
+    <section id="t-teachers" class="hidden">
+      <div class="card">
+        <h2>Waiting for approval <span class="n" id="tqCount">0</span></h2>
+        <p class="muted small" style="margin-top:4px">Teachers request access from this page (or the Design teacher sign-up). Choose which name(s) students pick for this teacher: the teacher then sees only those students. Changes reach every computer within about 5 minutes.</p>
+        <div class="scroll" style="margin-top:10px"><table class="tbl" id="tqTbl"></table></div>
+      </div>
+      <div class="card">
+        <h2>Teacher admins <span class="n" id="taCount">0</span></h2>
+        <div class="scroll" style="margin-top:10px"><table class="tbl" id="taTbl"></table></div>
+        <div id="taMsg"></div>
+      </div>
+    </section>
+
+    <section id="t-switches" class="hidden">
+      <div class="card">
+        <h2>Criteria switches (Design and IT)</h2>
+        <p class="muted small" style="margin-top:4px">Switch a criterion on and it opens for every student in that unit. Changes reach every computer within about 5 minutes.</p>
+        <div class="scroll" style="margin-top:10px"><table class="tbl" id="swTbl"></table></div>
+        <div class="row" style="margin-top:14px"><button class="btn" id="swGo">Apply switches</button></div>
+        <div id="swMsg"></div>
+      </div>
+    </section>
+
     <section id="t-setup" class="hidden">
       <div class="card">
         <h2>1 · Teacher log sheet</h2>
@@ -134,7 +187,13 @@ input.t:focus,select.t:focus{outline:none;border-color:var(--navy)}
         <div id="sheetMsg"></div>
       </div>
       <div class="card">
-        <h2>2 · Email alerts form</h2>
+        <h2>2 · Design Studio Log sheet</h2>
+        <p class="muted small" style="margin-top:4px">The Google Sheet linked to your <b>Design Studio Log</b> form: it holds Design and IT students' work. In the sheet, <b>Share → General access → Anyone with the link: Viewer</b>, then paste its link here. Without it, Design and IT progress can't be shown.</p>
+        <label class="f" for="setDs">Design log sheet link</label><input class="t" id="setDs" placeholder="https://docs.google.com/spreadsheets/d/…">
+        <div id="dsMsg"></div>
+      </div>
+      <div class="card">
+        <h2>3 · Email alerts form</h2>
         <p class="muted small" style="margin-top:4px">The lesson emails are sent through a Google Form that emails you each response, so your Gmail stays hidden.</p>
         <div class="notice warn"><b>Not made yet?</b> It takes about 3 minutes:<ol>
           <li>In Google Forms, create a new form called <b>SDC Alerts</b>.</li>
@@ -145,7 +204,7 @@ input.t:focus,select.t:focus{outline:none;border-color:var(--navy)}
         <div id="notifyMsg"></div>
       </div>
       <div class="row"><button class="btn" id="saveSet">Save setup</button><button class="btn ghost" id="testMail">Send a test email</button></div>
-      <p class="muted small" style="margin-top:12px">These links are saved on this computer only. To use the admin page on another computer, paste them there too.</p>
+      <p class="muted small" style="margin-top:12px">Saving also passes the two sheet links, locked, to every approved teacher, so their dashboards work on any computer. Teachers never see the links themselves.</p>
     </section>
   </div>
 </main>
@@ -170,37 +229,176 @@ const fmtD = ms => new Date(ms).toLocaleDateString("en-GB", { weekday:"short", d
 const fmtDT = ms => fmtD(ms) + ", " + fmtT(ms);
 const pill = c => C[c] ? `<span class="pill ${c}">${esc(C[c].short)}</span>` : `<span class="pill">${esc(c || "?")}</span>`;
 
-/* ---------------- unlock with the admin recovery password ---------------- */
-let KEYS = null;
+/* ================= WHO IS SIGNED IN =================
+   ROLE "super": the admin password unlocks the signing key: everything.
+   ROLE "teacher": an approved teacher account: only students who chose this teacher. */
+let KEYS = null, ROLE = null, ME = null, CFG = { py:"", ds:"" };
+const b64 = X.e64, unb64 = X.d64;
 async function unlock(pw){
-  const d64 = X.d64;
   const base = await crypto.subtle.importKey("raw", TE.encode(pw), "PBKDF2", false, ["deriveKey"]);
-  const key = await crypto.subtle.deriveKey({ name:"PBKDF2", salt:d64(WRAP.salt), iterations:WRAP.iter, hash:"SHA-256" }, base, { name:"AES-GCM", length:256 }, false, ["decrypt"]);
-  const priv = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name:"AES-GCM", iv:d64(WRAP.iv) }, key, d64(WRAP.ct))));
+  const key = await crypto.subtle.deriveKey({ name:"PBKDF2", salt:unb64(WRAP.salt), iterations:WRAP.iter, hash:"SHA-256" }, base, { name:"AES-GCM", length:256 }, false, ["decrypt"]);
+  const priv = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name:"AES-GCM", iv:unb64(WRAP.iv) }, key, unb64(WRAP.ct))));
   return { sig: await crypto.subtle.importKey("jwk", priv.sig, { name:"ECDSA", namedCurve:"P-256" }, false, ["sign"]) };
 }
-const fails = () => load("sdc_admin_fail", { n:0, until:0 });
+const canSee = teacher => ROLE === "super" || (!!ME && (ME.names || [ME.name]).some(n => SDC.sameTeacher(n, teacher)));
+const isSuper = () => ROLE === "super";
+
+/* ---- the course state: switches + approved teachers (signed), read from the Design switches sheet ---- */
+let DCFG = null, STATE = null, REQS = [];
+async function designConfig(){
+  if (DCFG) return DCFG;
+  try { const t = await (await fetch("/myp-design-curriculum-pathways/index.html", { cache:"no-store" })).text();
+    const m = t.match(/\/\*CONFIG-START\*\/\s*const CONFIG = ([\s\S]*?);\s*\/\*CONFIG-END\*\//); DCFG = m ? JSON.parse(m[1]) : {}; } catch(e){ DCFG = {}; }
+  return DCFG;
+}
+const PENDING_KEY = "sdc_state_pending";
+async function loadCourseState(){
+  const dc = await designConfig();
+  let r = { state:null, requests:[] };
+  try { r = await SDC.loadState(dc.controlCsv || SDC.CONTROL.csv); } catch(e){}
+  let st = r.state;
+  const pend = load(PENDING_KEY, null);   // a change published from this computer that Google hasn't republished yet
+  if (pend && (!st || String(pend.t) > String(st.t)) && Date.now() - Date.parse(pend.t) < 30 * 60000) st = pend;
+  STATE = st ? { unlocks: st.unlocks || {}, teachers: st.teachers || [], declined: st.declined || [], t: st.t } : { unlocks: dc.unlocks || {}, teachers: dc.teachers || [], declined: dc.declined || [], t: "" };
+  REQS = r.requests || [];
+  return STATE;
+}
+async function publishCourseState(next){
+  const dc = await designConfig();
+  const body = { unlocks: next.unlocks, teachers: next.teachers || [], declined: next.declined || [], t: new Date().toISOString() };
+  const sig = new Uint8Array(await crypto.subtle.sign({ name:"ECDSA", hash:"SHA-256" }, KEYS.sig, TE.encode(SDC.canon(body))));
+  const signed = Object.assign({}, body, { sig: b64(sig) });
+  const form = (dc.controlForm && (dc.controlForm.match(/docs\.google\.com\/forms\/(?:u\/\d+\/)?d\/(e\/)?([^/]+)\//) || [])) || [];
+  const action = form[2] ? `https://docs.google.com/forms/d/${form[1] || ""}${form[2]}/formResponse` : SDC.CONTROL.form;
+  const entry = ((dc.controlForm || "").match(/entry\.(\d+)=/) || [])[1]; const p = new URLSearchParams(); p.append(entry ? "entry." + entry : SDC.CONTROL.entry, JSON.stringify(signed));
+  try { await fetch(action, { method:"POST", mode:"no-cors", body:p }); } catch(e){ return false; }
+  store(PENDING_KEY, signed); STATE = Object.assign({}, body); return true;
+}
+
+/* ---- teacher keys: each teacher has a key pair; the private half is locked with their own password.
+        The super admin locks the sheet links for each teacher with that teacher's public key. ---- */
+async function pwKey(pw, salt, iter){ const base = await crypto.subtle.importKey("raw", TE.encode(pw), "PBKDF2", false, ["deriveKey", "deriveBits"]);
+  return crypto.subtle.deriveKey({ name:"PBKDF2", salt, iterations:iter, hash:"SHA-256" }, base, { name:"AES-GCM", length:256 }, false, ["encrypt", "decrypt"]); }
+async function pwHash(pw, saltB64){   // same as the Design course, so one password works in both
+  const salt = saltB64 ? unb64(saltB64) : crypto.getRandomValues(new Uint8Array(16));
+  const key = await crypto.subtle.importKey("raw", TE.encode(pw), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name:"PBKDF2", salt, iterations:100000, hash:"SHA-256" }, key, 256);
+  return { salt: b64(salt), hash: b64(new Uint8Array(bits)) };
+}
+async function newTeacherKeys(pw){
+  const kp = await crypto.subtle.generateKey({ name:"ECDH", namedCurve:"P-256" }, true, ["deriveKey"]);
+  const pub = await crypto.subtle.exportKey("jwk", kp.publicKey), priv = await crypto.subtle.exportKey("jwk", kp.privateKey);
+  const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name:"AES-GCM", iv }, await pwKey(pw, salt, 200000), TE.encode(JSON.stringify(priv))));
+  return { pub: { kty:pub.kty, crv:pub.crv, x:pub.x, y:pub.y }, wpriv: { s:b64(salt), iv:b64(iv), ct:b64(ct) } };
+}
+async function lockFor(pubJwk, obj){
+  const eph = await crypto.subtle.generateKey({ name:"ECDH", namedCurve:"P-256" }, true, ["deriveKey"]);
+  const pub = await crypto.subtle.importKey("jwk", Object.assign({ ext:true }, pubJwk), { name:"ECDH", namedCurve:"P-256" }, false, []);
+  const key = await crypto.subtle.deriveKey({ name:"ECDH", public:pub }, eph.privateKey, { name:"AES-GCM", length:256 }, false, ["encrypt"]);
+  const iv = crypto.getRandomValues(new Uint8Array(12)), e = await crypto.subtle.exportKey("jwk", eph.publicKey);
+  return { epk: { kty:e.kty, crv:e.crv, x:e.x, y:e.y }, iv: b64(iv), ct: b64(new Uint8Array(await crypto.subtle.encrypt({ name:"AES-GCM", iv }, key, TE.encode(JSON.stringify(obj))))) };
+}
+async function openFor(t, pw){
+  const w = t.wpriv, priv = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name:"AES-GCM", iv:unb64(w.iv) }, await pwKey(pw, unb64(w.s), 200000), unb64(w.ct))));
+  const pk = await crypto.subtle.importKey("jwk", priv, { name:"ECDH", namedCurve:"P-256" }, false, ["deriveKey"]);
+  const epk = await crypto.subtle.importKey("jwk", Object.assign({ ext:true }, t.cfg.epk), { name:"ECDH", namedCurve:"P-256" }, false, []);
+  const key = await crypto.subtle.deriveKey({ name:"ECDH", public:epk }, pk, { name:"AES-GCM", length:256 }, false, ["decrypt"]);
+  return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name:"AES-GCM", iv:unb64(t.cfg.iv) }, key, unb64(t.cfg.ct))));
+}
+const staffCfg = () => ({ py: sheetLink() || "", ds: load(DS_KEY, "") || "" });
+
+/* ---- sign-in screens ---- */
+const fails = k => load("sdc_admin_fail_" + k, { n:0, until:0 });
+const failNote = (k, f) => { f.n++; if (f.n >= 5) f.until = Date.now() + Math.min(30, Math.pow(2, f.n - 5)) * 60000; store("sdc_admin_fail_" + k, f); };
+const note = (id, kind, html) => $(id).innerHTML = `<div class="notice ${kind}">${html}</div>`;
+document.querySelectorAll("#lgTabs button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#lgTabs button").forEach(x => x.setAttribute("aria-selected", x === b));
+  ["teacher","request","super"].forEach(t => $("l-" + t).classList.toggle("hidden", t !== b.dataset.l));
+});
+$("knownTeachers").innerHTML = [...new Set(Object.values(TEACHERS).flat())].map(n => `<option value="${esc(n)}">`).join("");
+
 $("pwGo").onclick = async () => {
-  const f = fails(); if (f.until > Date.now()){ $("pwMsg").innerHTML = `<div class="notice bad">Too many wrong tries. Wait ${Math.ceil((f.until - Date.now()) / 60000)} minute(s).</div>`; return; }
-  $("pwGo").disabled = true; $("pwMsg").innerHTML = `<div class="notice ok">Checking…</div>`;
-  try { KEYS = await unlock($("pw").value); store("sdc_admin_fail", { n:0, until:0 }); }
-  catch(e){ KEYS = null; f.n++; if (f.n >= 5) f.until = Date.now() + Math.min(30, Math.pow(2, f.n - 5)) * 60000; store("sdc_admin_fail", f);
-    SDC.log("adminfail", { name:"(unknown)", course:"" }, { tries:f.n });
-    $("pwMsg").innerHTML = `<div class="notice bad">That password is not right.</div>`; }
+  const f = fails("super"); if (f.until > Date.now()) return note("pwMsg", "bad", `Too many wrong tries. Wait ${Math.ceil((f.until - Date.now()) / 60000)} minute(s).`);
+  $("pwGo").disabled = true; note("pwMsg", "ok", "Checking…");
+  try { KEYS = await unlock($("pw").value); store("sdc_admin_fail_super", { n:0, until:0 }); }
+  catch(e){ KEYS = null; failNote("super", f); SDC.log("adminfail", { name:"(unknown)", course:"" }, { tries:f.n }); note("pwMsg", "bad", "That password is not right."); }
   $("pwGo").disabled = false; $("pw").value = "";
-  if (KEYS){ $("locked").classList.add("hidden"); $("app").classList.remove("hidden"); $("outBtn").classList.remove("hidden"); start(); }
+  if (KEYS){ ROLE = "super"; ME = { name:"Super admin" }; enter(); }
 };
 $("pw").addEventListener("keydown", e => { if (e.key === "Enter") $("pwGo").click(); });
+
+const SCHOOL = /^[^\s@]+@sisd\.ae$/i;
+$("tGo").onclick = async () => {
+  const email = $("tEmail").value.trim().toLowerCase(), pw = $("tPw").value;
+  if (!SCHOOL.test(email)) return note("tMsg", "bad", "Use your full SISD email address.");
+  const f = fails(email); if (f.until > Date.now()) return note("tMsg", "bad", `Too many wrong tries. Wait ${Math.ceil((f.until - Date.now()) / 60000)} minute(s).`);
+  $("tGo").disabled = true; note("tMsg", "ok", "Checking…");
+  try {
+    await loadCourseState();
+    const t = STATE.teachers.find(x => x.email === email);
+    if (!t){ return note("tMsg", REQS.some(r => r.email === email) ? "warn" : "bad", REQS.some(r => r.email === email) ? "Your request is waiting for the super admin to approve it." : (STATE.declined.includes(email) ? "Your access was not approved. Speak to the super admin." : "No approved teacher account for that email. Use <b>Request teacher access</b> first.")); }
+    if ((await pwHash(pw, t.salt)).hash !== t.hash){ failNote(email, f); SDC.log("adminfail", { name:t.name, email, course:"" }, { teacher:true, tries:f.n }); return note("tMsg", "bad", "That password is not right."); }
+    store("sdc_admin_fail_" + email, { n:0, until:0 });
+    ROLE = "teacher"; ME = { name:t.name, email, names: (t.names && t.names.length ? t.names : [t.name]) };
+    if (t.wpriv && t.cfg){ try { CFG = await openFor(t, pw); } catch(e){ CFG = { py:"", ds:"" }; } }
+    else {
+      CFG = { py:"", ds:"" };
+      if (!t.pub && !REQS.some(r => r.email === email && r.pub)){   // approved in the Design course before this dashboard existed: ask for data access once
+        const k = await newTeacherKeys(pw); await postRequest({ email, name:t.name, as:t.name, salt:t.salt, hash:t.hash, t:new Date().toISOString(), pub:k.pub, wpriv:k.wpriv, access:true });
+      }
+    }
+    $("tPw").value = ""; SDC.log("staffsignin", { name:t.name, email, course:"" }, { role:"teacher" }); enter();
+  } catch(e){ note("tMsg", "bad", "Couldn't check your account: " + esc(e.message || "no connection") + "."); }
+  finally { $("tGo").disabled = false; }
+};
+$("tPw").addEventListener("keydown", e => { if (e.key === "Enter") $("tGo").click(); });
+
+async function postRequest(req){
+  const dc = await designConfig(), f = (dc.controlForm || "").match(/docs\.google\.com\/forms\/(?:u\/\d+\/)?d\/(e\/)?([^/]+)\//), entry = ((dc.controlForm || "").match(/entry\.(\d+)=/) || [])[1];
+  const p = new URLSearchParams(); p.append(entry ? "entry." + entry : SDC.CONTROL.entry, JSON.stringify({ request:req }));
+  await fetch(f ? `https://docs.google.com/forms/d/${f[1] || ""}${f[2]}/formResponse` : SDC.CONTROL.form, { method:"POST", mode:"no-cors", body:p });
+}
+$("rGo").onclick = async () => {
+  const name = $("rName").value.trim().replace(/\s+/g, " "), as = $("rAs").value.trim().replace(/\s+/g, " "), email = $("rEmail").value.trim().toLowerCase(), pw = $("rPw").value;
+  if (name.split(" ").length < 2) return note("rMsg", "bad", "Type your first and last name.");
+  if (!as) return note("rMsg", "bad", "Type the name students pick for you, e.g. Mr. Ahmed.");
+  if (!SCHOOL.test(email)) return note("rMsg", "bad", "Use your full SISD email address.");
+  if (pw.length < 10 || !/[a-z]/i.test(pw) || !/\d/.test(pw)) return note("rMsg", "bad", "Use at least 10 characters with letters and a number.");
+  if (pw !== $("rPw2").value) return note("rMsg", "bad", "The two passwords don't match.");
+  $("rGo").disabled = true; note("rMsg", "ok", "Sending…");
+  try {
+    const h = await pwHash(pw), k = await newTeacherKeys(pw);
+    await postRequest({ email, name: as, full: name, as, salt:h.salt, hash:h.hash, t:new Date().toISOString(), pub:k.pub, wpriv:k.wpriv });
+    SDC.log("staffrequest", { name, email, course:"" }, { as });
+    ["rName","rAs","rEmail","rPw","rPw2"].forEach(id => $(id).value = "");
+    note("rMsg", "ok", "Request sent. Once the super admin approves it, sign in on the <b>Teacher</b> tab.");
+  } catch(e){ note("rMsg", "bad", "Couldn't send the request. Check the internet connection and try again."); }
+  finally { $("rGo").disabled = false; }
+};
+
+function enter(){
+  $("locked").classList.add("hidden"); $("app").classList.remove("hidden"); $("outBtn").classList.remove("hidden");
+  document.querySelectorAll("[data-super]").forEach(e => e.classList.toggle("hidden", !isSuper()));
+  $("whoTitle").textContent = isSuper() ? "Super admin" : "Teacher dashboard";
+  $("whoSub").textContent = isSuper() ? "All students, all courses" : "Signed in as " + ME.name + " · you see students who chose " + ME.names.join(" / ");
+  $("stTitle").textContent = isSuper() ? "Students" : "My students";
+  start();
+}
 $("outBtn").onclick = () => location.reload();
 
 /* ---------------- tabs ---------------- */
-document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
-  document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
-  ["hp","students","log","setup"].forEach(t => $("t-" + t).classList.toggle("hidden", t !== b.dataset.t));
+const TABS = ["hp","students","log","teachers","switches","setup"];
+document.querySelectorAll("#app .tabs button").forEach(b => b.onclick = () => {
+  if (b.hasAttribute("data-super") && !isSuper()) return;
+  document.querySelectorAll("#app .tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
+  TABS.forEach(t => $("t-" + t).classList.toggle("hidden", t !== b.dataset.t));
+  if (b.dataset.t === "teachers") renderTeachers();
+  if (b.dataset.t === "switches") renderSwitches();
 });
 
 /* ---------------- setup ---------------- */
-const SHEET_KEY = "sdc_admin_sheet", NOTIFY_KEY = "sdc_admin_notify";
+const SHEET_KEY = "sdc_admin_sheet", NOTIFY_KEY = "sdc_admin_notify", DS_KEY = "sdc_admin_ds";
 function sheetLink(){ return load(SHEET_KEY, "") || load("pyl_admin_sheet", ""); }   // falls back to the Python admin's saved link
 const sheetId = l => (String(l || "").match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})/) || [])[1] || null;
 function parseForm(link){
@@ -208,17 +406,26 @@ function parseForm(link){
   const ent = []; const re = /entry\.(\d+)=/g; let x; while ((x = re.exec(link))) ent.push("entry." + x[1]);
   return ent.length >= 5 ? { action:`https://docs.google.com/forms/d/${m[1] || ""}${m[2]}/formResponse`, ent } : null;
 }
+const pyLink = () => isSuper() ? sheetLink() : (CFG.py || ""), dsLink = () => isSuper() ? load(DS_KEY, "") : (CFG.ds || "");
 function paintSetup(){
-  $("setSheet").value = sheetLink(); $("setNotify").value = load(NOTIFY_KEY, "");
+  if (!isSuper()){ $("hpWarn").innerHTML = !sheetId(pyLink()) ? `<div class="notice warn">Your dashboard isn't connected to the class data yet. Ask the super admin to open <b>Setup</b> and press <b>Save setup</b>.</div>` : ""; return; }
+  $("setSheet").value = sheetLink(); $("setNotify").value = load(NOTIFY_KEY, ""); $("setDs").value = load(DS_KEY, "");
+  $("dsMsg").innerHTML = sheetId(load(DS_KEY, "")) ? `<div class="notice ok">Connected.</div>` : `<div class="notice warn">Not connected yet: Design and IT progress needs this.</div>`;
   $("sheetMsg").innerHTML = sheetId(sheetLink()) ? `<div class="notice ok">Connected.</div>` : `<div class="notice warn">Not connected yet: the House Points, Students and Sign-in log tabs need this.</div>`;
   $("notifyMsg").innerHTML = parseForm(load(NOTIFY_KEY, "")) ? `<div class="notice ok">Connected: lesson emails will be sent.</div>` : `<div class="notice warn">Not connected yet: lesson results show here but can't be emailed.</div>`;
   $("hpWarn").innerHTML = !sheetId(sheetLink()) ? `<div class="notice warn">Connect your log sheet in <b>Setup</b> first.</div>` : !parseForm(load(NOTIFY_KEY, "")) ? `<div class="notice warn">Emails are off until you add the alerts form in <b>Setup</b>. Results still appear below.</div>` : "";
 }
-$("saveSet").onclick = () => {
-  const s = $("setSheet").value.trim(), n = $("setNotify").value.trim();
-  if (s && !sheetId(s)) return toast("The sheet link should contain docs.google.com/spreadsheets/d/…");
+$("saveSet").onclick = async () => {
+  const s = $("setSheet").value.trim(), n = $("setNotify").value.trim(), d = $("setDs").value.trim();
+  if ((s && !sheetId(s)) || (d && !sheetId(d))) return toast("Sheet links should contain docs.google.com/spreadsheets/d/…");
   if (n && !parseForm(n)) return toast("The form link should be a pre-filled link with five entry.… parts.");
-  store(SHEET_KEY, s); store(NOTIFY_KEY, n); paintSetup(); toast("Saved."); refresh();
+  const changed = s !== sheetLink() || d !== load(DS_KEY, "");
+  store(SHEET_KEY, s); store(NOTIFY_KEY, n); store(DS_KEY, d); paintSetup(); refresh();
+  await loadCourseState();
+  if (STATE.teachers.some(t => t.pub)){   // pass the links, locked, to every teacher
+    const teachers = await Promise.all(STATE.teachers.map(async t => t.pub ? Object.assign({}, t, { cfg: await lockFor(t.pub, staffCfg()) }) : t));
+    toast((await publishCourseState(Object.assign({}, STATE, { teachers }))) ? "Saved and shared with teachers." : "Saved here, but Google Forms couldn't be reached.");
+  } else toast(changed ? "Saved." : "Saved.");
 };
 async function sendMail(type, student, teacher, text){
   const f = parseForm(load(NOTIFY_KEY, "")); if (!f) return false;
@@ -233,7 +440,7 @@ $("testMail").onclick = async () => {
 };
 
 /* ---------------- reading the log sheet ---------------- */
-let ROWS = [], PYACCTS = {};
+let ROWS = [], PYACCTS = {}, PYSNAP = {}, DS = {};
 function parseCSV(t){
   const R = []; let row = [], cur = "", q = false;
   for (let i = 0; i < t.length; i++){ const c = t[i];
@@ -243,7 +450,7 @@ function parseCSV(t){
   return R;
 }
 async function refresh(){
-  const id = sheetId(sheetLink()); paintSetup();
+  const id = sheetId(pyLink()); paintSetup();
   if (!id){ renderAll(); return; }
   $("loadState").textContent = "Loading…";
   const urls = [`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&headers=1&t=${Date.now()}`, `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&t=${Date.now()}`];
@@ -251,19 +458,50 @@ async function refresh(){
   for (const u of urls){ try { const r = await fetch(u, { cache:"no-store" }); if (!r.ok) continue; const t = await r.text(); if (/<html/i.test(t.slice(0, 300))) continue; text = t; break; } catch(e){} }
   if (text == null){ $("loadState").textContent = ""; $("hpWarn").innerHTML = `<div class="notice bad">Couldn't read the log sheet. In the sheet, set <b>Share → Anyone with the link: Viewer</b>.</div>`; renderAll(); return; }
   const R = parseCSV(text), head = (R[0] || []).map(x => x.trim().toLowerCase()), di = head.findIndex(x => x === "data" || x.indexOf("data") === 0);
-  ROWS = []; PYACCTS = {};
+  ROWS = []; PYACCTS = {}; PYSNAP = {};
   R.slice(1).forEach(r => {
     let d = null; try { d = JSON.parse(r[di] || ""); } catch(e){ return; }
     if (!d || !d.acct) return;
     if (d.sdc){ d.when = Date.parse(d.at) || 0; ROWS.push(d); return; }
     const a = d.acct, k = SDC.keyOf(a.email, a.name), when = Date.parse(d.at) || 0;   // older Python Pathways rows: known CS students
     if (!PYACCTS[k] || PYACCTS[k].when <= when) PYACCTS[k] = { when, name:a.name, email:a.email || "", grade:String(a.grade || ""), teacher:a.teacher || "", course:"cs", level:a.path || "" };
+    if (d.paths && (!PYSNAP[k] || PYSNAP[k].when <= when)) PYSNAP[k] = { when, snap:d };
   });
   ROWS.sort((a, b) => a.when - b.when);
+  await loadDesign();
   $("loadState").textContent = "Updated " + fmtT(Date.now());
   renderAll(); await autoSend();
 }
 $("refresh").onclick = refresh;
+
+/* Design and IT work: the Design Studio Log sheet (one row per event; work arrives in numbered chunks) */
+async function fetchCsv(id){
+  const urls = [`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&headers=1&t=${Date.now()}`, `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&t=${Date.now()}`];
+  for (const u of urls){ try { const r = await fetch(u, { cache:"no-store" }); if (!r.ok) continue; const t = await r.text(); if (/<html/i.test(t.slice(0, 300))) continue; return t; } catch(e){} }
+  return null;
+}
+async function loadDesign(){
+  DS = {}; const id = sheetId(dsLink()); if (!id) return;
+  const text = await fetchCsv(id); if (text == null) return;
+  const R = parseCSV(text), head = (R[0] || []).map(x => x.trim().toLowerCase());
+  const col = (n, fb) => { const i = head.findIndex(x => x === n || x.indexOf(n) === 0); return i >= 0 ? i : fb; };
+  const ci = { email:col("email", 1), name:col("name", 2), grade:col("grade", 3), teacher:col("teacher", 4), crit:col("criterion", 5), event:col("event", 6), role:col("role", 7), det:col("details", 8) };
+  const parts = {};
+  R.slice(1).forEach(r => {
+    const email = String(r[ci.email] || "").trim().toLowerCase(); if (!/@/.test(email) || /^staff$/i.test(r[ci.grade] || "") || /teacher/i.test(r[ci.role] || "")) return;
+    const st = DS[email] = DS[email] || { email, name:"", grade:"", teacher:"", events:[], work:{}, last:0 };
+    st.name = r[ci.name] || st.name; st.grade = r[ci.grade] || st.grade; st.teacher = r[ci.teacher] || st.teacher;
+    let det = String(r[ci.det] || ""); const tm = det.match(/\s\|\s(\d{4}-\d\d-\d\dT[\d:.]+Z)\s*$/); const when = tm ? Date.parse(tm[1]) : 0; if (tm) det = det.slice(0, tm.index);
+    st.last = Math.max(st.last, when);
+    if (det.startsWith("DS1|W|")){ const p = det.split("|"), [, , c, , kn, wid] = p, [k, n] = kn.split("/").map(Number), key = email + "|" + c + "|" + wid;
+      const e = parts[key] = parts[key] || { email, c, wid, n, got:{}, when }; e.got[k] = p.slice(6).join("|"); e.when = Math.max(e.when, when); return; }
+    if (det.startsWith("DS1|")) return;
+    st.events.push({ when, crit:String(r[ci.crit] || "").replace(/^Criterion\s*/i, ""), event:r[ci.event] || "", det:det.slice(0, 300) });
+  });
+  Object.values(parts).forEach(e => { if (Object.keys(e.got).length !== e.n) return;
+    let w = null; try { w = JSON.parse(Array.from({ length:e.n }, (_, i) => e.got[i + 1]).join("")); } catch(x){ return; }
+    const st = DS[e.email], cur = st.work[e.c]; if (!cur || parseInt(e.wid, 36) >= parseInt(cur.wid, 36)) st.work[e.c] = { wid:e.wid, when:e.when, w }; });
+}
 
 /* ---------------- House Points lessons ---------------- */
 const classKey = a => [a.course, a.grade, a.teacher, a.cls || ""].join("|");
@@ -295,7 +533,7 @@ function lessons(){
     L.wrong = ROWS.filter(r => r.type === "wrongcourse" && r.when >= L.start - 10 * 60000 && r.when <= L.end + 60000 && (r.acct.teacher === L.cls.teacher || Object.values(L.students).some(s => s.name === r.acct.name)));
     L.signins = new Set(ROWS.filter(r => (r.type === "signin" || r.type === "signup") && r.when >= L.start - 15 * 60000 && r.when <= L.end && classKey(r.acct).split("|").slice(0, 3).join("|") === L.key.split("|").slice(0, 3).join("|")).map(r => SDC.keyOf(r.acct.email, r.acct.name))).size;
   });
-  return out.sort((a, b) => b.last - a.last);
+  return out.filter(L => canSee(L.cls.teacher)).sort((a, b) => b.last - a.last);
 }
 function sentSet(){
   const s = Object.assign({}, load("sdc_hpsent", {}));
@@ -327,7 +565,7 @@ async function sendLesson(L, manual){
 }
 let sending = false;
 async function autoSend(){
-  if (sending || !parseForm(load(NOTIFY_KEY, ""))) return; sending = true;
+  if (!isSuper() || sending || !parseForm(load(NOTIFY_KEY, ""))) return; sending = true;
   try { for (const L of lessons()) if (L.lesson && L.ended && !L.sent && Date.now() - L.end < CATCHUP_H * 3600000 && L.top.length){ await sendLesson(L, false); await new Promise(r => setTimeout(r, 800)); } }
   finally { sending = false; }
   renderHP();
@@ -335,10 +573,10 @@ async function autoSend(){
 function renderHP(){
   const all = lessons().filter(L => L.lesson || !L.ended).slice(0, 40);
   if (!all.length){ $("hpList").innerHTML = `<div class="card muted">No lessons yet. Once students complete tasks through the platform, each class's lesson appears here.</div>`; return; }
-  const canMail = !!parseForm(load(NOTIFY_KEY, ""));
+  const canMail = isSuper() && !!parseForm(load(NOTIFY_KEY, ""));
   $("hpList").innerHTML = all.map((L, i) => {
     const state = !L.ended ? `<span class="pill bad">● Live, last work ${fmtT(L.last)}</span>` : L.sent ? `<span class="pill ok">✓ Emailed ${fmtT(L.sent)}</span>` : !L.lesson ? `<span class="pill">Fewer than ${MIN_STUDENTS} students</span>` : `<span class="pill warn">Not emailed yet</span>`;
-    const btn = !L.ended ? `<button class="btn red sm" data-end="${i}">End lesson now and email</button>` : `<button class="btn ghost sm" data-send="${i}" ${canMail ? "" : "disabled"}>${L.sent ? "Email again" : "Email now"}</button>`;
+    const btn = !isSuper() ? "" : !L.ended ? `<button class="btn red sm" data-end="${i}">End lesson now and email</button>` : `<button class="btn ghost sm" data-send="${i}" ${canMail ? "" : "disabled"}>${L.sent ? "Email again" : "Email now"}</button>`;
     return `<div class="card lesson ${L.ended ? "" : "live"}"><h3>${pill(L.cls.course)} ${esc(classLabel(L.cls))} ${state}</h3>
       <div class="muted small">${esc(fmtD(L.start))}, ${esc(fmtT(L.start))}–${esc(fmtT(L.end))} · ${L.n} student${L.n === 1 ? "" : "s"} completed work${L.signins ? " · " + L.signins + " signed in" : ""}${L.wrong.length ? ` · <b style="color:var(--bad)">${L.wrong.length} wrong-course attempt${L.wrong.length === 1 ? "" : "s"}</b>` : ""}</div>
       <ol class="top5">${L.top.map(s => `<li><b>${esc(s.name)}</b><span class="small">${s.tasks} task${s.tasks === 1 ? "" : "s"} · score ${fmtScore(s.score)}${levelName(s.course, s.level) ? " · " + esc(levelName(s.course, s.level)) : ""}</span></li>`).join("")}</ol>
@@ -363,20 +601,180 @@ function students(){
     if (r.type !== "wrongcourse"){ Object.assign(s, { name:r.acct.name, email:r.acct.email || s.email || "", grade:r.acct.grade || s.grade, teacher:r.acct.teacher || s.teacher, course:r.acct.course || s.course, level:r.acct.level || s.level, cls:r.acct.cls || s.cls || "" }); }
     else { s.name = s.name || r.acct.name; s.email = s.email || r.acct.email; s.wrong = (s.wrong || 0) + 1; }
     if (r.type === "signin" || r.type === "signup"){ s.signins++; s.last = Math.max(s.last, r.when); }
+    if (r.type === "task") s.active = Math.max(s.active || 0, r.when);
   });
-  return Object.values(S).filter(s => s.name).sort((a, b) => (a.course || "").localeCompare(b.course || "") || String(a.grade).localeCompare(String(b.grade), undefined, { numeric:true }) || a.name.localeCompare(b.name));
+  Object.values(DS).forEach(d => {   // Design and IT students who haven't signed in through the platform yet
+    const k = "e:" + d.email; if (S[k]) return;
+    S[k] = { key:k, name:d.name, email:d.email, grade:String(d.grade || "").replace(/^G/, "").split(/\s/)[0], teacher:d.teacher, course: Object.keys(d.work).length && Object.values(d.work).every(w => w.w && w.w.g === "10IT") ? "it" : "design", last:0, signins:0 };
+  });
+  Object.values(S).forEach(s => { const ps = PYSNAP[s.key]; s.py = ps ? ps.snap : null; s.ds = DS[(s.email || "").toLowerCase()] || null;
+    s.active = Math.max(s.active || 0, ps ? ps.when : 0, s.ds ? s.ds.last : 0); });
+  return Object.values(S).filter(s => s.name && canSee(s.teacher)).sort((a, b) => (a.course || "").localeCompare(b.course || "") || String(a.grade).localeCompare(String(b.grade), undefined, { numeric:true }) || a.name.localeCompare(b.name));
+}
+/* short progress summary for the table */
+function pySummary(snap){
+  if (!snap || !snap.paths) return null; let solved = 0, house = 0, lessons = 0;
+  Object.values(snap.paths).forEach(P => { solved += P.solved || 0; house += P.house || 0; lessons += Object.keys(P.lessons || {}).length; });
+  return { solved, house, lessons };
+}
+function dsSummary(d){
+  if (!d) return null; const out = {};
+  ["A","B","C","D"].forEach(c => { const w = d.work[c] && d.work[c].w, ev = d.events.filter(e => e.crit === c);
+    const done = w ? w.strands.filter(x => x.done).length : new Set(ev.filter(e => /^Strand .* complete$/.test(e.event)).map(e => e.event)).size;
+    const sub = ev.some(e => /Criterion submitted/.test(e.event)) || (w && w.kind === "submission");
+    if (done || sub || ev.length) out[c] = { done, sub, prac: w ? w.practice.correct : (ev.some(e => /Practice passed/.test(e.event)) ? "✓" : 0) }; });
+  return out;
+}
+function progressCell(s){
+  if (s.course === "cs"){ const p = pySummary(s.py); if (!p) return "<span class='muted'>no work yet</span>";
+    return `<b>${p.solved}</b> exercises · <b>${p.house}</b> 🏠<div class="em">${p.lessons} lesson${p.lessons === 1 ? "" : "s"} started</div>`; }
+  const d = dsSummary(s.ds); if (!d || !Object.keys(d).length) return "<span class='muted'>no work yet</span>";
+  return Object.keys(d).map(c => `<span class="pill ${d[c].sub ? "ok" : ""}" title="Criterion ${c}">${c}: ${d[c].done}/4${d[c].sub ? " ✓" : ""}</span>`).join(" ");
 }
 function renderStudents(){
   const q = $("stQ").value.trim().toLowerCase(), cf = $("stC").value;
   const list = students().filter(s => (!cf || s.course === cf) && (!q || (s.name + " " + (s.email || "")).toLowerCase().indexOf(q) >= 0));
   $("stCount").textContent = list.length;
-  $("stTbl").innerHTML = `<tr><th>Student</th><th>Course</th><th>Grade</th><th>Level / class</th><th>Teacher</th><th>Last sign-in</th><th></th></tr>` +
+  $("stWarn").innerHTML = !isSuper() && !sheetId(pyLink()) ? `<div class="notice warn">Your dashboard isn't connected to the class data yet. Ask the super admin to open <b>Setup</b> and press <b>Save setup</b>.</div>` : "";
+  $("stTbl").innerHTML = `<tr><th>Student</th><th>Course</th><th>Grade</th><th>Level / class</th><th>Teacher</th><th>Progress</th><th>Last active</th><th></th></tr>` +
     (list.length ? list.map((s, i) => `<tr><td><b>${esc(s.name)}</b><div class="em">${esc(s.email || "no email on record")}</div>${s.wrong ? `<span class="pill bad">${s.wrong} wrong-course</span>` : ""}</td>
       <td>${pill(s.course)}</td><td>${s.grade ? "G" + esc(s.grade) : ""}</td><td>${esc(s.course === "cs" ? levelName("cs", s.level) : s.cls || "")}</td><td>${esc(s.teacher || "")}</td>
-      <td class="small">${s.last ? esc(fmtDT(s.last)) : "<span class='muted'>not yet through the platform</span>"}</td>
-      <td><button class="btn ghost sm" data-ed="${i}">Change</button></td></tr>`).join("") : `<tr><td colspan="7" class="muted">No students yet. They appear here after signing in through the platform.</td></tr>`);
+      <td class="small">${progressCell(s)}</td>
+      <td class="small">${s.active || s.last ? esc(fmtDT(s.active || s.last)) : "<span class='muted'>—</span>"}</td>
+      <td style="white-space:nowrap"><button class="btn sm" data-pr="${i}">Progress &amp; feedback</button>${isSuper() ? ` <button class="btn ghost sm" data-ed="${i}">Change</button>` : ""}</td></tr>`).join("")
+      : `<tr><td colspan="8" class="muted">${isSuper() ? "No students yet. They appear here after signing in through the platform." : "No students have chosen you as their teacher yet."}</td></tr>`);
   $("stTbl").querySelectorAll("[data-ed]").forEach(b => b.onclick = () => editStudent(list[+b.dataset.ed]));
+  $("stTbl").querySelectorAll("[data-pr]").forEach(b => b.onclick = () => openProgress(list[+b.dataset.pr]));
 }
+
+/* ---------------- one student's progress, and feedback to them ---------------- */
+const fmtMs = ms => ms >= 60000 ? Math.round(ms / 60000) + " min" : ms ? Math.round(ms / 1000) + " s" : "";
+function pyDetail(s){
+  const snap = s.py; if (!snap || !snap.paths) return `<p class="muted">No Computer Science work has reached the log yet.</p>`;
+  return Object.keys(snap.paths).map(p => { const P = snap.paths[p];
+    const rows = Object.keys(P.lessons || {}).sort((a, b) => a - b).map(n => { const L = P.lessons[n], ok = (L.core || []).filter(x => x.ok).length, h = (L.core || []).concat(L.prac || []).reduce((a, x) => a + (x.h || 0), 0);
+      const mins = Object.values(L.days || {}).reduce((a, x) => a + x, 0);
+      return `<tr><td><b>L${esc(n)}</b> ${esc(L.title || "")}</td><td>${ok}/${(L.core || []).length}</td><td>${(L.prac || []).length}</td><td>${h}</td><td>${esc(fmtMs(mins))}</td><td>${L.subs ? "✓" : ""}</td></tr>`; }).join("");
+    return `<h3 style="margin-top:14px">${esc(PATHS[p] || p)} · ${P.solved || 0} exercises · ${P.house || 0} House Point${P.house === 1 ? "" : "s"}</h3>
+      <div class="scroll"><table class="tbl"><tr><th>Lesson</th><th>Exercises</th><th>Practice</th><th>Hints</th><th>Time</th><th>Submitted</th></tr>${rows || `<tr><td colspan="6" class="muted">No lessons started.</td></tr>`}</table></div>`; }).join("");
+}
+function fieldVal(f){
+  if (f.t === "sketch") return f.value ? "<i>sketch or image added</i>" : "<span class='muted'>no image</span>";
+  if (f.t === "table" && Array.isArray(f.value)) return `<div class="scroll"><table class="tbl">${f.cols ? `<tr>${f.cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr>` : ""}${f.value.filter(r => Array.isArray(r) && r.some(x => String(x || "").trim())).map(r => `<tr>${r.map(x => `<td>${esc(x)}</td>`).join("")}</tr>`).join("")}</table></div>`;
+  if (Array.isArray(f.value)) return esc(f.value.join(", "));
+  if (f.value && typeof f.value === "object") return esc(Object.values(f.value).join(", "));
+  return String(f.value || "").trim() ? `<div class="ans">${esc(f.value)}</div>` : "<span class='muted'>not answered</span>";
+}
+function dsDetail(s){
+  const d = s.ds; if (!d) return `<p class="muted">No Design or IT work has reached the log yet${sheetId(dsLink()) ? "" : " (the Design log sheet isn't connected in Setup)"}.</p>`;
+  const crits = Object.keys(d.work).sort();
+  if (!crits.length) return `<p class="muted">${d.events.length} activity record${d.events.length === 1 ? "" : "s"}, but no saved work yet.</p>`;
+  return crits.map(c => { const W = d.work[c].w;
+    return `<details class="blk" ${crits.length === 1 ? "open" : ""}><summary>Criterion ${esc(c)} · ${esc(W.unit || "")} · ${W.strands.filter(x => x.done).length}/4 strands${W.kind === "submission" ? " · submitted" : ""} · practice ${W.practice.correct} correct</summary>
+      ${W.scenario && W.scenario.title ? `<p class="small" style="margin-top:8px"><b>Challenge:</b> ${esc(W.scenario.title)}${W.scenario.brief ? " · " + esc(W.scenario.brief) : ""}</p>` : ""}
+      ${W.strands.map(x => `<div style="margin-top:10px"><b>Strand ${esc(x.n)}</b> ${x.done ? "<span class='pill ok'>done</span>" : "<span class='pill'>not finished</span>"}${x.self ? ` <span class="pill">self-rating ${esc(x.self)}</span>` : ""}<div class="em">${esc(x.strand)}</div>
+        ${x.fields.map(f => `<div style="margin-top:6px"><div class="small" style="font-weight:700">${esc(f.label)}</div>${fieldVal(f)}</div>`).join("")}</div>`).join("")}
+      <div class="em" style="margin-top:8px">Saved ${esc(fmtDT(d.work[c].when || Date.parse(W.at) || 0))}</div></details>`; }).join("");
+}
+function autoNotes(s){   // a starting point the teacher edits before sending
+  if (s.course === "cs"){ const snap = s.py; const well = [], next = []; if (!snap || !snap.paths) return { s:"", i:"", n:"" };
+    Object.values(snap.paths).forEach(P => Object.keys(P.lessons || {}).forEach(n => { const L = P.lessons[n], core = L.core || [];
+      if (core.length && core.every(x => x.ok)) well.push("Completed all exercises in Lesson " + n + " (" + L.title + ")");
+      core.filter(x => !x.ok).slice(0, 2).forEach(x => next.push("Finish \"" + x.t + "\" in Lesson " + n));
+      if ((L.prac || []).length >= 3) well.push("Kept practising in Lesson " + n + " (" + L.prac.length + " practice questions)"); }));
+    return { s: well.slice(0, 3).join("\n"), i: next.slice(0, 3).join("\n"), n: "" }; }
+  return { s:"", i:"", n:"" };
+}
+async function openProgress(s){
+  const bg = document.createElement("div"); bg.className = "modal-bg";
+  const crits = s.ds ? Object.keys(s.ds.work).sort() : [], a0 = autoNotes(s);
+  const about = s.course === "cs"
+    ? `<option value="Computer Science">Computer Science (general)</option>` + (s.py && s.py.paths ? Object.values(s.py.paths).flatMap(P => Object.keys(P.lessons || {}).map(n => `<option>Lesson ${esc(n)}: ${esc(P.lessons[n].title || "")}</option>`)).join("") : "")
+    : ["A","B","C","D"].map(c => `<option value="Criterion ${c}" ${crits[crits.length - 1] === c ? "selected" : ""}>Criterion ${c}</option>`).join("") + `<option>General</option>`;
+  bg.innerHTML = `<div class="modal wide" role="dialog" aria-label="Student progress">
+    <div class="row" style="justify-content:space-between"><div><h2>${esc(s.name)} ${pill(s.course)}</h2><div class="em">${esc([s.email, s.grade ? "Grade " + s.grade : "", s.course === "cs" ? levelName("cs", s.level) : s.cls, s.teacher].filter(Boolean).join(" · "))}</div></div><button class="btn ghost sm" data-x>Close</button></div>
+    <div style="margin-top:10px">${s.course === "cs" ? pyDetail(s) : dsDetail(s)}</div>
+    <div class="card fbform" style="margin:18px 0 0;background:var(--soft)">
+      <h2>Send feedback to ${esc(s.name.split(" ")[0])}</h2>
+      <p class="muted small" style="margin-top:4px">${esc(s.name.split(" ")[0])} sees it in their course (a red <b>Feedback from your teacher</b> button at the top) the next time they sign in.</p>
+      <div class="grid2"><label class="f">About<select class="t" id="fAbout">${about}</select></label>
+        ${s.course !== "cs" ? `<label class="f">Suggested MYP level (optional)<select class="t" id="fLvl"><option value="">No level</option>${[1,2,3,4,5,6,7,8].map(n => `<option>${n}</option>`).join("")}</select></label>` : `<div></div>`}</div>
+      <label class="f">Strengths<textarea id="fS">${esc(a0.s)}</textarea></label>
+      <label class="f">Improvements<textarea id="fI">${esc(a0.i)}</textarea></label>
+      <label class="f">Next steps<textarea id="fN">${esc(a0.n)}</textarea></label>
+      <label class="f">From<input class="t" id="fFrom" value="${esc(isSuper() ? (s.teacher || "Your teacher") : ME.name)}"></label>
+      <div class="row" style="margin-top:12px"><button class="btn red" id="fGo">Send feedback</button></div><div id="fMsg"></div>
+      <h3 style="margin-top:16px">Feedback already sent</h3><div id="fHist" class="small muted">Loading…</div>
+    </div></div>`;
+  document.body.appendChild(bg);
+  const q = sel => bg.querySelector(sel);
+  bg.onclick = e => { if (e.target === bg || e.target.hasAttribute("data-x")) bg.remove(); };
+  const hist = async () => { try { const l = await SDC.getFeedback(s.email, s.name);
+      q("#fHist").innerHTML = l.length ? l.map(f => `<div style="border-left:3px solid var(--red);padding:4px 10px;margin-top:8px"><b>${esc(f.about || "")}</b> · ${esc(fmtDT(f.at || f.ver))}${f.from ? " · " + esc(f.from) : ""}${f.lvl ? " · level " + esc(f.lvl) : ""}<div style="white-space:pre-wrap;color:var(--ink)">${esc([f.s && "Strengths: " + f.s, f.i && "Improvements: " + f.i, f.n && "Next steps: " + f.n].filter(Boolean).join("\n"))}</div></div>`).join("") : "None yet.";
+    } catch(e){ q("#fHist").textContent = "Couldn't load (no connection)."; } };
+  hist();
+  q("#fGo").onclick = async () => {
+    const fb = { course: s.course, about: q("#fAbout").value, s: q("#fS").value.trim(), i: q("#fI").value.trim(), n: q("#fN").value.trim(), from: q("#fFrom").value.trim().slice(0, 60) };
+    if (q("#fLvl") && q("#fLvl").value) fb.lvl = q("#fLvl").value;
+    if (!fb.s && !fb.i && !fb.n) return q("#fMsg").innerHTML = `<div class="notice bad">Write at least one section first.</div>`;
+    q("#fGo").disabled = true;
+    try { await SDC.sendFeedback({ email:s.email, name:s.name }, fb);
+      SDC.log("feedback", { name:s.name, email:s.email, course:s.course, grade:s.grade, teacher:s.teacher }, { about:fb.about, by: ME.name });
+      q("#fMsg").innerHTML = `<div class="notice ok">Sent. ${esc(s.name.split(" ")[0])} will see it at their next sign-in.</div>`; ["#fS","#fI","#fN"].forEach(x => q(x).value = ""); setTimeout(hist, 4000);
+    } catch(e){ q("#fMsg").innerHTML = `<div class="notice bad">Couldn't send. Check the connection and try again.</div>`; }
+    q("#fGo").disabled = false;
+  };
+}
+
+/* ---------------- teachers (super admin) ---------------- */
+async function renderTeachers(){
+  $("tqTbl").innerHTML = `<tr><td class="muted">Loading…</td></tr>`;
+  await loadCourseState();
+  const known = new Set(STATE.teachers.map(t => t.email));
+  const pend = REQS.filter(r => r.pub ? !(known.has(r.email) && (STATE.teachers.find(t => t.email === r.email) || {}).pub) : !known.has(r.email)).filter(r => !STATE.declined.includes(r.email) || r.access);
+  const latest = {}; pend.forEach(r => { if (!latest[r.email] || String(r.t) > String(latest[r.email].t)) latest[r.email] = r; });
+  const P = Object.values(latest);
+  $("tqCount").textContent = P.length;
+  $("tqTbl").innerHTML = `<tr><th>Teacher</th><th>Email</th><th>Students pick them as</th><th>Requested</th><th></th></tr>` + (P.length ? P.map((r, i) => `<tr><td><b>${esc(r.full || r.name)}</b>${r.access ? `<div class="em">already approved: asking for dashboard access</div>` : ""}${r.pub ? "" : `<div class="em">requested in the Design course: dashboard data needs a request from this page</div>`}</td><td>${esc(r.email)}</td>
+      <td><input class="t" data-as="${i}" value="${esc(r.as || r.name)}" list="knownTeachers" style="min-width:150px"><div class="em">Separate several names with commas</div></td><td class="small">${esc(r.t ? fmtDT(Date.parse(r.t)) : "")}</td>
+      <td style="white-space:nowrap"><button class="btn sm" data-ok="${i}">Approve</button> <button class="btn ghost sm" data-no="${i}">Decline</button></td></tr>`).join("") : `<tr><td colspan="5" class="muted">No requests.</td></tr>`);
+  $("taCount").textContent = STATE.teachers.length;
+  $("taTbl").innerHTML = `<tr><th>Teacher</th><th>Email</th><th>Sees students who chose</th><th>Dashboard</th><th></th></tr>` + (STATE.teachers.length ? STATE.teachers.map((t, i) => `<tr><td><b>${esc(t.full || t.name)}</b></td><td>${esc(t.email)}</td>
+      <td><input class="t" data-nm="${i}" value="${esc((t.names && t.names.length ? t.names : [t.name]).join(", "))}" style="min-width:150px"></td><td>${t.cfg ? "<span class='pill ok'>connected</span>" : t.pub ? "<span class='pill warn'>press Save setup</span>" : "<span class='pill warn'>waiting for their first sign-in here</span>"}</td>
+      <td style="white-space:nowrap"><button class="btn sm" data-sv="${i}">Save</button> <button class="btn ghost sm" data-rm="${i}">Remove access</button></td></tr>`).join("") : `<tr><td colspan="5" class="muted">No teacher admins yet.</td></tr>`);
+  const done = (ok, what) => { $("taMsg").innerHTML = `<div class="notice ${ok ? "ok" : "bad"}">${ok ? esc(what) + " Teachers' computers update within about 5 minutes." : "Google Forms couldn't be reached. Try again."}</div>`; renderTeachers(); };
+  const names = v => v.split(",").map(x => x.trim().replace(/\s+/g, " ")).filter(Boolean).slice(0, 4);
+  $("tqTbl").querySelectorAll("[data-ok]").forEach(b => b.onclick = async () => { const r = P[+b.dataset.ok], nm = names($("tqTbl").querySelector(`[data-as="${b.dataset.ok}"]`).value); if (!nm.length) return toast("Type the name students pick for this teacher.");
+    b.disabled = true; const old = STATE.teachers.find(t => t.email === r.email) || {};
+    const entry = { email:r.email, name:nm[0], names:nm, full:String(r.full || old.full || r.name || "").slice(0, 80), salt: old.salt || r.salt, hash: old.hash || r.hash };
+    if (r.access && old.hash && r.hash !== old.hash){ entry.salt = old.salt; entry.hash = old.hash; }
+    if (r.pub){ entry.pub = r.pub; entry.wpriv = r.wpriv; entry.cfg = await lockFor(r.pub, staffCfg()); }
+    const teachers = STATE.teachers.filter(t => t.email !== r.email).concat([entry]);
+    done(await publishCourseState(Object.assign({}, STATE, { teachers, declined: STATE.declined.filter(e => e !== r.email) })), "Approved " + entry.name + ".");
+    SDC.log("staffapproved", { name:entry.name, email:entry.email, course:"" }, { names:nm }); });
+  $("tqTbl").querySelectorAll("[data-no]").forEach(b => b.onclick = async () => { const r = P[+b.dataset.no]; b.disabled = true;
+    done(await publishCourseState(Object.assign({}, STATE, { declined: [...new Set(STATE.declined.concat([r.email]))] })), "Declined."); });
+  $("taTbl").querySelectorAll("[data-sv]").forEach(b => b.onclick = async () => { const i = +b.dataset.sv, nm = names($("taTbl").querySelector(`[data-nm="${i}"]`).value); if (!nm.length) return toast("Type at least one name.");
+    b.disabled = true; const teachers = STATE.teachers.map((t, k) => k === i ? Object.assign({}, t, { name:nm[0], names:nm }) : t);
+    done(await publishCourseState(Object.assign({}, STATE, { teachers })), "Saved."); });
+  $("taTbl").querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => { const t = STATE.teachers[+b.dataset.rm]; if (!confirmBox("Remove " + t.name + "'s access? They can no longer sign in to the dashboard or Design teacher tools.")) return;
+    b.disabled = true; done(await publishCourseState(Object.assign({}, STATE, { teachers: STATE.teachers.filter(x => x.email !== t.email), declined: [...new Set(STATE.declined.concat([t.email]))] })), "Removed."); });
+}
+function confirmBox(msg){ return window.confirm(msg); }
+
+/* ---------------- criteria switches (super admin) ---------------- */
+const UNITS = [["6","G6 Design"],["7","G7 Design"],["8","G8 Design"],["10","G10 Design (ePortfolio)"],["10HH","G10 Design (Harvest Hub)"],["10IT","G10 IT"]];
+let SW = null;
+async function renderSwitches(){
+  $("swTbl").innerHTML = `<tr><td class="muted">Loading…</td></tr>`;
+  await loadCourseState(); SW = JSON.parse(JSON.stringify(STATE.unlocks || {}));
+  $("swTbl").innerHTML = `<tr><th>Unit</th>${["A","B","C","D"].map(c => `<th>Criterion ${c}</th>`).join("")}</tr>` + UNITS.map(([g, l]) => `<tr><td><b>${esc(l)}</b></td>${["A","B","C","D"].map(c => `<td><button class="sw" role="switch" aria-label="${esc(l)} Criterion ${c}" aria-checked="${!!(SW[g] && SW[g][c])}" data-g="${g}" data-c="${c}"></button></td>`).join("")}</tr>`).join("");
+  $("swTbl").querySelectorAll(".sw").forEach(b => b.onclick = () => { const on = b.getAttribute("aria-checked") !== "true"; b.setAttribute("aria-checked", on); SW[b.dataset.g] = SW[b.dataset.g] || {}; SW[b.dataset.g][b.dataset.c] = on; });
+}
+$("swGo").onclick = async () => { $("swGo").disabled = true;
+  const ok = await publishCourseState(Object.assign({}, STATE, { unlocks: SW }));
+  $("swMsg").innerHTML = `<div class="notice ${ok ? "ok" : "bad"}">${ok ? "Applied. Students see the change within about 5 minutes." : "Google Forms couldn't be reached. Try again."}</div>`; $("swGo").disabled = false; };
+
 $("stQ").oninput = renderStudents; $("stC").onchange = renderStudents;
 $("stAdd").onclick = () => editStudent({ name:"", email:"", course:"cs", grade:"", teacher:"", level:"", cls:"", isNew:true });
 
@@ -446,7 +844,7 @@ function editStudent(s){
 /* ---------------- sign-in log ---------------- */
 function renderLog(){
   const f = $("lgF").value;
-  const list = ROWS.filter(r => ["signin","signup","wrongcourse"].indexOf(r.type) >= 0 && (!f || r.type === f)).slice().reverse().slice(0, 400);
+  const list = ROWS.filter(r => ["signin","signup","wrongcourse"].indexOf(r.type) >= 0 && (!f || r.type === f) && canSee(r.acct.teacher)).slice().reverse().slice(0, 400);
   $("lgCount").textContent = list.length;
   const what = r => r.type === "wrongcourse" ? `<span class="pill bad">⛔ Stopped</span> tried ${esc(C[r.acct.course] ? C[r.acct.course].name : r.acct.course)}${r.registered ? `, registered for <b>${esc(C[r.registered] ? C[r.registered].name : r.registered)}</b>` : r.reason === "grade" ? " (not Grade 10)" : ""}${r.signup ? " (sign-up)" : ""}`
     : r.type === "signup" ? `<span class="pill ok">New</span> signed up` : `signed in${r.unchecked ? ` <span class="pill warn">offline: not checked</span>` : ""}`;
