@@ -7,8 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
+<script src="/python-pathways/pp-sync.js?v=20261102e"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261102d"></script>
+<script src="sdc.js?v=20261102e"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -253,6 +254,7 @@ async function unlock(pw){
   const base = await crypto.subtle.importKey("raw", TE.encode(pw), "PBKDF2", false, ["deriveKey"]);
   const key = await crypto.subtle.deriveKey({ name:"PBKDF2", salt:unb64(WRAP.salt), iterations:WRAP.iter, hash:"SHA-256" }, base, { name:"AES-GCM", length:256 }, false, ["decrypt"]);
   const priv = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name:"AES-GCM", iv:unb64(WRAP.iv) }, key, unb64(WRAP.ct))));
+  RKEY = priv.enc || null;   // the PIN reset key (only this part is ever passed to teachers, never the signing key)
   return { sig: await crypto.subtle.importKey("jwk", priv.sig, { name:"ECDSA", namedCurve:"P-256" }, false, ["sign"]) };
 }
 const canSee = teacher => ROLE === "super" || (!!ME && (ME.names || [ME.name]).some(n => SDC.sameTeacher(n, teacher)));
@@ -321,8 +323,8 @@ async function openFor(t, pw){
   const key = await crypto.subtle.deriveKey({ name:"ECDH", public:epk }, pk, { name:"AES-GCM", length:256 }, false, ["decrypt"]);
   return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name:"AES-GCM", iv:unb64(t.cfg.iv) }, key, unb64(t.cfg.ct))));
 }
-let AKEY = "";   // the Python answer key's data key (base64), never stored
-const staffCfg = () => ({ py: sheetLink() || "", ds: load(DS_KEY, "") || "", ak: AKEY || "" });
+let AKEY = "", RKEY = null;   // the Python answer key's data key and the PIN reset key: memory only, never stored
+const staffCfg = () => ({ py: sheetLink() || "", ds: load(DS_KEY, "") || "", ak: AKEY || "", rk: RKEY || null });
 async function vaultFile(){ const t = await (await fetch("/python-pathways/answers.enc.js?v=" + Date.now(), { cache:"no-store" })).text(); return JSON.parse(t.replace(/^\s*window\.PP_ENC\s*=\s*/, "").replace(/;\s*$/, "")); }
 const VAAD = t => TE.encode("pp-vault-v2|" + t);
 async function vaultKeyFromPassword(pw){
@@ -343,7 +345,7 @@ async function shareWithTeachers(){
   if (!STATE.teachers.some(t => t.pub)) return null;
   const teachers = await Promise.all(STATE.teachers.map(async t => t.pub ? Object.assign({}, t, { cfg: await lockFor(t.pub, staffCfg()) }) : t));
   const ok = await publishCourseState(Object.assign({}, STATE, { teachers }));
-  if (ok && AKEY) store("sdc_ak_shared", AKEY.slice(0, 12));
+  if (ok && AKEY) store("sdc_ak_shared", "v2:" + AKEY.slice(0, 12));
   return ok;
 }
 
@@ -366,7 +368,7 @@ $("pwGo").onclick = async () => {
   if (KEYS){ ROLE = "super"; ME = { name:"Super admin" };
     try { AKEY = await vaultKeyFromPassword(pwTyped); await openAnswers(AKEY); } catch(e){ AKEY = ""; }
     enter();
-    if (AKEY && load("sdc_ak_shared", "") !== AKEY.slice(0, 12)) shareWithTeachers().catch(() => {});   // give teachers the answer key once
+    if (AKEY && load("sdc_ak_shared", "") !== "v2:" + AKEY.slice(0, 12)) shareWithTeachers().catch(() => {});   // give teachers the answer key and PIN reset key once
   }
 };
 $("pw").addEventListener("keydown", e => { if (e.key === "Enter") $("pwGo").click(); });
@@ -387,13 +389,14 @@ $("tGo").onclick = async () => {
     if (vm){ SDC.log("unverified", { name:t.name, email, course:"" }, { teacher:true }); return note("tMsg", "warn", vm); }
     ROLE = "teacher"; ME = { name:t.name, email, names: (t.names && t.names.length ? t.names : [t.name]) };
     if (t.wpriv && t.cfg){ try { CFG = await openFor(t, pw); } catch(e){ CFG = { py:"", ds:"" }; } }
-    if (CFG.ak){ try { await openAnswers(CFG.ak); } catch(e){} }
     else {
       CFG = { py:"", ds:"" };
       if (!t.pub && !REQS.some(r => r.email === email && r.pub)){   // approved in the Design course before this dashboard existed: ask for data access once
         const k = await newTeacherKeys(pw); await postRequest({ email, name:t.name, as:t.name, salt:t.salt, hash:t.hash, t:new Date().toISOString(), pub:k.pub, wpriv:k.wpriv, access:true });
       }
     }
+    if (CFG.ak){ try { await openAnswers(CFG.ak); } catch(e){} }
+    RKEY = CFG.rk || null;
     $("tPw").value = ""; SDC.log("staffsignin", { name:t.name, email, course:"" }, { role:"teacher" }); enter();
   } catch(e){ note("tMsg", "bad", "Couldn't check your account: " + esc(e.message || "no connection") + "."); }
   finally { $("tGo").disabled = false; }
@@ -720,10 +723,11 @@ function renderStudents(){
       <td>${pill(s.course)}</td><td>${s.grade ? "G" + esc(s.grade) : ""}</td><td>${esc(s.course === "cs" ? levelName("cs", s.level) : s.cls || "")}</td><td>${esc(s.teacher || "")}</td>
       <td class="small">${progressCell(s)}</td>
       <td class="small">${s.active || s.last ? esc(fmtDT(s.active || s.last)) : "<span class='muted'>—</span>"}</td>
-      <td style="white-space:nowrap"><button class="btn sm" data-pr="${i}">Progress &amp; feedback</button>${isSuper() ? ` <button class="btn ghost sm" data-ed="${i}">Change</button>` : ""}</td></tr>`).join("")
+      <td style="white-space:nowrap"><button class="btn sm" data-pr="${i}">Progress &amp; feedback</button>${s.course === "cs" ? ` <button class="btn ghost sm" data-pin="${i}">🔑 Reset PIN</button>` : ""}${isSuper() ? ` <button class="btn ghost sm" data-ed="${i}">Change</button>` : ""}</td></tr>`).join("")
       : `<tr><td colspan="8" class="muted">${isSuper() ? "No students yet. They appear here after signing in through the platform." : "No students have chosen you as their teacher yet."}</td></tr>`);
   $("stTbl").querySelectorAll("[data-ed]").forEach(b => b.onclick = () => editStudent(list[+b.dataset.ed]));
   $("stTbl").querySelectorAll("[data-pr]").forEach(b => b.onclick = () => openProgress(list[+b.dataset.pr]));
+  $("stTbl").querySelectorAll("[data-pin]").forEach(b => b.onclick = () => resetPin(list[+b.dataset.pin]));
 }
 
 /* ---------------- one student's progress, and feedback to them ---------------- */
@@ -771,7 +775,7 @@ async function openProgress(s){
     ? `<option value="Computer Science">Computer Science (general)</option>` + (s.py && s.py.paths ? Object.values(s.py.paths).flatMap(P => Object.keys(P.lessons || {}).map(n => `<option>Lesson ${esc(n)}: ${esc(P.lessons[n].title || "")}</option>`)).join("") : "")
     : ["A","B","C","D"].map(c => `<option value="Criterion ${c}" ${crits[crits.length - 1] === c ? "selected" : ""}>Criterion ${c}</option>`).join("") + `<option>General</option>`;
   bg.innerHTML = `<div class="modal wide" role="dialog" aria-label="Student progress">
-    <div class="row" style="justify-content:space-between"><div><h2>${esc(s.name)} ${pill(s.course)}</h2><div class="em">${esc([s.email, s.grade ? "Grade " + s.grade : "", s.course === "cs" ? levelName("cs", s.level) : s.cls, s.teacher].filter(Boolean).join(" · "))}</div></div><button class="btn ghost sm" data-x>Close</button></div>
+    <div class="row" style="justify-content:space-between"><div><h2>${esc(s.name)} ${pill(s.course)} ${s.course === "cs" ? `<button class="btn ghost sm" id="pinBtn">🔑 Reset PIN</button>` : ""}</h2><div class="em">${esc([s.email, s.grade ? "Grade " + s.grade : "", s.course === "cs" ? levelName("cs", s.level) : s.cls, s.teacher].filter(Boolean).join(" · "))}</div></div><button class="btn ghost sm" data-x>Close</button></div>
     <div style="margin-top:10px">${s.course === "cs" ? pyDetail(s) + `<h2 style="margin-top:18px">Exercises and exact answers</h2><p class="muted small">Each exercise as this student sees it, their latest code, and the exact answer to their own version.</p>` + (window.PPAnswerView ? PPAnswerView.render(s.py, window.PPAnswers) : "") : dsDetail(s)}</div>
     <div class="card fbform" style="margin:18px 0 0;background:var(--soft)">
       <h2>Send feedback to ${esc(s.name.split(" ")[0])}</h2>
@@ -788,6 +792,7 @@ async function openProgress(s){
   document.body.appendChild(bg);
   if (window.PPAnswerView) PPAnswerView.bind(bg);
   const q = sel => bg.querySelector(sel);
+  if (q("#pinBtn")) q("#pinBtn").onclick = () => resetPin(s);
   bg.onclick = e => { if (e.target === bg || e.target.hasAttribute("data-x")) bg.remove(); };
   const hist = async () => { try { const l = await SDC.getFeedback(s.email, s.name);
       q("#fHist").innerHTML = l.length ? l.map(f => `<div style="border-left:3px solid var(--red);padding:4px 10px;margin-top:8px"><b>${esc(f.about || "")}</b> · ${esc(fmtDT(f.at || f.ver))}${f.from ? " · " + esc(f.from) : ""}${f.lvl ? " · level " + esc(f.lvl) : ""}<div style="white-space:pre-wrap;color:var(--ink)">${esc([f.s && "Strengths: " + f.s, f.i && "Improvements: " + f.i, f.n && "Next steps: " + f.n].filter(Boolean).join("\n"))}</div></div>`).join("") : "None yet.";
@@ -803,6 +808,32 @@ async function openProgress(s){
       q("#fMsg").innerHTML = `<div class="notice ok">Sent. ${esc(s.name.split(" ")[0])} will see it at their next sign-in.</div>`; ["#fS","#fI","#fN"].forEach(x => q(x).value = ""); setTimeout(hist, 4000);
     } catch(e){ q("#fMsg").innerHTML = `<div class="notice bad">Couldn't send. Check the connection and try again.</div>`; }
     q("#fGo").disabled = false;
+  };
+}
+
+/* ---------------- Reset a Computer Science student's PIN (works on every computer, progress kept) ---------------- */
+function resetPin(s){
+  const bg = document.createElement("div"); bg.className = "modal-bg"; bg.style.zIndex = 70;
+  const pin = String(1000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 9000));
+  bg.innerHTML = `<div class="modal" role="dialog" aria-label="Reset PIN"><h2>🔑 Reset PIN: ${esc(s.name)}</h2>
+    <p class="muted small" style="margin-top:4px">${esc(s.name.split(" ")[0])} signs in with the new PIN on any computer. Their progress is kept and the old PIN stops working.</p>
+    <label class="f">New 4-digit PIN<input class="t" id="rpPin" inputmode="numeric" maxlength="4" value="${pin}"></label>
+    ${RKEY ? "" : `<div class="notice warn">${isSuper() ? "The reset key isn't unlocked. Lock and sign in again as super admin." : "PIN resets aren't set up for your account yet. Ask the super admin to sign in to this page once, then sign in again."}</div>`}
+    <div id="rpMsg"></div><div class="row" style="margin-top:14px"><button class="btn red" id="rpGo" ${RKEY ? "" : "disabled"}>Reset PIN</button><button class="btn ghost" id="rpX">Close</button></div></div>`;
+  document.body.appendChild(bg);
+  const q = x => bg.querySelector(x);
+  q("#rpX").onclick = () => bg.remove(); bg.onclick = e => { if (e.target === bg) bg.remove(); };
+  q("#rpPin").oninput = e => { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4); };
+  q("#rpGo").onclick = async () => {
+    const p = q("#rpPin").value; if (!/^\d{4}$/.test(p)) return q("#rpMsg").innerHTML = `<div class="notice bad">The PIN must be 4 numbers.</div>`;
+    if (!window.PPSync || !PPSync.enabled()) return q("#rpMsg").innerHTML = `<div class="notice bad">Computer Science sync isn't connected.</div>`;
+    q("#rpGo").disabled = true; q("#rpMsg").innerHTML = `<div class="notice ok">Working… (a few seconds)</div>`;
+    try { const ok = await PPSync.resetWithKey(String(s.name).trim().toLowerCase().replace(/\s+/g, " "), p, RKEY);
+      q("#rpMsg").innerHTML = ok ? `<div class="notice ok"><b>Done.</b> ${esc(s.name)} can now sign in with PIN <b style="font-size:1.15em">${p}</b> on any computer.</div>`
+        : `<div class="notice warn">No saved progress was found for ${esc(s.name)} yet. Ask them to sign in once on their usual computer, then try again.</div>`;
+      if (ok) SDC.log("pinreset", { name:s.name, email:s.email, course:"cs", grade:s.grade, teacher:s.teacher }, { by: ME.name });
+    } catch(e){ q("#rpMsg").innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; }
+    q("#rpGo").disabled = false;
   };
 }
 
