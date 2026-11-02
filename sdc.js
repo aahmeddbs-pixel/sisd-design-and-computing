@@ -1,3 +1,40 @@
+/* gfSend: post answers to a Google Form exactly like the form's own Submit button does
+   (the hidden fields a real submission carries, sent both by fetch and by a hidden form in a hidden frame). */
+if (!window.gfSend) window.gfSend = (function(){
+  let chain = Promise.resolve(), n = 0;
+  function full(body){
+    const p = new URLSearchParams(body instanceof URLSearchParams ? body : String(body || ""));
+    const z = "-" + Math.floor(Math.random() * 9e18).toString();
+    if (!p.has("fvv")) p.append("fvv", "1");
+    if (!p.has("pageHistory")) p.append("pageHistory", "0");
+    if (!p.has("fbzx")) p.append("fbzx", z);
+    if (!p.has("partialResponse")) p.append("partialResponse", JSON.stringify([null, null, z]));
+    return p;
+  }
+  function viaFrame(action, p){
+    return new Promise(res => {
+      try {
+        if (!document.body) return res(false);
+        const name = "gfsink" + (++n), fr = document.createElement("iframe");
+        fr.name = name; fr.title = "sync"; fr.setAttribute("aria-hidden", "true"); fr.tabIndex = -1;
+        fr.style.cssText = "position:absolute;width:1px;height:1px;left:-9999px;top:-9999px;border:0;opacity:0";
+        const f = document.createElement("form"); f.method = "POST"; f.action = action; f.target = name; f.acceptCharset = "UTF-8"; f.style.display = "none";
+        p.forEach((v, k) => { const i = document.createElement("textarea"); i.name = k; i.value = v; f.appendChild(i); });
+        let done = false; const end = ok => { if (done) return; done = true; setTimeout(() => { try { fr.remove(); f.remove(); } catch(e){} }, 1500); res(ok); };
+        fr.onload = () => end(true); setTimeout(() => end(true), 6000);
+        document.body.appendChild(fr); document.body.appendChild(f); f.submit();
+      } catch(e){ res(false); }
+    });
+  }
+  return function gfSend(action, body, keep){
+    const p = full(body);
+    const viaFetch = fetch(action, { method:"POST", mode:"no-cors", body:p, keepalive: !!keep && p.toString().length < 60000 }).then(() => true, () => false);
+    if (keep === "unload") return viaFetch;
+    const framed = chain = chain.then(() => viaFrame(action, p));
+    return Promise.all([viaFetch, framed]).then(([x, y]) => x || y);
+  };
+})();
+
 /* SISD Design and Computing: shared platform layer for Python Pathways (Computer Science) and
    MYP Design Curriculum Pathways (Design and IT).
    - The portal page sets a "gate" for this browser tab: which course the student chose.
@@ -63,7 +100,7 @@ function getQ(){ try { return JSON.parse(localStorage.getItem(Q_KEY)) || []; } c
 function setQ(q){ try { while (q.length > 200) q.shift(); localStorage.setItem(Q_KEY, JSON.stringify(q)); } catch(e){} }
 async function post(action, fields, keep){
   const p = new URLSearchParams(); Object.keys(fields).forEach(k => p.append(k, fields[k]));
-  try { await fetch(action, { method:"POST", mode:"no-cors", body:p, keepalive: !!keep && p.toString().length < 60000 }); return true; } catch(e){ return false; }
+  try { return await gfSend(action, p, keep); } catch(e){ return false; }
 }
 let flushing = false;
 async function flush(){

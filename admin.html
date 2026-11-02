@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261102g"></script>
+<script src="/python-pathways/pp-sync.js?v=20261102h"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261102g"></script>
+<script src="sdc.js?v=20261102h"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -288,7 +288,7 @@ async function publishCourseState(next){
   const form = (dc.controlForm && (dc.controlForm.match(/docs\.google\.com\/forms\/(?:u\/\d+\/)?d\/(e\/)?([^/]+)\//) || [])) || [];
   const action = form[2] ? `https://docs.google.com/forms/d/${form[1] || ""}${form[2]}/formResponse` : SDC.CONTROL.form;
   const entry = ((dc.controlForm || "").match(/entry\.(\d+)=/) || [])[1]; const p = new URLSearchParams(); p.append(entry ? "entry." + entry : SDC.CONTROL.entry, JSON.stringify(signed));
-  try { await fetch(action, { method:"POST", mode:"no-cors", body:p }); } catch(e){ return false; }
+  if (!(await gfSend(action, p))) return false;
   store(PENDING_KEY, signed); STATE = Object.assign({}, body); return true;
 }
 
@@ -406,7 +406,7 @@ $("tPw").addEventListener("keydown", e => { if (e.key === "Enter") $("tGo").clic
 async function postRequest(req){
   const dc = await designConfig(), f = (dc.controlForm || "").match(/docs\.google\.com\/forms\/(?:u\/\d+\/)?d\/(e\/)?([^/]+)\//), entry = ((dc.controlForm || "").match(/entry\.(\d+)=/) || [])[1];
   const p = new URLSearchParams(); p.append(entry ? "entry." + entry : SDC.CONTROL.entry, JSON.stringify({ request:req }));
-  await fetch(f ? `https://docs.google.com/forms/d/${f[1] || ""}${f[2]}/formResponse` : SDC.CONTROL.form, { method:"POST", mode:"no-cors", body:p });
+  await gfSend(f ? `https://docs.google.com/forms/d/${f[1] || ""}${f[2]}/formResponse` : SDC.CONTROL.form, p);
 }
 $("rGo").onclick = async () => {
   const name = $("rName").value.trim().replace(/\s+/g, " "), as = $("rAs").value.trim().replace(/\s+/g, " "), email = $("rEmail").value.trim().toLowerCase(), pw = $("rPw").value;
@@ -478,7 +478,7 @@ $("saveSet").onclick = async () => {
 async function sendMail(type, student, teacher, text){
   const f = parseForm(load(NOTIFY_KEY, "")); if (!f) return false;
   const p = new URLSearchParams(); [type, student, "", teacher, text].forEach((v, i) => p.append(f.ent[i], v));
-  try { await fetch(f.action, { method:"POST", mode:"no-cors", body:p }); return true; } catch(e){ return false; }
+  return await gfSend(f.action, p);
 }
 function paintVerify(){
   $("vState").textContent = SDC.verifyOn() ? "on" : "off";
