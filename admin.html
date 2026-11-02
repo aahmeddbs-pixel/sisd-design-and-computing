@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261102k"></script>
+<script src="/python-pathways/pp-sync.js?v=20261102m"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261102k"></script>
+<script src="sdc.js?v=20261102m"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -686,7 +686,7 @@ function students(){
   });
   Object.values(DS).forEach(d => {   // Design and IT students who haven't signed in through the platform yet
     const k = "e:" + d.email; if (S[k]) return;
-    S[k] = { key:k, name:d.name, email:d.email, grade:String(d.grade || "").replace(/^G/, "").split(/\s/)[0], teacher:d.teacher, course: Object.keys(d.work).length && Object.values(d.work).every(w => w.w && w.w.g === "10IT") ? "it" : "design", last:0, signins:0 };
+    S[k] = { key:k, name:d.name, email:d.email, grade:String(d.grade || "").replace(/^G/, "").split(/\s/)[0], teacher:d.teacher, course: Object.keys(d.work).length && Object.values(d.work).every(w => w.w && (w.w.g === "10IT" || w.w.g === "10HH")) ? "it" : "design", last:0, signins:0 };
   });
   Object.values(S).forEach(s => { const ps = PYSNAP[s.key]; s.py = ps ? ps.snap : null; s.ds = DS[(s.email || "").toLowerCase()] || null;
     s.active = Math.max(s.active || 0, ps ? ps.when : 0, s.ds ? s.ds.last : 0); });
@@ -920,7 +920,7 @@ async function renderTeachers(){
 function confirmBox(msg){ return window.confirm(msg); }
 
 /* ---------------- criteria switches (super admin) ---------------- */
-const UNITS = [["6","G6 Design"],["7","G7 Design"],["8","G8 Design"],["10","G10 Design (ePortfolio)"],["10HH","G10 Design (Harvest Hub)"],["10IT","G10 IT"]];
+const UNITS = [["6","G6 Design"],["7","G7 Design"],["8","G8 Design"],["10","G10 Design (ePortfolio)"],["10HH","G10 IT (Harvest Hub)"],["10IT","G10 IT"]];
 let SW = null;
 async function renderSwitches(){
   $("swTbl").innerHTML = `<tr><td class="muted">Loading…</td></tr>`;
