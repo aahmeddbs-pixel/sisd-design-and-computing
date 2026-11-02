@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voice Studio · SISD Design and Computing</title>
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
+<style>
+:root{--navy:#1B2D4E;--navy-d:#101d35;--red:#DC2B3E;--bg:#F3F5F9;--card:#fff;--ink:#16223A;--muted:#5B6782;--line:#D8DEEA;--soft:#E9EDF5;--ok:#1E8A55;--okbg:#E3F4EA;--warn:#8A4B00;--warnbg:#FFF2DC;--hl:#FFF2DC}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0E1626;--card:#16213A;--ink:#E7ECF6;--muted:#9AA7C2;--line:#2A3858;--soft:#1D2A47;--okbg:#143326;--ok:#47C487;--warnbg:#3A2C10;--warn:#F0B44C;--hl:#3A2C10}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 Arial,Helvetica,sans-serif;min-height:100vh}
+button,select{font:inherit;color:inherit;cursor:pointer}
+.hidden{display:none!important}
+.top{background:var(--navy);color:#fff;border-bottom:4px solid var(--red)}
+.top .in{max-width:1240px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.logo{background:var(--red);border-radius:7px;padding:4px 9px;font-weight:900;letter-spacing:.06em;font-size:.9rem}
+.brand{font-weight:900;font-size:1.1rem}
+.top a{color:#fff;font-weight:700;font-size:.85rem;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:4px 12px;text-decoration:none;margin-left:auto}
+.wrap{max-width:1240px;margin:0 auto;padding:18px 16px 60px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+.btn{border:none;border-radius:10px;padding:9px 16px;font-weight:800;background:var(--navy);color:#fff;display:inline-flex;gap:6px;align-items:center;text-decoration:none}
+.btn.red{background:var(--red)} .btn.ok{background:var(--ok)} .btn.ghost{background:var(--card);color:var(--ink);border:2px solid var(--line)}
+.btn.sm{padding:5px 11px;font-size:.85rem} .btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.muted{color:var(--muted)} .small{font-size:.88rem}
+.grid{display:grid;grid-template-columns:330px minmax(0,1fr);gap:16px;margin-top:14px}
+@media(max-width:860px){.grid{grid-template-columns:1fr}}
+.list{max-height:72vh;overflow:auto;padding:6px}
+.list h3{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:12px 6px 4px}
+.list h4{font-size:.85rem;margin:8px 6px 2px}
+.item{display:flex;gap:8px;align-items:flex-start;width:100%;text-align:left;background:none;border:1px solid transparent;border-radius:9px;padding:6px 8px;font-size:.88rem}
+.item:hover{background:var(--soft)} .item.on{background:var(--soft);border-color:var(--navy)}
+.dot{flex:none;width:18px;text-align:center}
+.bar{height:8px;border-radius:99px;background:var(--soft);overflow:hidden;margin-top:6px}.bar i{display:block;height:100%;background:var(--ok);width:0}
+.pill{display:inline-block;font-size:.78rem;font-weight:800;border-radius:99px;padding:2px 9px;background:var(--soft)}
+.pill.ok{background:var(--okbg);color:var(--ok)} .pill.warn{background:var(--warnbg);color:var(--warn)}
+video{width:100%;border-radius:12px;background:#000;display:block}
+.script{list-style:none;max-height:400px;overflow:auto;margin-top:10px}
+.script li{padding:8px 10px;border-radius:9px;margin-bottom:6px;line-height:1.55;font-size:1.02rem;border:1px solid var(--line)}
+.script li.on{background:var(--hl);border-color:var(--warn);font-weight:700}
+.script .tm{color:var(--muted);font-size:.78rem;font-weight:700;margin-right:8px}
+.count{font-size:2.6rem;font-weight:900;text-align:center}
+.tips{background:var(--soft);border-radius:12px;padding:12px 14px;margin-top:12px}
+.tips li{margin-left:18px}
+.filters button{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:4px 12px;font-size:.85rem;font-weight:700}
+.filters button[aria-pressed=true]{background:var(--navy);color:#fff;border-color:var(--navy)}
+</style>
+</head>
+<body>
+<div class="top"><div class="in"><span class="logo">SISD</span><span class="brand">Voice Studio</span><span class="small" style="opacity:.8">Record every narration in your own voice</span><a href="admin.html">← Staff dashboard</a></div></div>
+<div class="wrap">
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <div><b id="progTxt">Loading the scripts…</b><div class="bar" style="width:280px"><i id="progBar"></i></div></div>
+      <div class="row"><button class="btn ok" id="zipAll" disabled>⬇ Save all my recordings (one zip file)</button></div>
+    </div>
+    <p class="small muted" style="margin-top:10px">Your recordings are kept safely in this browser on this computer, so you can record a few at a time and come back later. When you're ready, press <b>Save all my recordings</b> and send the zip file to Claude: each recording is put on the right video. Students then hear <b>your voice</b> instead of the computer voice (in English).</p>
+    <details class="tips"><summary style="font-weight:800;cursor:pointer">Tips for a great recording</summary>
+      <ul class="small" style="margin-top:6px"><li>Use a quiet room. A headset or earphones with a microphone sounds best.</li>
+      <li>Speak like you're talking to one student: warm, calm and a little slower than normal.</li>
+      <li><b>Computer Science videos:</b> the video plays silently while you record. Read each line when it lights up; it stops by itself at the end.</li>
+      <li><b>Design and IT videos:</b> read the paragraphs in order at a steady pace, with a short pause between them. Press <b>Next line</b> (or the space bar) to move the highlight, then <b>Stop</b> when you finish.</li>
+      <li>Made a mistake? Press <b>Record again</b>. Only the last take is kept.</li></ul></details>
+  </div>
+  <div class="grid">
+    <div class="card" style="padding:8px">
+      <div class="filters row" style="padding:6px"><button data-f="all" aria-pressed="true">All</button><button data-f="Computer Science" aria-pressed="false">Computer Science</button><button data-f="Design" aria-pressed="false">Design</button><button data-f="IT" aria-pressed="false">IT</button><button data-f="todo" aria-pressed="false">Not recorded</button></div>
+      <div class="list" id="list"></div>
+    </div>
+    <div class="card" id="main"><p class="muted">Choose a script on the left.</p></div>
+  </div>
+</div>
+<script>
+(function(){
+"use strict";
+const $ = id => document.getElementById(id);
+const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+const fmt = s => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
+let ITEMS = [], REC = {}, cur = null, filter = "all";
+
+/* ---------- recordings are kept in this browser (IndexedDB) ---------- */
+const DBN = "sdc-voice-studio";
+function db(){ return new Promise((res, rej) => { const r = indexedDB.open(DBN, 1); r.onupgradeneeded = () => r.result.createObjectStore("rec"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+async function dbAll(){ const d = await db(); return new Promise(res => { const out = {}, tx = d.transaction("rec"), st = tx.objectStore("rec"), rq = st.openCursor();
+  rq.onsuccess = () => { const c = rq.result; if (c){ out[c.key] = c.value; c.continue(); } else res(out); }; rq.onerror = () => res(out); }); }
+async function dbPut(k, v){ const d = await db(); return new Promise((res, rej) => { const tx = d.transaction("rec", "readwrite"); tx.objectStore("rec").put(v, k); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); }
+async function dbDel(k){ const d = await db(); return new Promise(res => { const tx = d.transaction("rec", "readwrite"); tx.objectStore("rec").delete(k); tx.oncomplete = res; tx.onerror = res; }); }
+
+/* ---------- a small zip writer (no compression: audio is already compressed) ---------- */
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++){ let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = u8 => { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+async function makeZip(files){   // [{name, blob}]
+  const parts = [], central = []; let off = 0; const te = new TextEncoder(), now = new Date();
+  const dt = ((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1)) & 0xFFFF, dd = (((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()) & 0xFFFF;
+  for (const f of files){
+    const data = new Uint8Array(await f.blob.arrayBuffer()), name = te.encode(f.name), crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30)); h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true);
+    h.setUint16(10, dt, true); h.setUint16(12, dd, true); h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+    parts.push(h.buffer, name, data);
+    const c = new DataView(new ArrayBuffer(46)); c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true);
+    c.setUint16(12, dt, true); c.setUint16(14, dd, true); c.setUint32(16, crc, true); c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+    central.push(c.buffer, name); off += 30 + name.length + data.length;
+  }
+  const csize = central.reduce((a, b) => a + (b.byteLength || b.length), 0), e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...central, e.buffer], { type:"application/zip" });
+}
+
+/* ---------- list ---------- */
+function progress(){
+  const n = ITEMS.filter(x => REC[x.file]).length;
+  $("progTxt").textContent = n + " of " + ITEMS.length + " recorded on this computer";
+  $("progBar").style.width = (ITEMS.length ? n / ITEMS.length * 100 : 0) + "%";
+  $("zipAll").disabled = !n;
+}
+function renderList(){
+  let h = "", lastC = "", lastG = "";
+  ITEMS.forEach((x, i) => {
+    if (filter === "todo" ? REC[x.file] : filter !== "all" && x.course !== filter) return;
+    if (x.course !== lastC){ h += `<h3>${esc(x.course)}</h3>`; lastC = x.course; lastG = ""; }
+    if (x.group !== lastG){ h += `<h4>${esc(x.group)}</h4>`; lastG = x.group; }
+    h += `<button class="item${cur === x ? " on" : ""}" data-i="${i}"><span class="dot">${REC[x.file] ? "✅" : "○"}</span><span>${esc(x.label)}</span></button>`;
+  });
+  $("list").innerHTML = h || `<p class="muted small" style="padding:8px">Everything here is recorded. 🎉</p>`;
+  $("list").querySelectorAll(".item").forEach(b => b.onclick = () => open(ITEMS[+b.dataset.i]));
+  progress();
+}
+document.querySelectorAll(".filters button").forEach(b => b.onclick = () => { filter = b.dataset.f; document.querySelectorAll(".filters button").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false")); renderList(); });
+
+/* ---------- recording ---------- */
+function pickMime(){ for (const m of ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"]){ try { if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m; } catch(e){} } return ""; }
+const extOf = m => /mp4/.test(m) ? "m4a" : /ogg/.test(m) ? "ogg" : "webm";
+async function liveOnSite(x){
+  for (const e of ["webm", "m4a", "mp4", "mp3", "ogg"]){ try { const r = await fetch("/" + x.file + "." + e, { method:"HEAD", cache:"no-store" }); if (r.ok) return e; } catch(err){} }
+  return "";
+}
+let state = { rec:null, stream:null, recording:false, audio:null, url:"", line:0, t0:0, tick:null };
+function stopAll(){
+  try { if (state.recording && state.rec) state.rec.stop(); } catch(e){}
+  state.recording = false; clearInterval(state.tick);
+  if (state.audio){ state.audio.pause(); state.audio = null; }
+  if (state.url){ URL.revokeObjectURL(state.url); state.url = ""; }
+  const v = $("v"); if (v) v.pause();
+}
+function open(x){
+  stopAll(); cur = x; renderList();
+  const isVid = !!x.video, lines = isVid ? x.lines : x.paras.map((p, i) => [i, p]);
+  $("main").innerHTML = `<div class="row" style="justify-content:space-between"><div><div class="small muted" style="font-weight:800">${esc(x.course)} · ${esc(x.group)}</div><h2 style="font-size:1.3rem;margin-top:2px">${esc(x.label)}</h2></div>
+      <div class="row"><span id="have"></span><span class="pill" id="live">Checking the site…</span></div></div>
+    ${isVid ? `<video id="v" playsinline muted preload="metadata" src="${esc(x.video)}" poster="${esc(x.poster || "")}" style="margin-top:12px"></video>` : `<p class="small muted" style="margin-top:10px">This is the introduction video for this criterion. Read all ${lines.length} paragraphs in order.</p>`}
+    <div class="count" id="cnt"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn red" id="rec">● Record</button><button class="btn ghost hidden" id="next">Next line ⏎</button><button class="btn ghost hidden" id="stop">■ Stop</button>
+      <button class="btn ghost hidden" id="play">▶ Play back</button><button class="btn ghost hidden" id="dl">⬇ Save this file</button><button class="btn ghost hidden" id="del">🗑 Delete</button>
+      <button class="btn ghost" id="nxt" style="margin-left:auto">Next script →</button></div>
+    <div id="msg" class="small" style="margin-top:8px;font-weight:700"></div>
+    <div class="small" style="font-weight:800;margin-top:12px">Script${isVid ? ": read each line when it lights up" : ": read the highlighted paragraph"}</div>
+    <ol class="script" id="script">${lines.map((l, i) => `<li data-i="${i}">${isVid ? `<span class="tm">${fmt(l[0])}</span>` : `<span class="tm">${i + 1}</span>`}${esc(l[1])}</li>`).join("")}</ol>`;
+  const v = $("v"), msg = t => $("msg").innerHTML = t;
+  const mark = k => { state.line = k; $("script").querySelectorAll("li").forEach((li, i) => { const on = i === k; if (on && !li.classList.contains("on")){ const box = li.parentNode; box.scrollTop = Math.max(0, li.offsetTop - box.offsetTop - 60); } li.classList.toggle("on", on); }); };
+  if (v) v.addEventListener("timeupdate", () => { let k = 0; lines.forEach((l, i) => { if (v.currentTime >= l[0]) k = i; }); mark(k); });
+  mark(0);
+  const paint = () => { const r = REC[x.file];
+    $("have").innerHTML = r ? `<span class="pill ok">✅ Recorded ${esc(new Date(r.at).toLocaleDateString())} · ${fmt(r.secs || 0)}</span>` : `<span class="pill warn">Not recorded yet</span>`;
+    ["play", "dl", "del"].forEach(id => $(id).classList.toggle("hidden", !r)); $("rec").textContent = r ? "● Record again" : "● Record"; };
+  paint();
+  liveOnSite(x).then(e => { if (cur !== x) return; $("live").textContent = e ? "Your voice is live on the site" : "Students hear the computer voice"; $("live").className = "pill" + (e ? " ok" : ""); });
+  const finish = () => { if (!state.recording) return; state.recording = false; clearInterval(state.tick); $("cnt").textContent = ""; try { state.rec.stop(); } catch(e){} if (v) v.pause(); $("stop").classList.add("hidden"); $("next").classList.add("hidden"); };
+  if (v) v.addEventListener("ended", finish);
+  $("stop").onclick = finish;
+  $("next").onclick = () => { if (!v && state.recording) mark(Math.min(lines.length - 1, state.line + 1)); };
+  document.onkeydown = e => { if (e.code === "Space" && state.recording && !v && e.target === document.body){ e.preventDefault(); $("next").click(); } };
+  $("rec").onclick = async () => {
+    if (!window.MediaRecorder || !navigator.mediaDevices){ msg("This browser can't record sound. Use Chrome or Edge on a laptop."); return; }
+    stopAll(); msg("");
+    try { state.stream = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true } }); }
+    catch(e){ msg("Allow the microphone when your browser asks, then press Record again."); return; }
+    const mime = pickMime(), chunks = []; const rec = state.rec = new MediaRecorder(state.stream, mime ? { mimeType:mime, audioBitsPerSecond:64000 } : undefined);
+    rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    rec.onstop = async () => {
+      state.stream.getTracks().forEach(t => t.stop());
+      const type = rec.mimeType || mime || "audio/webm", blob = new Blob(chunks, { type }), secs = (Date.now() - state.t0) / 1000;
+      if (secs < 2){ msg("That was too short to keep. Press Record and read the script."); return; }
+      const val = { blob, ext: extOf(type), at: Date.now(), secs };
+      try { await dbPut(x.file, val); REC[x.file] = val; } catch(e){ REC[x.file] = val; msg("Saved for now, but this browser couldn't keep it after closing. Press Save all before you leave."); }
+      if (cur === x){ paint(); $("rec").disabled = false; if (!$("msg").textContent) msg("✅ Saved. Press <b>Play back</b> to check it, or <b>Next script</b> to carry on."); }
+      renderList();
+    };
+    $("rec").disabled = true; ["play", "dl", "del"].forEach(id => $(id).classList.add("hidden"));
+    if (v){ v.muted = true; v.pause(); v.currentTime = 0; } mark(0);
+    for (const n of ["3", "2", "1"]){ $("cnt").textContent = n; await new Promise(r => setTimeout(r, 800)); if (cur !== x) return; }
+    $("cnt").textContent = ""; state.recording = true; state.t0 = Date.now(); rec.start(250);
+    if (v){ v.play().catch(() => {}); msg("🔴 Recording… read each line as it lights up. It stops by itself at the end of the video."); }
+    else { $("next").classList.remove("hidden"); msg("🔴 Recording… read the highlighted paragraph, then press <b>Next line</b> (or the space bar). Press <b>Stop</b> when you've finished."); }
+    $("stop").classList.remove("hidden");
+    state.tick = setInterval(() => { if (state.recording && cur === x) $("cnt").innerHTML = `<span style="font-size:1.1rem;color:var(--red)">⏺ ${fmt((Date.now() - state.t0) / 1000)}</span>`; }, 500);
+  };
+  $("play").onclick = () => {
+    const r = REC[x.file]; if (!r) return;
+    if (state.audio && !state.audio.paused){ state.audio.pause(); if (v) v.pause(); $("play").textContent = "▶ Play back"; return; }
+    if (state.url) URL.revokeObjectURL(state.url); state.url = URL.createObjectURL(r.blob);
+    const a = state.audio = new Audio(state.url); a.onended = () => { if (v) v.pause(); $("play").textContent = "▶ Play back"; };
+    if (v){ v.muted = true; v.currentTime = 0; v.play().catch(() => {}); }
+    a.play().catch(() => {}); $("play").textContent = "❚❚ Stop playback";
+  };
+  $("dl").onclick = () => { const r = REC[x.file]; if (!r) return; const u = URL.createObjectURL(r.blob), a = document.createElement("a"); a.href = u; a.download = x.file.split("/").pop() + "." + r.ext; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(u); a.remove(); }, 1000); };
+  $("del").onclick = async () => { if (!confirm("Delete this recording from this computer?")) return; await dbDel(x.file); delete REC[x.file]; paint(); renderList(); };
+  $("nxt").onclick = () => { const i = ITEMS.indexOf(x); const n = ITEMS.slice(i + 1).find(y => !REC[y.file]) || ITEMS.find(y => !REC[y.file]); if (n) open(n); };
+}
+$("zipAll").onclick = async () => {
+  const files = ITEMS.filter(x => REC[x.file]).map(x => ({ name: x.file + "." + REC[x.file].ext, blob: REC[x.file].blob }));
+  if (!files.length) return;
+  $("zipAll").disabled = true; $("zipAll").textContent = "Preparing…";
+  try { const z = await makeZip(files), u = URL.createObjectURL(z), a = document.createElement("a");
+    a.href = u; a.download = "sisd-voice-recordings-" + new Date().toISOString().slice(0, 10) + ".zip"; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(u); a.remove(); }, 2000); }
+  finally { $("zipAll").textContent = "⬇ Save all my recordings (one zip file)"; $("zipAll").disabled = false; }
+};
+Promise.all([fetch("voice-scripts.json?v=20261102n", { cache:"no-store" }).then(r => r.json()), dbAll().catch(() => ({}))]).then(([items, rec]) => {
+  ITEMS = items; REC = rec; renderList(); open(ITEMS.find(x => !REC[x.file]) || ITEMS[0]);
+}).catch(() => { $("progTxt").textContent = "The scripts couldn't be loaded. Check the internet connection and refresh."; });
+window.addEventListener("beforeunload", () => stopAll());
+})();
+</script>
+</body>
+</html>
