@@ -7,7 +7,7 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="sdc.js?v=20261102a"></script>
+<script src="sdc.js?v=20261102b"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -129,6 +129,7 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
       <div class="card">
         <h2>House Points after each lesson</h2>
         <p class="muted small" style="margin-top:4px">A lesson ends when nobody in that class has done any work for 15 minutes (at least 3 students must have worked, so home learning isn't counted). While this page is open it checks every 2 minutes and emails you the top 5 for each lesson that has ended. Lessons that ended while it was closed (in the last 24 hours) are emailed when you next open it.</p>
+        <p class="muted small" style="margin-top:6px"><b>Who can get a House Point:</b> only students who worked actively for at least 30 minutes in that lesson (typing, running and checking work: being signed in doesn't count), and only one House Point per student per lesson. Totals restart every Monday.</p>
         <p class="muted small" style="margin-top:6px"><b>How the top 5 is chosen:</b> new tasks completed in that lesson, weighted by difficulty. Python: Beginner ×1, Intermediate ×1.5, Advanced ×3 per exercise. Design and IT: practice passed ×1, criterion submitted ×2, strand completed ×3. Ties go to the student with more tasks.</p>
         <div id="hpWarn"></div>
       </div>
@@ -516,7 +517,8 @@ function lessons(){
       if (cur && (r.when - cur.last > QUIET_MIN * 60000 || (forced[cur.key] && r.when > forced[cur.key]))) close();
       if (!cur) cur = { key: k + "|" + new Date(r.when).toISOString().slice(0, 16), cls: r.acct, start: r.when, last: r.when, students: {} };
       cur.last = r.when;
-      const sk = SDC.keyOf(r.acct.email, r.acct.name), st = cur.students[sk] = cur.students[sk] || { name: r.acct.name, level: r.acct.level, course: r.acct.course, tasks: 0, score: 0, last: 0, seen: {} };
+      const sk = SDC.keyOf(r.acct.email, r.acct.name), st = cur.students[sk] = cur.students[sk] || { key: sk, name: r.acct.name, level: r.acct.level, course: r.acct.course, tasks: 0, score: 0, last: 0, seen: {}, mins: 0 };
+      st.mins = Math.max(st.mins, +r.mins || 0);
       const tk = r.task.t; if (st.seen[tk]) return; st.seen[tk] = 1;     // each task counts once
       st.tasks++; st.score += +r.task.w || 1; st.last = r.when;
     });
@@ -527,7 +529,12 @@ function lessons(){
     L.n = Object.keys(L.students).length;
     L.ended = !!forced[L.key] || now - L.last >= QUIET_MIN * 60000;
     L.end = forced[L.key] ? Math.max(L.last, Math.min(forced[L.key], now)) : L.last;
-    L.top = Object.values(L.students).sort((a, b) => b.score - a.score || b.tasks - a.tasks || a.last - b.last).slice(0, 5);
+    // active work minutes this session also come from the "30 minutes reached" and sign-out records
+    ROWS.forEach(r => { if (r.type !== "work" || r.when < L.start - 60 * 60000 || r.when > L.end + 20 * 60000) return; const st = L.students[SDC.keyOf(r.acct.email, r.acct.name)]; if (st) st.mins = Math.max(st.mins, +r.mins || 0); });
+    // one House Point per student per session, and only after 30 minutes of active work
+    L.eligible = Object.values(L.students).filter(x => x.mins >= WORK_MIN);
+    L.short = Object.values(L.students).filter(x => x.mins < WORK_MIN);
+    L.top = L.eligible.sort((a, b) => b.score - a.score || b.tasks - a.tasks || a.last - b.last).slice(0, 5);
     L.sent = sent[L.key] || null;
     L.lesson = L.n >= MIN_STUDENTS || !!forced[L.key];
     L.wrong = ROWS.filter(r => r.type === "wrongcourse" && r.when >= L.start - 10 * 60000 && r.when <= L.end + 60000 && (r.acct.teacher === L.cls.teacher || Object.values(L.students).some(s => s.name === r.acct.name)));
@@ -541,13 +548,26 @@ function sentSet(){
   return s;
 }
 const fmtScore = n => Math.round(n * 10) / 10;
+const WORK_MIN = 30;
+const weekOf = ms => { const x = new Date(ms); x.setHours(12, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x.toISOString().slice(0, 10); };
+/* House Points this week (restarts every Monday): lesson awards (top 5) + Python House Points earned this week */
+function weekTotals(){
+  const wk = weekOf(Date.now()), T = {};
+  const add = (k, name, course, teacher, f, n) => { const t = T[k] = T[k] || { name, course, teacher, lessons:0, cs:0 }; t[f] += n; };
+  lessons().filter(L => L.lesson && L.ended && weekOf(L.start) === wk).forEach(L => L.top.forEach(s => add(s.key, s.name, s.course, L.cls.teacher, "lessons", 1)));
+  Object.keys(PYSNAP).forEach(k => { const sn = PYSNAP[k].snap, a = sn.acct || {}; if (!canSee(a.teacher)) return;
+    Object.values(sn.paths || {}).forEach(P => { const n = (P.hpLedger || []).filter(x => x.week === wk).length; if (n) add(k, a.name, "cs", a.teacher, "cs", n); }); });
+  return Object.values(T).sort((a, b) => (b.lessons + b.cs) - (a.lessons + a.cs) || a.name.localeCompare(b.name));
+}
 function emailText(L){
   const lines = [];
   lines.push("🏠 House Points: " + classLabel(L.cls));
   lines.push("Lesson: " + fmtD(L.start) + ", " + fmtT(L.start) + "–" + fmtT(L.end) + " · " + L.n + " student" + (L.n === 1 ? "" : "s") + " completed work" + (L.signins ? " · " + L.signins + " signed in" : ""));
   lines.push("");
-  lines.push("Top " + L.top.length + " (most new tasks, weighted by difficulty):");
-  L.top.forEach((s, i) => lines.push((i + 1) + ". " + s.name + ": " + s.tasks + " task" + (s.tasks === 1 ? "" : "s") + ", score " + fmtScore(s.score) + (levelName(s.course, s.level) ? " (" + levelName(s.course, s.level) + ")" : "")));
+  lines.push("Top " + L.top.length + " (most new tasks, weighted by difficulty; only students who worked at least " + WORK_MIN + " minutes; one House Point each):");
+  L.top.forEach((s, i) => lines.push((i + 1) + ". " + s.name + ": " + s.tasks + " task" + (s.tasks === 1 ? "" : "s") + ", score " + fmtScore(s.score) + ", " + s.mins + " min work" + (levelName(s.course, s.level) ? " (" + levelName(s.course, s.level) + ")" : "")));
+  if (!L.top.length) lines.push("Nobody worked actively for " + WORK_MIN + " minutes in this lesson.");
+  if (L.short.length) lines.push("Not eligible (under " + WORK_MIN + " minutes of active work): " + L.short.map(s => s.name + " (" + s.mins + " min)").join(", "));
   if (L.wrong.length){
     lines.push(""); lines.push("⚠️ Wrong-course sign-in attempts:");
     L.wrong.forEach(r => lines.push("• " + fmtT(r.when) + " " + (r.acct.name || r.acct.email || "Unknown") + " tried " + (C[r.acct.course] ? C[r.acct.course].name : r.acct.course) + (r.registered ? ", registered for " + (C[r.registered] ? C[r.registered].name : r.registered) : "") + (r.reason === "grade" ? " (not Grade 10)" : "")));
@@ -571,15 +591,21 @@ async function autoSend(){
   renderHP();
 }
 function renderHP(){
-  const all = lessons().filter(L => L.lesson || !L.ended).slice(0, 40);
-  if (!all.length){ $("hpList").innerHTML = `<div class="card muted">No lessons yet. Once students complete tasks through the platform, each class's lesson appears here.</div>`; return; }
+  const all = lessons().filter(L => L.lesson || !L.ended).slice(0, 40), wk = weekTotals();
+  const weekCard = `<div class="card"><h2>🏠 House Points this week <span class="n">week of ${esc(fmtD(Date.parse(weekOf(Date.now()) + "T12:00:00")))}</span></h2>
+    <p class="muted small" style="margin-top:4px">Restarts every Monday. Lesson awards = times in a lesson's top 5. Python = House Points earned in the course (exercise target + 30 minutes of work, one per session).</p>
+    <div class="scroll" style="margin-top:8px"><table class="tbl"><tr><th>Student</th><th>Course</th><th>Teacher</th><th>Lesson awards</th><th>Python House Points</th><th>Total</th></tr>
+    ${wk.length ? wk.map(t => `<tr><td><b>${esc(t.name)}</b></td><td>${pill(t.course)}</td><td>${esc(t.teacher || "")}</td><td>${t.lessons}</td><td>${t.cs}</td><td><b>${t.lessons + t.cs}</b></td></tr>`).join("") : `<tr><td colspan="6" class="muted">No House Points yet this week.</td></tr>`}</table></div></div>`;
+  if (!all.length){ $("hpList").innerHTML = weekCard + `<div class="card muted">No lessons yet. Once students complete tasks through the platform, each class's lesson appears here.</div>`; return; }
   const canMail = isSuper() && !!parseForm(load(NOTIFY_KEY, ""));
-  $("hpList").innerHTML = all.map((L, i) => {
+  $("hpList").innerHTML = weekCard + all.map((L, i) => {
     const state = !L.ended ? `<span class="pill bad">● Live, last work ${fmtT(L.last)}</span>` : L.sent ? `<span class="pill ok">✓ Emailed ${fmtT(L.sent)}</span>` : !L.lesson ? `<span class="pill">Fewer than ${MIN_STUDENTS} students</span>` : `<span class="pill warn">Not emailed yet</span>`;
     const btn = !isSuper() ? "" : !L.ended ? `<button class="btn red sm" data-end="${i}">End lesson now and email</button>` : `<button class="btn ghost sm" data-send="${i}" ${canMail ? "" : "disabled"}>${L.sent ? "Email again" : "Email now"}</button>`;
     return `<div class="card lesson ${L.ended ? "" : "live"}"><h3>${pill(L.cls.course)} ${esc(classLabel(L.cls))} ${state}</h3>
       <div class="muted small">${esc(fmtD(L.start))}, ${esc(fmtT(L.start))}–${esc(fmtT(L.end))} · ${L.n} student${L.n === 1 ? "" : "s"} completed work${L.signins ? " · " + L.signins + " signed in" : ""}${L.wrong.length ? ` · <b style="color:var(--bad)">${L.wrong.length} wrong-course attempt${L.wrong.length === 1 ? "" : "s"}</b>` : ""}</div>
-      <ol class="top5">${L.top.map(s => `<li><b>${esc(s.name)}</b><span class="small">${s.tasks} task${s.tasks === 1 ? "" : "s"} · score ${fmtScore(s.score)}${levelName(s.course, s.level) ? " · " + esc(levelName(s.course, s.level)) : ""}</span></li>`).join("")}</ol>
+      <ol class="top5">${L.top.map(s => `<li><b>${esc(s.name)}</b><span class="small">${s.tasks} task${s.tasks === 1 ? "" : "s"} · score ${fmtScore(s.score)} · ${s.mins} min${levelName(s.course, s.level) ? " · " + esc(levelName(s.course, s.level)) : ""}</span></li>`).join("")}</ol>
+      ${!L.top.length ? `<p class="muted small" style="margin-top:8px">Nobody has worked actively for ${WORK_MIN} minutes yet.</p>` : ""}
+      ${L.short.length ? `<p class="muted small" style="margin-top:8px">Under ${WORK_MIN} minutes of active work (not eligible): ${L.short.map(x => esc(x.name) + " (" + x.mins + " min)").join(", ")}</p>` : ""}
       <div class="row" style="margin-top:10px">${btn}</div></div>`;
   }).join("");
   $("hpList").querySelectorAll("[data-send]").forEach(b => b.onclick = async () => { b.disabled = true; await sendLesson(all[+b.dataset.send], true); renderHP(); });
@@ -614,7 +640,8 @@ function students(){
 /* short progress summary for the table */
 function pySummary(snap){
   if (!snap || !snap.paths) return null; let solved = 0, house = 0, lessons = 0;
-  Object.values(snap.paths).forEach(P => { solved += P.solved || 0; house += P.house || 0; lessons += Object.keys(P.lessons || {}).length; });
+  const wk = weekOf(Date.now());
+  Object.values(snap.paths).forEach(P => { solved += P.solved || 0; house += P.week === wk ? (P.houseWeek || 0) : 0; lessons += Object.keys(P.lessons || {}).length; });
   return { solved, house, lessons };
 }
 function dsSummary(d){
@@ -627,7 +654,7 @@ function dsSummary(d){
 }
 function progressCell(s){
   if (s.course === "cs"){ const p = pySummary(s.py); if (!p) return "<span class='muted'>no work yet</span>";
-    return `<b>${p.solved}</b> exercises · <b>${p.house}</b> 🏠<div class="em">${p.lessons} lesson${p.lessons === 1 ? "" : "s"} started</div>`; }
+    return `<b>${p.solved}</b> exercises · <b>${p.house}</b> 🏠 this week<div class="em">${p.lessons} lesson${p.lessons === 1 ? "" : "s"} started</div>`; }
   const d = dsSummary(s.ds); if (!d || !Object.keys(d).length) return "<span class='muted'>no work yet</span>";
   return Object.keys(d).map(c => `<span class="pill ${d[c].sub ? "ok" : ""}" title="Criterion ${c}">${c}: ${d[c].done}/4${d[c].sub ? " ✓" : ""}</span>`).join(" ");
 }

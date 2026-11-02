@@ -139,7 +139,7 @@ function log(type, a, extra){
   enqueue(LOG.url, { [LOG.entries.type]:"sdc-" + type, [LOG.entries.student]:acct.name, [LOG.entries.email]:acct.email, [LOG.entries.teacher]:acct.teacher, [LOG.entries.data]:JSON.stringify(data) });
 }
 /* one completed task, for the end-of-lesson House Points ranking. w = difficulty weight */
-function task(a, title, w, kind){ log("task", a, { task:{ t:String(title || "").slice(0, 120), w:+w || 1, kind:kind || "task" } }); }
+function task(a, title, w, kind){ const wk = work(); log("task", a, { task:{ t:String(title || "").slice(0, 120), w:+w || 1, kind:kind || "task" }, sid: wk && wk.sid, mins: wk ? Math.floor(wk.ms / 60000) : 0 }); }
 
 /* ---------- staff: the signed course state (criteria switches + approved teachers) ----------
    Published by the super admin to the Design Studio Switches form and signed with the admin key, so nobody else
@@ -223,6 +223,28 @@ async function showFeedbackButton(){
   };
 }
 
+/* ---------- active work time ----------
+   Counts only while the student is actually working: the page is open and they typed, clicked or ran something
+   in the last 2 minutes. Being signed in and idle does not count. One session = one sign-in, on one day. */
+const IDLE_MS = 120000, WORK_GOAL_MIN = 30;
+let lastAct = 0;
+const dayNow = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+["keydown", "input", "pointerdown", "change"].forEach(ev => window.addEventListener(ev, e => { if (e.isTrusted !== false) lastAct = Date.now(); }, true));
+function work(){
+  const g = gate(); if (!g || !g.who) return null;
+  if (!g.sid || g.day !== dayNow()){ const sid = Math.random().toString(36).slice(2, 10); patchGate({ sid, day: dayNow(), work: 0, told30: false }); return { sid, ms: 0 }; }
+  return { sid: g.sid, ms: g.work || 0 };
+}
+let workTick = Date.now();
+setInterval(() => {
+  const now = Date.now(), dt = Math.min(now - workTick, 10000); workTick = now;
+  const g = gate(); if (!g || !g.who || document.hidden || now - lastAct > IDLE_MS) return;
+  const w = work(); if (!w) return;
+  const ms = w.ms + dt; patchGate({ work: ms });
+  if (ms >= WORK_GOAL_MIN * 60000 && !gate().told30){ patchGate({ told30: true }); log("work", Object.assign({ course: g.course }, g.acct || g.who), { sid: w.sid, mins: Math.floor(ms / 60000) }); }
+}, 5000);
+window.addEventListener("pagehide", () => { const g = gate(), w = work(); if (g && w && w.ms > 60000) log("work", Object.assign({ course: g.course }, g.acct || g.who), { sid: w.sid, mins: Math.floor(w.ms / 60000), end: true }); });
+
 /* ---------- checks used by the course pages ---------- */
 const MSG = {
   other: (c, by) => `This account is registered for <b>${esc(courseLabel(c))}</b>${by ? " by your teacher" : ""}, not the course you chose. You can only see the course you are registered for. If this is wrong, ask your teacher: only they can change your course.`,
@@ -246,7 +268,7 @@ async function confirm(a, signup){
   if (A && A.c !== c){ log("wrongcourse", Object.assign({}, a, { course:c }), { registered:A.c, byAdmin:true }); return { ok:false, msg:MSG.other(A.c, true), registered:A.c }; }
   if (!A && L.reg && L.reg.c !== c){ log("wrongcourse", Object.assign({}, a, { course:c }), { registered:L.reg.c }); return { ok:false, msg:MSG.other(L.reg.c, false), registered:L.reg.c }; }
   if (!L.reg) register(a.email, a.name, c, (A && A.g) || a.grade);
-  patchGate({ who:{ email:normEmail(a.email), name:a.name } }); setTimeout(showFeedbackButton, 800);
+  patchGate({ who:{ email:normEmail(a.email), name:a.name }, acct: acctOf(Object.assign({}, a, { course: c })) }); work(); setTimeout(showFeedbackButton, 800);
   if (!(g && g.logged)){ log(signup ? "signup" : "signin", Object.assign({}, a, { course:c }), { gate:g && g.mode }); patchGate({ logged:true }); }
   return { ok:true, assign:A };
 }
@@ -470,5 +492,5 @@ function strip(c, onSignOut, noLang, mainSel){
 function signedOutNotice(msg){ try { sessionStorage.setItem("sdc_msg", msg); } catch(e){} }
 
 return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, confirm, canSignUp, lookup, register,
-  log, task, strip, signedOutNotice, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
+  log, task, strip, signedOutNotice, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();
