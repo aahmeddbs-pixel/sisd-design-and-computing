@@ -497,7 +497,7 @@ function chunksOf(text){
 }
 let readTok = 0, readBtn = null;
 function setBtn(b, on){ if (!b) return; b.setAttribute("aria-pressed", on ? "true" : "false"); if (b.classList.contains("sdcListen")) b.innerHTML = (on ? STOP_ICON : SPEAKER) + (b.classList.contains("sdcPage") ? `<span class="sdcLt">${on ? "Stop" : "Read to me"}</span>` : ""); b.title = on ? "Stop reading" : (b.dataset.label || "Read this aloud"); const t = b.querySelector(".sdcLt"); if (t && !b.classList.contains("sdcPage")) t.textContent = on ? "Stop" : (b.dataset.label || "Listen"); }
-function stopReading(){ readTok++; try { speechSynthesis.cancel(); } catch(e){} setBtn(readBtn, false); readBtn = null; }
+function stopReading(){ readTok++; narrTok++; try { speechSynthesis.cancel(); } catch(e){} setBtn(readBtn, false); readBtn = null; }
 function speak(text, onend){
   if (!canSpeak()) return false;
   const my = ++readTok; try { speechSynthesis.cancel(); } catch(e){}
@@ -514,6 +514,55 @@ function textOf(el){
   const box = document.createElement("div"); box.className = "sdcTmp notranslate"; box.setAttribute("translate", "no"); box.setAttribute("aria-hidden", "true");
   box.style.cssText = "position:absolute;left:-10000px;top:0;width:700px"; box.appendChild(c); document.body.appendChild(box);
   const t = box.innerText; box.remove(); return t.replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu, " ");
+}
+/* ---------- narrator for the course videos ----------
+   A calm, natural voice: the best neural/natural voice on the device (male or female, the student's choice),
+   spoken sentence by sentence with short breaths between them, at an easy pace, in the chosen language. */
+const NARR_KEY = "sdc_narrator";
+const MALE = /(guy|ryan|thomas|andrew|brian|christopher|eric|roger|steffan|davis|tony|jason|william|liam|elliot|alfie|oliver|noah|ethan|daniel|arthur|aaron|fred|alex|tom|rishi|lee|george|henri|remy|jorge|alvaro|dmitry|pavel|google uk english male|\bmale\b)/i;
+const FEMALE = /(aria|jenny|sonia|libby|maisie|emma|ava|michelle|natasha|clara|hollie|abbi|bella|samantha|serena|kate|karen|moira|tessa|martha|stephanie|denise|elvira|svetlana|dariya|amelie|monica|paulina|google uk english female|google us english|\bfemale\b)/i;
+function narrator(){ try { return localStorage.getItem(NARR_KEY) === "female" ? "female" : "male"; } catch(e){ return "male"; } }
+function setNarrator(g){ try { localStorage.setItem(NARR_KEY, g === "female" ? "female" : "male"); } catch(e){} narrVoices = {}; }
+let narrVoices = {};
+try { speechSynthesis.addEventListener("voiceschanged", () => { narrVoices = {}; }); } catch(e){}
+function narrVoice(code){
+  const g = narrator(), key = code + "|" + g;
+  try { if (narrVoices[key] !== undefined) return narrVoices[key];
+    const want = VOICE[code] || "en-GB", base = want.slice(0, 2), vs = speechSynthesis.getVoices();
+    const score = v => { const l = String(v.lang || "").replace("_", "-"), nm = String(v.name || ""); let n = l === want ? 20 : l.slice(0, 2) === base ? 12 : -999;
+      if (/natural|neural/i.test(nm)) n += 60; else if (/online/i.test(nm)) n += 40;
+      if (/premium|enhanced|siri/i.test(nm)) n += 45;
+      if (/^google/i.test(nm)) n += 25;
+      if ((g === "male" ? MALE : FEMALE).test(nm)) n += 30; else if ((g === "male" ? FEMALE : MALE).test(nm)) n -= 10;
+      if (/espeak|robot|compact|novelty|whisper|bad news|bells|zarvox|trinoids|albert|bahh|boing|bubbles|cellos|deranged|hysterical|organ|superstar|jester|wobble|junior|ralph|kathy|grandma|grandpa|eddy|flo|reed|rocko|sandy|shelley/i.test(nm)) n -= 80;
+      if (!v.localService) n += 4;
+      return n; };
+    const best = vs.map(v => [score(v), v]).filter(x => x[0] > 0).sort((a, b) => b[0] - a[0])[0];
+    return (narrVoices[key] = best ? best[1] : null); } catch(e){ return null; }
+}
+let narrTok = 0;
+function stopNarrating(){ narrTok++; try { speechSynthesis.cancel(); } catch(e){} }
+/* narrate(text, {onend}) → true if speaking. Translates first when another language is chosen. */
+function narrate(text, opts){
+  opts = opts || {};
+  if (!canSpeak() || !String(text || "").trim()){ opts.onend && opts.onend(); return false; }
+  stopReading(); const my = ++narrTok;
+  const code = getLang();
+  const go = tt => {
+    if (my !== narrTok) return;
+    const v = narrVoice(code), natural = /natural|neural|online|premium|enhanced|siri|^google/i.test(v ? v.name : "");
+    const list = []; chunksOf(humanise(tt)).forEach(c => (c.match(/[^.!?]+[.!?]*\s*/g) || [c]).forEach(x => { if (x.trim()) list.push(x.trim()); }));
+    let i = 0;
+    const next = () => { if (my !== narrTok) return; if (i >= list.length){ opts.onend && opts.onend(); return; }
+      const t = list[i++], u = new SpeechSynthesisUtterance(t); u.lang = VOICE[code] || "en-GB"; if (v) u.voice = v;
+      u.rate = (natural ? 0.97 : 0.92) * (opts.rate || 1); u.pitch = natural ? 1 : (narrator() === "male" ? 0.92 : 1.02); u.volume = 1;
+      const pause = /[?!]$/.test(t) ? 420 : /[.]$/.test(t) ? 360 : 200;   // a breath between sentences, like a person talking
+      let done = false; const fin = () => { if (!done){ done = true; setTimeout(next, pause); } }; u.onend = fin; u.onerror = fin; setTimeout(fin, Math.max(7000, t.length * 130));
+      speechSynthesis.speak(u); };
+    next();
+  };
+  if (code === "en") go(text); else translateText(humanise(text), code).catch(() => text).then(go);
+  return true;
 }
 /* Speak in the chosen language: the text is translated first (not just read in English with a foreign voice).
    Uses Google's translation service directly, so it works even if the page itself hasn't finished translating. */
@@ -618,5 +667,5 @@ function strip(c, onSignOut, noLang, mainSel){
 function signedOutNotice(msg, kind){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg, kind: kind || "bad" })); } catch(e){} }
 
 return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
-  log, task, strip, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
+  log, task, strip, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();
