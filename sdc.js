@@ -89,19 +89,28 @@ function gviz(tq, sheet){
   });
 }
 let COL = null;
+/* every tab that holds sync rows: the linked tab plus any "Form responses N" tab (a re-linked form writes to a new tab) */
 async function column(){
   if (COL) return COL;
-  const r = await gviz("select * limit 30"), cols = (r.table && r.table.cols) || [], rows = (r.table && r.table.rows) || [];
-  let i = cols.findIndex((x, j) => rows.some(row => String(((row.c || [])[j] || {}).v || "").startsWith("PPS2|")));
-  if (i < 0) i = cols.findIndex(x => /^\s*data\s*$/i.test(x.label || ""));
-  if (i < 0) i = Math.min(1, cols.length - 1);
-  return (COL = { col: cols[i].id, time: cols[0].id });
+  const locs = [];
+  for (const sheet of ["", ...[1,2,3,4,5,6].map(n => "Form responses " + n), "Form Responses 1", "Form Responses 2"]){
+    let r; try { r = await gviz("select * limit 30", sheet); } catch(e){ if (!sheet) throw e; continue; }
+    const cols = (r.table && r.table.cols) || [], rws = (r.table && r.table.rows) || [];
+    let i = cols.findIndex((x, j) => rws.some(row => String(((row.c || [])[j] || {}).v || "").startsWith("PPS2|")));
+    if (i < 0) i = cols.findIndex(x => /^\s*data\s*$/i.test(x.label || ""));
+    if (i >= 0) locs.push({ col: cols[i].id, time: cols[0].id, sheet });
+  }
+  if (!locs.length) locs.push({ col: "B", time: "A", sheet: "" });
+  return (COL = locs);
 }
 async function rows(kind, id, limit){
-  const c = await column(), r = await gviz(`select ${c.col} where ${c.col} starts with 'PPS2|${kind}|${id}|' order by ${c.time} desc limit ${limit || 30}`);
-  const out = [];
-  ((r.table && r.table.rows) || []).forEach(row => { const p = String(((row.c || [])[0] || {}).v || "").split("|"); if (p.length >= 7) out.push({ ver:+p[3], text:p.slice(6).join("|") }); });
-  return out;   // newest first
+  const out = [], seen = new Set();
+  for (const c of await column()){
+    let r; try { r = await gviz(`select ${c.col} where ${c.col} starts with 'PPS2|${kind}|${id}|' order by ${c.time} desc limit ${limit || 30}`, c.sheet); } catch(e){ if (!c.sheet) throw e; continue; }
+    ((r.table && r.table.rows) || []).forEach(row => { const v = String(((row.c || [])[0] || {}).v || ""); if (seen.has(v)) return; seen.add(v);
+      const p = v.split("|"); if (p.length >= 7) out.push({ ver:+p[3], text:p.slice(6).join("|") }); });
+  }
+  return out.sort((a, b) => b.ver - a.ver);   // newest first
 }
 const sendRow = (kind, id, text) => enqueue(SYNC.action, { [SYNC.entry]: ["PPS2", kind, id, String(Date.now()), 0, 1, text].join("|") });
 
