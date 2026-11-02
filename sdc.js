@@ -67,6 +67,18 @@ const d64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 const u8ToB64Text = t => e64(TE.encode(t)), b64ToText = s => new TextDecoder().decode(d64(s));
 const hex = u8 => [...u8].map(v => v.toString(16).padStart(2, "0")).join("");
 const normEmail = e => String(e || "").trim().toLowerCase();
+/* the teacher's test student: can enter every course and see every grade, level and criterion */
+const TESTERS = ["test@sisd.ae"];
+const isTester = e => TESTERS.indexOf(normEmail(e)) >= 0;
+const TEST_PW = "b6fbc936080011b082b40a66fa98641e0c132ae742d915f7c1baaed0e4a92577";   // SHA-256 of the test student's password
+async function testerPw(email, pw){
+  if (!isTester(email) || !(window.crypto && crypto.subtle)) return false;
+  const h = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("sdc-test|" + normEmail(email) + "|" + String(pw || ""))));
+  return [...h].map(v => v.toString(16).padStart(2, "0")).join("") === TEST_PW;
+}
+/* accounts the super admin asked to delete straight away (no 30-day wait) */
+const DELETED = [{ email:"ahmed.dbs@gmail.com", at:Date.parse("2026-11-02T14:50:00Z") }, { email:"aahmed.dbs@gmail.com", at:Date.parse("2026-11-02T14:50:00Z") }];
+const fixedDeletion = e => DELETED.find(d => d.email === normEmail(e)) || null;
 const normName = n => String(n || "").trim().toLowerCase().replace(/\s+/g, " ");
 function keyOf(email, name){ const e = normEmail(email); return e ? "e:" + e : "n:" + normName(name); }
 async function idOf(email, name){ return hex(new Uint8Array(await crypto.subtle.digest("SHA-256", TE.encode("sdc|" + keyOf(email, name))))).slice(0, 32); }
@@ -169,6 +181,7 @@ async function lookup(email, name){
   const [S, G] = await Promise.all([rows("S", id, 20), rows("G", id, 50)]);
   let assign = null;
   for (const r of S){ const o = await verify(r.text); if (o && o.k === id){ assign = o; break; } }
+  const fd = fixedDeletion(email); if (fd && (!assign || !(assign.at > fd.at))) assign = { k:id, del:true, at:fd.at };
   let reg = null;
   for (const r of G){ try { const o = JSON.parse(r.text); if (o && course(o.c) && (!reg || r.ver < reg.ver)) reg = Object.assign({ ver:r.ver }, o); } catch(e){} }
   return { id, assign, reg };
@@ -294,7 +307,7 @@ window.addEventListener("pagehide", () => { const g = gate(), w = work(); if (g 
 /* ---------- checks used by the course pages ---------- */
 const MSG = {
   other: (c, by) => `This account is registered for <b>${esc(courseLabel(c))}</b>${by ? " by your teacher" : ""}, not the course you chose. You can only see the course you are registered for. If this is wrong, ask your teacher: only they can change your course.`,
-  deleted: () => `<b>This account was deleted</b> by your teacher because it had not been used for over a month. Use <b>Sign up</b> to make a new account.`,
+  deleted: () => `<b>This account was deleted</b> by your teacher. Use <b>Sign up</b> to make a new account.`,
   grade: g => `IT is only for Grade 10, and this account is registered for Grade ${esc(g)}. Sign out and choose your own course.`
 };
 /* After a successful sign-in or sign-up inside a course page.
@@ -304,6 +317,12 @@ async function confirm(a, signup){
   const g = gate();
   const c = a.course || (g && g.course);
   if (offline()) return { ok:true, assign:null };
+  if (isTester(a.email)){   // test student: every course, every grade
+    patchGate({ who:{ email:normEmail(a.email), name:a.name }, acct: acctOf(Object.assign({}, a, { course:c })) }); work();
+    if (!(g && g.logged)){ log(signup ? "signup" : "signin", Object.assign({}, a, { course:c }), { gate:g && g.mode, test:true }); patchGate({ logged:true }); }
+    return { ok:true, assign:null };
+  }
+  { const fd = fixedDeletion(a.email); if (fd && !(createdMs(a) > fd.at)){ log("deletedsignin", Object.assign({}, a, { course:c }), {}); try { if (window.SDC_forget) window.SDC_forget(a); } catch(e){} return { ok:false, deleted:true, msg:MSG.deleted() }; } }
   let L = null;
   try { L = await lookup(a.email, a.name); } catch(e){ L = null; }
   if (!L){ // sheet unreachable: let them in, it is checked again next time (new sign-ups must still verify)
@@ -380,7 +399,7 @@ const createdMs = a => { const v = a && a.created; return typeof v === "number" 
 /* has the super admin deleted this (old) account? Then signing up again is allowed and starts fresh */
 async function isDeleted(email, name){ try { const L = await lookup(email, name); return !!(L.assign && L.assign.del); } catch(e){ return false; } }
 async function canSignUp(email, name, c){
-  if (offline()) return { ok:true };
+  if (offline() || isTester(email)) return { ok:true };
   let L = null; try { L = await lookup(email, name); } catch(e){ return { ok:true }; }
   if (L.assign && L.assign.del){ if (!L.reg || L.reg.ver <= L.assign.at) return { ok:true, deleted:true }; L.assign = null; }
   if (L.assign && L.assign.c !== c){ log("wrongcourse", { email, name, course:c }, { registered:L.assign.c, byAdmin:true, signup:true }); return { ok:false, msg:MSG.other(L.assign.c, true) }; }
@@ -598,6 +617,6 @@ function strip(c, onSignOut, noLang, mainSel){
 }
 function signedOutNotice(msg, kind){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg, kind: kind || "bad" })); } catch(e){} }
 
-return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, confirm, canSignUp, isDeleted, lookup, register,
+return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
   log, task, strip, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();

@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261102i"></script>
+<script src="/python-pathways/pp-sync.js?v=20261102j"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261102i"></script>
+<script src="sdc.js?v=20261102j"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -564,7 +564,7 @@ const classKey = a => [a.course, a.grade, a.teacher, a.cls || ""].join("|");
 const classLabel = a => `G${a.grade} ${C[a.course] ? C[a.course].name : a.course}${a.cls ? " · " + a.cls : ""} (${a.teacher || "no teacher"})`;
 function lessons(){
   const byClass = {}, out = [], forced = load("sdc_forced", {});
-  ROWS.filter(r => r.type === "task" && r.task).forEach(r => { const k = classKey(r.acct); (byClass[k] = byClass[k] || []).push(r); });
+  ROWS.filter(r => r.type === "task" && r.task && !SDC.isTester(r.acct.email)).forEach(r => { const k = classKey(r.acct); (byClass[k] = byClass[k] || []).push(r); });
   Object.keys(byClass).forEach(k => {
     let cur = null;
     const close = () => { if (cur) out.push(cur); cur = null; };
@@ -692,6 +692,7 @@ function students(){
     s.active = Math.max(s.active || 0, ps ? ps.when : 0, s.ds ? s.ds.last : 0); });
   const gone = {};   // accounts the super admin deleted: hidden unless the student has been active since (a new account)
   ROWS.forEach(r => { if (r.type === "admindelete" && r.student && r.student.key) gone[r.student.key] = Math.max(gone[r.student.key] || 0, r.when); });
+  SDC.DELETED.forEach(d => { gone["e:" + d.email] = Math.max(gone["e:" + d.email] || 0, d.at); });
   Object.values(S).forEach(s => { s.seen = Math.max(s.active || 0, s.last || 0, s.when || 0); });
   return Object.values(S).filter(s => s.name && canSee(s.teacher) && !(gone[s.key] && s.seen <= gone[s.key])).sort((a, b) => (a.course || "").localeCompare(b.course || "") || String(a.grade).localeCompare(String(b.grade), undefined, { numeric:true }) || a.name.localeCompare(b.name));
 }
