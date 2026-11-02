@@ -294,6 +294,7 @@ window.addEventListener("pagehide", () => { const g = gate(), w = work(); if (g 
 /* ---------- checks used by the course pages ---------- */
 const MSG = {
   other: (c, by) => `This account is registered for <b>${esc(courseLabel(c))}</b>${by ? " by your teacher" : ""}, not the course you chose. You can only see the course you are registered for. If this is wrong, ask your teacher: only they can change your course.`,
+  deleted: () => `<b>This account was deleted</b> by your teacher because it had not been used for over a month. Use <b>Sign up</b> to make a new account.`,
   grade: g => `IT is only for Grade 10, and this account is registered for Grade ${esc(g)}. Sign out and choose your own course.`
 };
 /* After a successful sign-in or sign-up inside a course page.
@@ -311,7 +312,15 @@ async function confirm(a, signup){
     if (!(g && g.logged)) { log("signin", Object.assign({}, a, { course:c }), { gate:g && g.mode, unchecked:true }); patchGate({ logged:true }); }
     return { ok:true, assign:null };
   }
-  const A = L.assign;
+  let A = L.assign;
+  if (A && A.del){   // the super admin deleted an inactive account
+    if (!(createdMs(a) > A.at)){
+      log("deletedsignin", Object.assign({}, a, { course:c }), {});
+      try { if (window.SDC_forget) window.SDC_forget(a); } catch(e){}
+      return { ok:false, deleted:true, msg:MSG.deleted() };
+    }
+    A = null; if (L.reg && L.reg.ver <= L.assign.at) L.reg = null;   // a new account made after the deletion: start fresh
+  }
   if (A && A.c !== c){ log("wrongcourse", Object.assign({}, a, { course:c }), { registered:A.c, byAdmin:true }); return { ok:false, msg:MSG.other(A.c, true), registered:A.c }; }
   if (!A && L.reg && L.reg.c !== c){ log("wrongcourse", Object.assign({}, a, { course:c }), { registered:L.reg.c }); return { ok:false, msg:MSG.other(L.reg.c, false), registered:L.reg.c }; }
   if (!L.reg) register(a.email, a.name, c, (A && A.g) || a.grade);
@@ -367,9 +376,13 @@ async function verifyGate(email, kind, isNew){
 }
 
 /* Before creating an account: is this email free to sign up for this course? */
+const createdMs = a => { const v = a && a.created; return typeof v === "number" ? v : Date.parse(v || "") || 0; };
+/* has the super admin deleted this (old) account? Then signing up again is allowed and starts fresh */
+async function isDeleted(email, name){ try { const L = await lookup(email, name); return !!(L.assign && L.assign.del); } catch(e){ return false; } }
 async function canSignUp(email, name, c){
   if (offline()) return { ok:true };
   let L = null; try { L = await lookup(email, name); } catch(e){ return { ok:true }; }
+  if (L.assign && L.assign.del){ if (!L.reg || L.reg.ver <= L.assign.at) return { ok:true, deleted:true }; L.assign = null; }
   if (L.assign && L.assign.c !== c){ log("wrongcourse", { email, name, course:c }, { registered:L.assign.c, byAdmin:true, signup:true }); return { ok:false, msg:MSG.other(L.assign.c, true) }; }
   if (!L.assign && L.reg && L.reg.c !== c){ log("wrongcourse", { email, name, course:c }, { registered:L.reg.c, signup:true }); return { ok:false, msg:MSG.other(L.reg.c, false) }; }
   return { ok:true, assign:L.assign };
@@ -585,6 +598,6 @@ function strip(c, onSignOut, noLang, mainSel){
 }
 function signedOutNotice(msg, kind){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg, kind: kind || "bad" })); } catch(e){} }
 
-return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, confirm, canSignUp, lookup, register,
+return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, confirm, canSignUp, isDeleted, lookup, register,
   log, task, strip, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();
