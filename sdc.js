@@ -350,7 +350,7 @@ async function confirm(a, signup){
   let L = null;
   try { L = await lookup(a.email, a.name); } catch(e){ L = null; }
   if (!L){ // sheet unreachable: let them in, it is checked again next time (new sign-ups must still verify)
-    const vm = c === "cs" || a.viaCS ? null : await verifyGate(a.email, "student", !!signup); if (vm){ log("unverified", Object.assign({}, a, { course:c }), { signup:!!signup }); return { ok:false, verify:true, msg:vm }; }
+    const made0 = createdMs(a), vm = c === "cs" || a.viaCS ? null : await verifyGate(a.email, "student", !!signup || (made0 ? made0 >= sinceMs() : false));   // new accounts must verify even when the online register can't be read if (vm){ log("unverified", Object.assign({}, a, { course:c }), { signup:!!signup }); return { ok:false, verify:true, msg:vm }; }
     patchGate({ who:{ email:normEmail(a.email), name:a.name } });
     if (!(g && g.logged)) { log("signin", Object.assign({}, a, { course:c }), { gate:g && g.mode, unchecked:true }); patchGate({ logged:true }); }
     return { ok:true, assign:null };
