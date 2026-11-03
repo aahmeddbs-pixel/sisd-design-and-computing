@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261103d"></script>
+<script src="/python-pathways/pp-sync.js?v=20261103e"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261103d"></script>
+<script src="sdc.js?v=20261103e"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -498,7 +498,8 @@ $("testMail").onclick = async () => {
 };
 
 /* ---------------- reading the log sheet ---------------- */
-let ROWS = [], PYACCTS = {}, PYSNAP = {}, DS = {};
+let ROWS = [], PYACCTS = {}, PYSNAP = {}, DS = {}, PINS = {};   // PINS: the latest known PIN of each CS student (sign-up or reset)
+const notePin = (k, pin, when) => { if (/^\d{4}$/.test(String(pin || "")) && (!PINS[k] || PINS[k].when <= when)) PINS[k] = { pin:String(pin), when }; };
 function parseCSV(t){
   const R = []; let row = [], cur = "", q = false;
   for (let i = 0; i < t.length; i++){ const c = t[i];
@@ -516,12 +517,13 @@ async function refresh(){
   for (const u of urls){ try { const r = await fetch(u, { cache:"no-store" }); if (!r.ok) continue; const t = await r.text(); if (/<html/i.test(t.slice(0, 300))) continue; text = t; break; } catch(e){} }
   if (text == null){ $("loadState").textContent = ""; $("hpWarn").innerHTML = `<div class="notice bad">Couldn't read the log sheet. In the sheet, set <b>Share → Anyone with the link: Viewer</b>.</div>`; renderAll(); return; }
   const R = parseCSV(text), head = (R[0] || []).map(x => x.trim().toLowerCase()), di = head.findIndex(x => x === "data" || x.indexOf("data") === 0);
-  ROWS = []; PYACCTS = {}; PYSNAP = {};
+  ROWS = []; PYACCTS = {}; PYSNAP = {}; PINS = {};
   R.slice(1).forEach(r => {
     let d = null; try { d = JSON.parse(r[di] || ""); } catch(e){ return; }
     if (!d || !d.acct) return;
-    if (d.sdc){ d.when = Date.parse(d.at) || 0; ROWS.push(d); return; }
+    if (d.sdc){ d.when = Date.parse(d.at) || 0; ROWS.push(d); if (d.type === "pinreset" && d.pin) notePin(SDC.keyOf(d.acct.email, d.acct.name), d.pin, d.when); return; }
     const a = d.acct, k = SDC.keyOf(a.email, a.name), when = Date.parse(d.at) || 0;   // older Python Pathways rows: known CS students
+    if (d.pin) notePin(k, d.pin, when);
     if (!PYACCTS[k] || PYACCTS[k].when <= when) PYACCTS[k] = { when, name:a.name, email:a.email || "", grade:String(a.grade || ""), teacher:a.teacher || "", course:"cs", level:a.path || "" };
     if (d.paths && (!PYSNAP[k] || PYSNAP[k].when <= when)) PYSNAP[k] = { when, snap:d };
   });
@@ -690,7 +692,7 @@ function students(){
     const k = "e:" + d.email; if (S[k]) return;
     S[k] = { key:k, name:d.name, email:d.email, grade:String(d.grade || "").replace(/^G/, "").split(/\s/)[0], teacher:d.teacher, course: Object.keys(d.work).length && Object.values(d.work).every(w => w.w && (w.w.g === "10IT" || w.w.g === "10HH")) ? "it" : "design", last:0, signins:0 };
   });
-  Object.values(S).forEach(s => { const ps = PYSNAP[s.key]; s.py = ps ? ps.snap : null; s.ds = DS[(s.email || "").toLowerCase()] || null;
+  Object.values(S).forEach(s => { if (s.course === "cs" && PINS[s.key]) s.pin = PINS[s.key].pin; const ps = PYSNAP[s.key]; s.py = ps ? ps.snap : null; s.ds = DS[(s.email || "").toLowerCase()] || null;
     s.active = Math.max(s.active || 0, ps ? ps.when : 0, s.ds ? s.ds.last : 0); });
   const gone = {};   // accounts the super admin deleted: hidden unless the student has been active since (a new account)
   ROWS.forEach(r => { if (r.type === "admindelete" && r.student && r.student.key) gone[r.student.key] = Math.max(gone[r.student.key] || 0, r.when); });
@@ -730,11 +732,14 @@ function renderStudents(){
       <td>${pill(s.course)}</td><td>${s.grade ? "G" + esc(s.grade) : ""}</td><td>${esc(s.course === "cs" ? levelName("cs", s.level) : s.cls || "")}</td><td>${esc(s.teacher || "")}</td>
       <td class="small">${progressCell(s)}</td>
       <td class="small">${s.active || s.last ? esc(fmtDT(s.active || s.last)) : "<span class='muted'>—</span>"}</td>
-      <td style="white-space:nowrap"><button class="btn sm" data-pr="${i}">Progress &amp; feedback</button>${s.course === "cs" ? ` <button class="btn ghost sm" data-pin="${i}">🔑 Reset PIN</button>` : ""}${isSuper() ? ` <button class="btn ghost sm" data-ed="${i}">Change</button>` + delBtn(s, i) : ""}</td></tr>`).join("")
+      <td style="white-space:nowrap"><button class="btn sm" data-pr="${i}">Progress &amp; feedback</button>${s.course === "cs" ? ` <button class="btn ghost sm" data-vp="${i}" title="Show or hide this student's PIN">👁 PIN</button> <button class="btn ghost sm" data-pin="${i}">🔑 Reset PIN</button>` : ""}${isSuper() ? ` <button class="btn ghost sm" data-ed="${i}">Change</button>` + delBtn(s, i) : ""}</td></tr>`).join("")
       : `<tr><td colspan="8" class="muted">${isSuper() ? "No students yet. They appear here after signing in through the platform." : "No students have chosen you as their teacher yet."}</td></tr>`);
   $("stTbl").querySelectorAll("[data-ed]").forEach(b => b.onclick = () => editStudent(list[+b.dataset.ed]));
   $("stTbl").querySelectorAll("[data-pr]").forEach(b => b.onclick = () => openProgress(list[+b.dataset.pr]));
   $("stTbl").querySelectorAll("[data-pin]").forEach(b => b.onclick = () => resetPin(list[+b.dataset.pin]));
+  $("stTbl").querySelectorAll("[data-vp]").forEach(b => b.onclick = () => { const s = list[+b.dataset.vp];
+    if (b.dataset.shown){ delete b.dataset.shown; b.textContent = "👁 PIN"; return; }
+    b.dataset.shown = "1"; b.innerHTML = s.pin ? `PIN <b style="font-family:Consolas,Menlo,monospace;letter-spacing:.15em">${esc(s.pin)}</b>` : "No PIN on record"; b.title = s.pin ? "Click to hide" : "This student signed up before PINs were recorded. Use Reset PIN to give them a new one."; });
   $("stTbl").querySelectorAll("[data-del]").forEach(b => b.onclick = () => deleteStudent(list[+b.dataset.del]));
 }
 /* ---- deleting an account (super admin only, once the student hasn't been online for a month) ---- */
@@ -874,7 +879,8 @@ function resetPin(s){
     try { const ok = await PPSync.resetWithKey(String(s.name).trim().toLowerCase().replace(/\s+/g, " "), p, RKEY);
       q("#rpMsg").innerHTML = ok ? `<div class="notice ok"><b>Done.</b> ${esc(s.name)} can now sign in with PIN <b style="font-size:1.15em">${p}</b> on any computer.</div>`
         : `<div class="notice warn">No saved progress was found for ${esc(s.name)} yet. Ask them to sign in once on their usual computer, then try again.</div>`;
-      if (ok) SDC.log("pinreset", { name:s.name, email:s.email, course:"cs", grade:s.grade, teacher:s.teacher }, { by: ME.name });
+      if (ok){ SDC.log("pinreset", { name:s.name, email:s.email, course:"cs", grade:s.grade, teacher:s.teacher }, { by: ME.name, pin:p });
+        notePin(s.key, p, Date.now()); s.pin = p; renderStudents(); }
     } catch(e){ q("#rpMsg").innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; }
     q("#rpGo").disabled = false;
   };
