@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261103l"></script>
+<script src="/python-pathways/pp-sync.js?v=20261103n"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261103l"></script>
+<script src="sdc.js?v=20261103n"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -144,6 +144,7 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
         <h2><span id="stTitle">Students</span> <span class="n" id="stCount">0</span></h2>
         <p class="muted small" style="margin-top:4px" id="stIntro">Open a student to see their progress and send them feedback. Press <b>✏️ Change course</b> to change a student's course, grade, level or teacher.</p>
         <div id="stWarn"></div>
+        <div id="dreq"></div>
         <div class="row" style="margin-top:12px"><input class="t" id="stQ" placeholder="Search name or email" style="max-width:280px">
           <select class="t" id="stC" style="max-width:190px"><option value="">All courses</option><option value="cs">Computer Science</option><option value="design">Design</option><option value="it">IT</option></select>
           <button class="btn ghost sm" id="stAdd" data-super>＋ Set up a student by email</button></div>
@@ -535,7 +536,9 @@ async function refresh(){
   if (text == null){ $("loadState").textContent = ""; $("hpWarn").innerHTML = `<div class="notice bad">Couldn't read the log sheet. In the sheet, set <b>Share → Anyone with the link: Viewer</b>.</div>`; renderAll(); return; }
   const R = parseCSV(text), head = (R[0] || []).map(x => x.trim().toLowerCase()), di = head.findIndex(x => x === "data" || x.indexOf("data") === 0);
   ROWS = []; PYACCTS = {}; PYSNAP = {}; PINS = {};
+  const seen = new Set();   // each save is sent twice (two delivery routes): keep one copy
   R.slice(1).forEach(r => {
+    if (seen.has(r[di])) return; seen.add(r[di]);
     let d = null; try { d = JSON.parse(r[di] || ""); } catch(e){ return; }
     if (!d || !d.acct) return;
     if (d.sdc){ d.when = Date.parse(d.at) || 0; ROWS.push(d); if (d.type === "pinreset" && d.pin) notePin(SDC.keyOf(d.acct.email, d.acct.name), d.pin, d.when); return; }
@@ -564,7 +567,9 @@ async function loadDesign(){
   const col = (n, fb) => { const i = head.findIndex(x => x === n || x.indexOf(n) === 0); return i >= 0 ? i : fb; };
   const ci = { email:col("email", 1), name:col("name", 2), grade:col("grade", 3), teacher:col("teacher", 4), crit:col("criterion", 5), event:col("event", 6), role:col("role", 7), det:col("details", 8) };
   const parts = {};
+  const seenDs = new Set();
   R.slice(1).forEach(r => {
+    { const sig = r.slice(1).join("\u0001"); if (seenDs.has(sig)) return; seenDs.add(sig); }   // the same save delivered twice
     const email = String(r[ci.email] || "").trim().toLowerCase(); if (!/@/.test(email) || /^staff$/i.test(r[ci.grade] || "") || /teacher/i.test(r[ci.role] || "")) return;
     const st = DS[email] = DS[email] || { email, name:"", grade:"", teacher:"", events:[], work:{}, last:0 };
     st.name = r[ci.name] || st.name; st.grade = r[ci.grade] || st.grade; st.teacher = r[ci.teacher] || st.teacher;
@@ -1043,7 +1048,44 @@ function renderLog(){
 }
 $("lgF").onchange = renderLog;
 
-function renderAll(){ renderHP(); renderStudents(); renderLog(); }
+function renderAll(){ renderHP(); renderDesignRequests(); renderStudents(); renderLog(); }
+/* ---------- Computer Science students asking to join Design: the teacher approves once, with the grade and class ---------- */
+function renderDesignRequests(){
+  const last = {};
+  ROWS.forEach(r => { if (["designrequest", "designapprove", "designdecline"].indexOf(r.type) < 0 || !r.acct) return;
+    const k = SDC.keyOf(r.acct.email, r.acct.name); if (!last[k] || last[k].when <= r.when) last[k] = r; });
+  const list = Object.values(last).filter(r => r.type === "designrequest" && canSee(r.acct.teacher)).sort((a, b) => a.when - b.when);
+  const box = $("dreq"); if (!box) return;
+  if (!list.length){ box.innerHTML = ""; return; }
+  const grades = ["6", "7", "8", "10"];
+  box.innerHTML = `<div class="card" style="margin:10px 0;border-left:6px solid var(--red);padding:14px 16px"><h3 style="margin:0">📥 Asking to join Design (${list.length})</h3>
+    <p class="small muted" style="margin:4px 0 8px">These Computer Science students want to use Design too. Check the grade and class, then approve. You only do this once per student: after that they switch between the courses without signing in again.</p>
+    ${canChange() ? "" : `<div class="notice warn small">Approving isn't set up for your account yet. Ask the super admin to sign in to this page once, then sign in again.</div>`}
+    <div class="scroll"><table class="tbl"><tr><th>Student</th><th>Asked</th><th>Design grade</th><th>Class</th><th></th></tr>${list.map((r, i) => { const a = r.acct, g0 = grades.indexOf(String(a.grade)) >= 0 ? String(a.grade) : "";
+      return `<tr><td><b>${esc(a.name)}</b><div class="em">${esc(a.email || "")} · Computer Science G${esc(a.grade || "?")} · ${esc(a.teacher || "")}</div></td><td class="small">${esc(fmtDT(r.when))}</td>
+        <td><select class="t" data-dg="${i}">${grades.map(g => `<option value="${g}"${g === g0 ? " selected" : ""}>Grade ${g}</option>`).join("")}</select></td>
+        <td><select class="t" data-dc="${i}"></select></td>
+        <td style="white-space:nowrap"><button class="btn sm" data-dok="${i}"${canChange() ? "" : " disabled"}>✓ Approve</button> <button class="btn ghost sm" data-dno="${i}"${canChange() ? "" : " disabled"}>Don't approve</button></td></tr>`; }).join("")}</table></div><div id="dreqMsg"></div></div>`;
+  const fillCls = i => { const g = box.querySelector(`[data-dg="${i}"]`).value, sel = box.querySelector(`[data-dc="${i}"]`), cl = CLASSES[g] || [];
+    sel.innerHTML = cl.length ? cl.map(c => `<option value="${esc(c[0])}">${esc(c[1])}</option>`).join("") : `<option value="">—</option>`; sel.disabled = cl.length < 2; };
+  list.forEach((r, i) => { fillCls(i); box.querySelector(`[data-dg="${i}"]`).onchange = () => fillCls(i); });
+  const act = async (i, yes) => {
+    const r = list[i], a = r.acct, g = box.querySelector(`[data-dg="${i}"]`).value, cls = box.querySelector(`[data-dc="${i}"]`).value || "";
+    box.querySelectorAll("button").forEach(b => b.disabled = true);
+    try {
+      const id = await SDC.idOf(a.email || "", a.name), at = Date.now();
+      const o = yes ? { k:id, c:"design", also:"cs", g, cls, t: a.teacher || "", at } : { k:id, c:"cs", declined:"design", at };
+      SDC.sendRow("S", id, await signAssign(o));
+      const by = isSuper() ? "(admin)" : (ME && ME.name) || "";
+      SDC.log(yes ? "designapprove" : "designdecline", { name:a.name, email:a.email, grade:a.grade, teacher:a.teacher, course:"design" }, yes ? { g, cls, by } : { by });
+      ROWS.push({ sdc:1, type: yes ? "designapprove" : "designdecline", when: at, acct:{ name:a.name, email:a.email, teacher:a.teacher } });
+      toast(yes ? a.name.split(" ")[0] + " can now use Design (Grade " + g + ")." : "Not approved. " + a.name.split(" ")[0] + " will see that Design wasn't approved.");
+    } catch(e){ $("dreqMsg").innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; }
+    renderDesignRequests();
+  };
+  box.querySelectorAll("[data-dok]").forEach(b => b.onclick = () => act(+b.dataset.dok, true));
+  box.querySelectorAll("[data-dno]").forEach(b => b.onclick = () => act(+b.dataset.dno, false));
+}
 let timer = null;
 try { document.getElementById("langSlot").innerHTML = SDC.langPicker(true); } catch(e){}
 function start(){ paintSetup(); paintVerify(); renderAll(); refresh(); clearInterval(timer); timer = setInterval(refresh, POLL_MS); }

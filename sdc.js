@@ -350,7 +350,7 @@ async function confirm(a, signup){
   let L = null;
   try { L = await lookup(a.email, a.name); } catch(e){ L = null; }
   if (!L){ // sheet unreachable: let them in, it is checked again next time (new sign-ups must still verify)
-    const vm = c === "cs" ? null : await verifyGate(a.email, "student", !!signup); if (vm){ log("unverified", Object.assign({}, a, { course:c }), { signup:!!signup }); return { ok:false, verify:true, msg:vm }; }
+    const vm = c === "cs" || a.viaCS ? null : await verifyGate(a.email, "student", !!signup); if (vm){ log("unverified", Object.assign({}, a, { course:c }), { signup:!!signup }); return { ok:false, verify:true, msg:vm }; }
     patchGate({ who:{ email:normEmail(a.email), name:a.name } });
     if (!(g && g.logged)) { log("signin", Object.assign({}, a, { course:c }), { gate:g && g.mode, unchecked:true }); patchGate({ logged:true }); }
     return { ok:true, assign:null };
@@ -364,7 +364,7 @@ async function confirm(a, signup){
     }
     A = null; if (L.reg && L.reg.ver <= L.assign.at) L.reg = null;   // a new account made after the deletion: start fresh
   }
-  if (A && A.c !== c && bothOk(A.c, c, a.grade, A.g, g && g.grade)) A = null;   // also taking the other course: fine, the change was for that one
+  if (A && A.c !== c && (A.also === c || bothOk(A.c, c, a.grade, A.g, g && g.grade))) A = null;   // approved for both: this change was for the other course   // also taking the other course: fine, the change was for that one
   if (A && A.c !== c){ log("wrongcourse", Object.assign({}, a, { course:c }), { registered:A.c, byAdmin:true }); return { ok:false, msg:MSG.other(A.c, true), registered:A.c }; }
   if (!A && L.reg && L.reg.c !== c && bothOk(L.reg.c, c, a.grade, L.reg.g, g && g.grade)){ /* Grade 6–8: registered for both is allowed */ }
   else if (!A && L.reg && L.reg.c !== c){ log("wrongcourse", Object.assign({}, a, { course:c }), { registered:L.reg.c }); return { ok:false, msg:MSG.other(L.reg.c, false), registered:L.reg.c }; }
@@ -372,7 +372,7 @@ async function confirm(a, signup){
   // only accounts made after verification was switched on must verify (judged by when the account was made,
   // not by when it first reached the online register). Computer Science students never need to verify.
   const made = createdMs(a), isNew = !!signup || (made ? made >= sinceMs() : (!!L.reg && L.reg.ver >= sinceMs()));
-  const vm = c === "cs" ? null : await verifyGate(a.email, "student", isNew);
+  const vm = c === "cs" || a.viaCS ? null : await verifyGate(a.email, "student", isNew);
   if (vm){ log("unverified", Object.assign({}, a, { course:c }), { signup:!!signup }); return { ok:false, verify:true, msg:vm }; }
   patchGate({ who:{ email:normEmail(a.email), name:a.name }, acct: acctOf(Object.assign({}, a, { course: c })) }); work(); setTimeout(showFeedbackButton, 800);
   if (!(g && g.logged)){ log(signup ? "signup" : "signin", Object.assign({}, a, { course:c }), { gate:g && g.mode }); patchGate({ logged:true }); }
@@ -429,17 +429,18 @@ async function verifyGate(email, kind, isNew){
 const createdMs = a => { const v = a && a.created; return typeof v === "number" ? v : Date.parse(v || "") || 0; };
 /* has the super admin deleted this (old) account? Then signing up again is allowed and starts fresh */
 async function isDeleted(email, name){ try { const L = await lookup(email, name); return !!(L.assign && L.assign.del); } catch(e){ return false; } }
-/* Grades 6–8 can take Computer Science AND Design: one course never blocks the other for them */
-const BOTH_GRADES = ["6", "7", "8"];
+/* Computer Science students (name + PIN) can also use Design (Grades 6–10), switching without signing in again.
+   Students who signed up for Design (school email + password) only see Design. */
+const BOTH_GRADES = ["6", "7", "8", "9", "10"];
 function bothOk(c1, c2, ...grades){
-  if (!((c1 === "cs" && c2 === "design") || (c1 === "design" && c2 === "cs"))) return false;
-  return grades.some(g => BOTH_GRADES.indexOf(String(g == null ? "" : g).replace(/^G/i, "").split(/\s/)[0]) >= 0);
+  return false;   // a second course now needs the teacher's approval (a signed change with also: the first course)
 }
 async function canSignUp(email, name, c){
   if (offline() || isTester(email)) return { ok:true };
   let L = null; try { L = await lookup(email, name); } catch(e){ return { ok:true }; }
   if (L.assign && L.assign.del){ if (!L.reg || L.reg.ver <= L.assign.at) return { ok:true, deleted:true }; L.assign = null; }
   const gg = (gate() || {}).grade;
+  if (L.assign && L.assign.c !== c && L.assign.also === c) return { ok:true, assign:null };
   if (L.assign && L.assign.c !== c && bothOk(L.assign.c, c, gg, L.assign.g)) return { ok:true, assign:null };
   if (L.assign && L.assign.c !== c){ log("wrongcourse", { email, name, course:c }, { registered:L.assign.c, byAdmin:true, signup:true }); return { ok:false, msg:MSG.other(L.assign.c, true) }; }
   if (!L.assign && L.reg && L.reg.c !== c && bothOk(L.reg.c, c, gg, L.reg.g)) return { ok:true, assign:null };
@@ -691,16 +692,21 @@ function listen(sels, fine, whole){
    [Sign out] signs out and stays on the course's sign-in screen; it then reads [Sign in].
    onSignOut() must sign the student out WITHOUT leaving the page; onSignIn() shows the sign-in form. */
 let STRIP = null;
+/* the other course a signed-in student can switch to straight away: only Computer Science students (Design, Grades 6–10) */
 function courseChoices(cur){
-  const g0 = gate() || {}, a = g0.acct || {}, n = parseInt(String(a.grade || g0.grade || "").replace(/^G/i, ""), 10);
-  return Object.keys(COURSES).filter(k => k !== cur && (isNaN(n) || (k === "cs" ? n >= 6 && n <= 12 : k === "design" ? n >= 6 && n <= 10 : n === 10)));
+  const g0 = gate() || {}, L = g0.link;
+  if (!STRIP || !STRIP.signedIn || !L || !L.cs) return [];
+  const n = parseInt(String(L.cs.grade || (g0.acct || {}).grade || "").replace(/^G/i, ""), 10);
+  return ["cs", "design"].filter(k => k !== cur && (k === "cs" || (!!L.design && !isNaN(n) && n >= 6 && n <= 10)));
 }
 function paintStrip(){
   if (!STRIP) return;
   const sel = document.getElementById("sdcCourse"), b = document.getElementById("sdcLeave");
   if (b) b.textContent = STRIP.signedIn ? "Sign out" : "Sign in";
   if (sel){ const opts = courseChoices(STRIP.c);
-    sel.innerHTML = `<option value="">Change course ▾</option>` + opts.map(k => `<option value="${k}">${esc(COURSES[k].name)}</option>`).join("") + `<option value="__portal">＋ Sign up for a course</option>`; sel.value = ""; }
+    sel.innerHTML = STRIP.signedIn ? `<option value="">Change course ▾</option>` + opts.map(k => `<option value="${k}">Switch to ${esc(COURSES[k].name)}</option>`).join("")
+      : `<option value="">Change course ▾</option>` + Object.keys(COURSES).filter(k => k !== STRIP.c).map(k => `<option value="${k}">Sign in to ${esc(COURSES[k].name)}</option>`).join("") + `<option value="__portal">＋ Sign up for a course</option>`;
+    sel.value = ""; sel.style.display = STRIP.signedIn && !opts.length ? "none" : ""; }
 }
 function setSignedIn(on){ if (STRIP){ STRIP.signedIn = !!on; paintStrip(); } }
 function strip(c, onSignOut, noLang, mainSel, onSignIn){
@@ -722,14 +728,15 @@ function strip(c, onSignOut, noLang, mainSel, onSignIn){
   STRIP = { c, signedIn:false, onSignOut, onSignIn };
   paintStrip();
   document.getElementById("sdcLeave").onclick = () => {
-    if (STRIP.signedIn){ if (onSignOut) onSignOut(); else leave("out"); return; }
+    if (STRIP.signedIn){ patchGate({ link:null }); if (onSignOut) onSignOut(false); else leave("out"); return; }   // a real sign-out ends the link between courses
     if (onSignIn) onSignIn(); else { patchGate({ mode:"signin" }); location.reload(); }
   };
   document.getElementById("sdcCourse").onchange = e => {
     const to = e.target.value; if (!to) return;
-    if (STRIP.signedIn && onSignOut){ try { onSignOut(true); } catch(x){} }   // save and sign out of this course first
+    const link = (gate() || {}).link || null, was = STRIP.signedIn;
+    if (was && onSignOut){ try { onSignOut(true); } catch(x){} }   // save this course first (the link to the other course is kept)
     if (to === "__portal"){ leave(""); return; }
-    setGate({ mode:"signin", course:to }); location.href = COURSES[to].app;
+    setGate({ mode: link && was ? "link" : "signin", course:to, link: was ? link : null }); location.href = COURSES[to].app;
   };
 }
 function signedOutNotice(msg, kind){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg, kind: kind || "bad" })); } catch(e){} }
