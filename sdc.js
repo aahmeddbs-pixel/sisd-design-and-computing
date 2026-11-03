@@ -172,8 +172,25 @@ const sendRow = (kind, id, text) => enqueue(SYNC.action, { [SYNC.entry]: ["PPS2"
 
 /* ---------- admin assignments (signed) ---------- */
 let pubKey = null;
+/* a change signed by an approved teacher: "T.<change>.<teacher's signature>.<the super admin's certificate for that teacher>" */
+let stateCache = null;
+async function approvedTeachers(){ if (!stateCache || Date.now() - stateCache.at > 300000){ let st = null; try { st = (await loadState()).state; } catch(e){} stateCache = { at: Date.now(), list: ((st && st.teachers) || []).map(t => String(t.email || "").toLowerCase()) }; } return stateCache.list; }
+async function verifyTeacher(parts){
+  try {
+    const [, b, s, c] = parts; if (!b || !s || !c) return null;
+    pubKey = pubKey || await crypto.subtle.importKey("jwk", SIG_PUB, { name:"ECDSA", namedCurve:"P-256" }, false, ["verify"]);
+    const cert = JSON.parse(b64ToText(c)), body = { email: cert.email, name: cert.name, spub: cert.spub, t: cert.t };
+    if (!cert.sig || !(await crypto.subtle.verify({ name:"ECDSA", hash:"SHA-256" }, pubKey, d64(cert.sig), TE.encode(canon(body))))) return null;   // the super admin vouches for this teacher's key
+    if ((await approvedTeachers()).indexOf(String(cert.email).toLowerCase()) < 0) return null;   // removed teachers can no longer make changes
+    const tk = await crypto.subtle.importKey("jwk", cert.spub, { name:"ECDSA", namedCurve:"P-256" }, false, ["verify"]), json = b64ToText(b);
+    if (!(await crypto.subtle.verify({ name:"ECDSA", hash:"SHA-256" }, tk, d64(s), TE.encode(json)))) return null;
+    const o = JSON.parse(json); o.by = cert.email; return o;
+  } catch(e){ return null; }
+}
 async function verify(text){
-  const [b, s] = String(text).split(".");
+  const parts = String(text).split(".");
+  if (parts[0] === "T") return verifyTeacher(parts);
+  const [b, s] = parts;
   if (!b || !s) return null;
   try {
     pubKey = pubKey || await crypto.subtle.importKey("jwk", SIG_PUB, { name:"ECDSA", namedCurve:"P-256" }, false, ["verify"]);

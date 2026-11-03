@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261103f"></script>
+<script src="/python-pathways/pp-sync.js?v=20261103g"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261103f"></script>
+<script src="sdc.js?v=20261103g"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -326,6 +326,20 @@ async function openFor(t, pw){
 }
 let AKEY = "", RKEY = null;   // the Python answer key's data key and the PIN reset key: memory only, never stored
 const staffCfg = () => ({ py: sheetLink() || "", ds: load(DS_KEY, "") || "", ak: AKEY || "", rk: RKEY || null });
+/* each approved teacher gets their own signing key, vouched for by the super admin, so they can change
+   their own students' course, grade, level or teacher. Removing the teacher stops their changes being accepted. */
+let TKEY = null, TCERT = null;
+async function teacherCfg(t){
+  const cfg = staffCfg();
+  if (KEYS && KEYS.sig && t.email){
+    const kp = await crypto.subtle.generateKey({ name:"ECDSA", namedCurve:"P-256" }, true, ["sign", "verify"]);
+    const pj = await crypto.subtle.exportKey("jwk", kp.publicKey), sk = await crypto.subtle.exportKey("jwk", kp.privateKey);
+    const cert = { email: String(t.email).toLowerCase(), name: t.name || "", spub: { kty:pj.kty, crv:pj.crv, x:pj.x, y:pj.y }, t: new Date().toISOString() };
+    const sig = new Uint8Array(await crypto.subtle.sign({ name:"ECDSA", hash:"SHA-256" }, KEYS.sig, TE.encode(SDC.canon(cert))));
+    cfg.sk = sk; cfg.cert = Object.assign({}, cert, { sig: b64(sig) });
+  }
+  return cfg;
+}
 async function vaultFile(){ const t = await (await fetch("/python-pathways/answers.enc.js?v=" + Date.now(), { cache:"no-store" })).text(); return JSON.parse(t.replace(/^\s*window\.PP_ENC\s*=\s*/, "").replace(/;\s*$/, "")); }
 const VAAD = t => TE.encode("pp-vault-v2|" + t);
 async function vaultKeyFromPassword(pw){
@@ -344,9 +358,9 @@ async function openAnswers(ak){
 async function shareWithTeachers(){
   await loadCourseState();
   if (!STATE.teachers.some(t => t.pub)) return null;
-  const teachers = await Promise.all(STATE.teachers.map(async t => t.pub ? Object.assign({}, t, { cfg: await lockFor(t.pub, staffCfg()) }) : t));
+  const teachers = await Promise.all(STATE.teachers.map(async t => t.pub ? Object.assign({}, t, { cfg: await lockFor(t.pub, await teacherCfg(t)) }) : t));
   const ok = await publishCourseState(Object.assign({}, STATE, { teachers }));
-  if (ok && AKEY) store("sdc_ak_shared", "v2:" + AKEY.slice(0, 12));
+  if (ok && AKEY) store("sdc_ak_shared", "v3:" + AKEY.slice(0, 12));
   return ok;
 }
 
@@ -369,7 +383,7 @@ $("pwGo").onclick = async () => {
   if (KEYS){ ROLE = "super"; ME = { name:"Super admin" };
     try { AKEY = await vaultKeyFromPassword(pwTyped); await openAnswers(AKEY); } catch(e){ AKEY = ""; }
     enter();
-    if (AKEY && load("sdc_ak_shared", "") !== "v2:" + AKEY.slice(0, 12)) shareWithTeachers().catch(() => {});   // give teachers the answer key and PIN reset key once
+    if (AKEY && load("sdc_ak_shared", "") !== "v3:" + AKEY.slice(0, 12)) shareWithTeachers().catch(() => {});   // give teachers the answer key and PIN reset key once
   }
 };
 $("pw").addEventListener("keydown", e => { if (e.key === "Enter") $("pwGo").click(); });
@@ -398,6 +412,8 @@ $("tGo").onclick = async () => {
     }
     if (CFG.ak){ try { await openAnswers(CFG.ak); } catch(e){} }
     RKEY = CFG.rk || null;
+    TKEY = null; TCERT = null;
+    if (CFG.sk && CFG.cert){ try { TKEY = await crypto.subtle.importKey("jwk", CFG.sk, { name:"ECDSA", namedCurve:"P-256" }, false, ["sign"]); TCERT = CFG.cert; } catch(e){ TKEY = null; } }
     $("tPw").value = ""; SDC.log("staffsignin", { name:t.name, email, course:"" }, { role:"teacher" }); enter();
   } catch(e){ note("tMsg", "bad", "Couldn't check your account: " + esc(e.message || "no connection") + "."); }
   finally { $("tGo").disabled = false; }
@@ -732,7 +748,7 @@ function renderStudents(){
       <td>${pill(s.course)}</td><td>${s.grade ? "G" + esc(s.grade) : ""}</td><td>${esc(s.course === "cs" ? levelName("cs", s.level) : s.cls || "")}</td><td>${esc(s.teacher || "")}</td>
       <td class="small">${progressCell(s)}</td>
       <td class="small">${s.active || s.last ? esc(fmtDT(s.active || s.last)) : "<span class='muted'>—</span>"}</td>
-      <td style="white-space:nowrap"><button class="btn sm" data-pr="${i}">Progress &amp; feedback</button>${s.course === "cs" ? ` <button class="btn ghost sm" data-vp="${i}" title="Show or hide this student's PIN">👁 PIN</button> <button class="btn ghost sm" data-pin="${i}">🔑 Reset PIN</button>` : ""}${isSuper() ? ` <button class="btn ghost sm" data-ed="${i}">Change</button>` + delBtn(s, i) : ""}</td></tr>`).join("")
+      <td style="white-space:nowrap"><button class="btn sm" data-pr="${i}">Progress &amp; feedback</button>${s.course === "cs" ? ` <button class="btn ghost sm" data-vp="${i}" title="Show or hide this student's PIN">👁 PIN</button> <button class="btn ghost sm" data-pin="${i}">🔑 Reset PIN</button>` : ""}${isSuper() || TKEY ? ` <button class="btn ghost sm" data-ed="${i}" title="Change course, grade, level or teacher">✏️ Change course</button>` : ""}${isSuper() ? delBtn(s, i) : ""}</td></tr>`).join("")
       : `<tr><td colspan="8" class="muted">${isSuper() ? "No students yet. They appear here after signing in through the platform." : "No students have chosen you as their teacher yet."}</td></tr>`);
   $("stTbl").querySelectorAll("[data-ed]").forEach(b => b.onclick = () => editStudent(list[+b.dataset.ed]));
   $("stTbl").querySelectorAll("[data-pr]").forEach(b => b.onclick = () => openProgress(list[+b.dataset.pr]));
@@ -914,7 +930,7 @@ async function renderTeachers(){
     if (SDC.verifyOn() && VSTAT[r.email] !== true && !r.access){ b.disabled = false; return toast("Wait until " + (r.full || r.name) + " has verified their SISD email."); }
     const entry = { email:r.email, name:nm[0], names:nm, full:String(r.full || old.full || r.name || "").slice(0, 80), salt: old.salt || r.salt, hash: old.hash || r.hash, req: old.req || r.t || "" };
     if (r.access && old.hash && r.hash !== old.hash){ entry.salt = old.salt; entry.hash = old.hash; }
-    if (r.pub){ entry.pub = r.pub; entry.wpriv = r.wpriv; entry.cfg = await lockFor(r.pub, staffCfg()); }
+    if (r.pub){ entry.pub = r.pub; entry.wpriv = r.wpriv; entry.cfg = await lockFor(r.pub, await teacherCfg(entry)); }
     const teachers = STATE.teachers.filter(t => t.email !== r.email).concat([entry]);
     done(await publishCourseState(Object.assign({}, STATE, { teachers, declined: STATE.declined.filter(e => e !== r.email) })), "Approved " + entry.name + ".");
     SDC.log("staffapproved", { name:entry.name, email:entry.email, course:"" }, { names:nm }); });
@@ -944,8 +960,14 @@ $("swGo").onclick = async () => { $("swGo").disabled = true;
 $("stQ").oninput = renderStudents; $("stC").onchange = renderStudents;
 $("stAdd").onclick = () => editStudent({ name:"", email:"", course:"cs", grade:"", teacher:"", level:"", cls:"", isNew:true });
 
+const canChange = () => isSuper() ? !!(KEYS && KEYS.sig) : !!TKEY;
 async function signAssign(o){
   const json = JSON.stringify(o);
+  if (!isSuper()){   // a teacher: signed with their own key, plus the super admin's certificate for it
+    if (!TKEY) throw new Error("Course changes aren't set up for your account yet. Ask the super admin to sign in to this page once, then sign in again.");
+    const sig = new Uint8Array(await crypto.subtle.sign({ name:"ECDSA", hash:"SHA-256" }, TKEY, TE.encode(json)));
+    return "T." + X.u8ToB64Text(json) + "." + X.e64(sig) + "." + X.u8ToB64Text(JSON.stringify(TCERT));
+  }
   const sig = new Uint8Array(await crypto.subtle.sign({ name:"ECDSA", hash:"SHA-256" }, KEYS.sig, TE.encode(json)));
   return X.u8ToB64Text(json) + "." + X.e64(sig);
 }
@@ -1002,7 +1024,7 @@ function editStudent(s){
     q("#eSave").disabled = true;
     try { SDC.sendRow("S", id, await signAssign(o)); }
     catch(e){ q("#eMsg").innerHTML = `<div class="notice bad">Could not sign the change: ${esc(e.message)}</div>`; q("#eSave").disabled = false; return; }
-    SDC.log("adminchange", { name:"(admin)", course:c, grade:g, teacher:t }, { student:{ name, email }, to:{ c, g, l:o.l, cls:o.cls, t }, from:{ c:s.course || "", g:s.grade || "", l:s.level || "", t:s.teacher || "" } });
+    SDC.log("adminchange", { name: isSuper() ? "(admin)" : (ME && ME.name) || "(teacher)", course:c, grade:g, teacher:t }, { student:{ name, email }, to:{ c, g, l:o.l, cls:o.cls, t }, from:{ c:s.course || "", g:s.grade || "", l:s.level || "", t:s.teacher || "" } });
     close(); toast("Saved. " + name.split(" ")[0] + " gets this at their next sign-in.");
   };
 }
