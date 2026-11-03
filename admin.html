@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261103q"></script>
+<script src="/python-pathways/pp-sync.js?v=20261103s"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261103q"></script>
+<script src="sdc.js?v=20261103s"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -157,7 +157,7 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
       <div class="card">
         <h2>Sign-in log <span class="n" id="lgCount">0</span></h2>
         <p class="muted small" style="margin-top:4px">Every sign-in and sign-up through the platform, with the course the student chose. Wrong-course attempts are marked in red and included in the lesson email.</p>
-        <div class="row" style="margin-top:12px"><select class="t" id="lgF" style="max-width:240px"><option value="">Everything</option><option value="wrongcourse">Wrong-course attempts only</option><option value="signup">Sign-ups only</option><option value="unverified">Waiting for email verification</option></select></div>
+        <div class="row" style="margin-top:12px"><select class="t" id="lgF" style="max-width:240px"><option value="">Everything</option><option value="wrongcourse">Wrong-course attempts only</option><option value="signup">Sign-ups only</option><option value="unverified">Waiting for approval</option></select></div>
         <div class="scroll" style="margin-top:12px"><table class="tbl" id="lgTbl"></table></div>
       </div>
     </section>
@@ -442,7 +442,7 @@ $("rGo").onclick = async () => {
     SDC.log("staffrequest", { name, email, course:"" }, { as });
     SDC.notifyRequest({ email, name, as, where:"Staff dashboard" });   // emails the super admin straight away
     ["rName","rAs","rEmail","rPw","rPw2"].forEach(id => $(id).value = "");
-    if (SDC.verifyOn()){ const v = await SDC.startVerify(email, "staff");
+    if (SDC.verifyOn() && !(SDC.VERIFY.mode === "approve")){ const v = await SDC.startVerify(email, "staff");
       note("rMsg", "ok", "Request sent. " + SDC.verifyMsg(email, v) + " The super admin can approve you once your email is verified."); }
     else note("rMsg", "ok", "Request sent. Once the super admin approves it, sign in on the <b>Teacher</b> tab.");
   } catch(e){ note("rMsg", "bad", "Couldn't send the request. Check the internet connection and try again."); }
@@ -502,7 +502,7 @@ async function sendMail(type, student, teacher, text){
   return await gfSend(f.action, p);
 }
 function paintVerify(){
-  $("vState").textContent = SDC.verifyOn() ? "on" : "off";
+  $("vState").textContent = SDC.verifyOn() ? (SDC.VERIFY.mode === "approve" ? "on: teachers approve new students (no emails)" : "on") : "off";
   document.querySelectorAll("#t-setup [data-on]").forEach(e => e.classList.toggle("hidden", !SDC.verifyOn()));
 }
 $("vCopy").onclick = async () => { try { const t = await (await fetch("verify-script.gs?v=" + Date.now(), { cache:"no-store" })).text(); await navigator.clipboard.writeText(t); toast("Script copied. Paste it into Apps Script."); }
@@ -752,7 +752,7 @@ function renderStudents(){
   $("stCount").textContent = list.length;
   $("stWarn").innerHTML = !isSuper() && !sheetId(pyLink()) ? `<div class="notice warn">Your dashboard isn't connected to the class data yet. Ask the super admin to open <b>Setup</b> and press <b>Save setup</b>.</div>` : "";
   $("stTbl").innerHTML = `<tr><th>Student</th><th>Course</th><th>Grade</th><th>Level / class</th><th>Teacher</th><th>Progress</th><th>Last active</th><th></th></tr>` +
-    (list.length ? list.map((s, i) => `<tr><td><b>${esc(s.name)}</b><div class="em">${esc(s.email || "no email on record")}</div>${s.wrong ? `<span class="pill bad">${s.wrong} wrong-course</span>` : ""}${s.unv && s.unv > (s.last || 0) ? ` <span class="pill warn" title="Signed up, but hasn't verified their email yet">⏳ not verified</span>` : ""}</td>
+    (list.length ? list.map((s, i) => `<tr><td><b>${esc(s.name)}</b><div class="em">${esc(s.email || "no email on record")}</div>${s.wrong ? `<span class="pill bad">${s.wrong} wrong-course</span>` : ""}${s.unv && s.unv > (s.last || 0) ? ` <span class="pill warn" title="Signed up, waiting for a teacher to approve the account">⏳ waiting for approval</span>` : ""}</td>
       <td>${pill(s.course)}</td><td>${s.grade ? "G" + esc(s.grade) : ""}</td><td>${esc(s.course === "cs" ? levelName("cs", s.level) : s.cls || "")}</td><td>${esc(s.teacher || "")}</td>
       <td class="small">${progressCell(s)}</td>
       <td class="small">${s.active || s.last ? esc(fmtDT(s.active || s.last)) : "<span class='muted'>—</span>"}</td>
@@ -920,22 +920,23 @@ async function renderTeachers(){
   const latest = {}; pend.forEach(r => { if (!latest[r.email] || String(r.t) > String(latest[r.email].t)) latest[r.email] = r; });
   const P = Object.values(latest);
   VSTAT = await SDC.verifyStatuses(P.map(r => r.email).concat(STATE.teachers.map(t => t.email)));
-  const vcell = e => !SDC.verifyOn() ? "" : VSTAT[e] === true ? `<div><span class="pill ok">✓ email verified</span></div>` : VSTAT[e] === false ? `<div><span class="pill warn">email not verified</span> <button class="btn ghost sm" data-vs="${esc(e)}">Send verification email</button></div>` : "";
+  const vcell = e => !SDC.verifyOn() || SDC.VERIFY.mode === "approve" ? "" : VSTAT[e] === true ? `<div><span class="pill ok">✓ email verified</span></div>` : VSTAT[e] === false ? `<div><span class="pill warn">email not verified</span> <button class="btn ghost sm" data-vs="${esc(e)}">Send verification email</button></div>` : "";
   $("tqCount").textContent = P.length;
   $("tqTbl").innerHTML = `<tr><th>Teacher</th><th>Email</th><th>Students pick them as</th><th>Requested</th><th></th></tr>` + (P.length ? P.map((r, i) => `<tr><td><b>${esc(r.full || r.name)}</b>${vcell(r.email)}${r.access ? `<div class="em">already approved: asking for dashboard access</div>` : ""}${r.pub ? "" : `<div class="em">requested in the Design course: dashboard data needs a request from this page</div>`}</td><td>${esc(r.email)}</td>
       <td><input class="t" data-as="${i}" value="${esc(r.as || r.name)}" list="knownTeachers" style="min-width:150px"><div class="em">Separate several names with commas</div></td><td class="small">${esc(r.t ? fmtDT(Date.parse(r.t)) : "")}</td>
-      <td style="white-space:nowrap"><button class="btn sm" data-ok="${i}" ${SDC.verifyOn() && VSTAT[r.email] !== true && !r.access ? 'title="Waiting for the teacher to verify their SISD email"' : ""}>Approve</button> <button class="btn ghost sm" data-no="${i}">Decline</button></td></tr>`).join("") : `<tr><td colspan="5" class="muted">No requests.</td></tr>`);
+      <td style="white-space:nowrap"><button class="btn sm" data-ok="${i}" ${SDC.verifyOn() && !(SDC.VERIFY.mode === "approve") && VSTAT[r.email] !== true && !r.access ? 'title="Waiting for the teacher to verify their SISD email"' : ""}>Approve</button> <button class="btn ghost sm" data-no="${i}">Decline</button></td></tr>`).join("") : `<tr><td colspan="5" class="muted">No requests.</td></tr>`);
   $("taCount").textContent = STATE.teachers.length;
-  $("taTbl").innerHTML = `<tr><th>Teacher</th><th>Email</th><th>Sees students who chose</th><th>Dashboard</th><th></th></tr>` + (STATE.teachers.length ? STATE.teachers.map((t, i) => `<tr><td><b>${esc(t.full || t.name)}</b>${vcell(t.email)}</td><td>${esc(t.email)}</td>
-      <td><input class="t" data-nm="${i}" value="${esc((t.names && t.names.length ? t.names : [t.name]).join(", "))}" style="min-width:150px"></td><td>${t.cfg ? "<span class='pill ok'>connected</span>" : t.pub ? "<span class='pill warn'>press Save setup</span>" : "<span class='pill warn'>waiting for their first sign-in here</span>"}</td>
-      <td style="white-space:nowrap"><button class="btn sm" data-sv="${i}">Save</button> <button class="btn ghost sm" data-rm="${i}">Remove access</button></td></tr>`).join("") : `<tr><td colspan="5" class="muted">No teacher admins yet.</td></tr>`);
+  $("taTbl").innerHTML = `<tr><th>Teacher</th><th>Email</th><th>Sees students who chose</th><th>In students' sign-up list</th><th>Dashboard</th><th></th></tr>` + (STATE.teachers.length ? STATE.teachers.map((t, i) => `<tr><td><b>${esc(t.full || t.name)}</b>${vcell(t.email)}</td><td>${esc(t.email)}</td>
+      <td><input class="t" data-nm="${i}" value="${esc((t.names && t.names.length ? t.names : [t.name]).join(", "))}" style="min-width:150px"></td>
+      <td><label class="small" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" data-pk="${i}"${t.pick === false ? "" : " checked"}> ${t.pick === false ? "hidden" : "shown"}</label><div class="em">Untick so students can't pick ${esc(t.name)} when signing up</div></td><td>${t.cfg ? "<span class='pill ok'>connected</span>" : t.pub ? "<span class='pill warn'>press Save setup</span>" : "<span class='pill warn'>waiting for their first sign-in here</span>"}</td>
+      <td style="white-space:nowrap"><button class="btn sm" data-sv="${i}">Save</button> <button class="btn ghost sm" data-rm="${i}">Remove access</button></td></tr>`).join("") : `<tr><td colspan="6" class="muted">No teacher admins yet.</td></tr>`);
   const done = (ok, what) => { $("taMsg").innerHTML = `<div class="notice ${ok ? "ok" : "bad"}">${ok ? esc(what) + " Teachers' computers update within about 5 minutes." : "Google Forms couldn't be reached. Try again."}</div>`; renderTeachers(); };
   document.querySelectorAll("#t-teachers [data-vs]").forEach(b => b.onclick = async () => { b.disabled = true; const r = await SDC.startVerify(b.dataset.vs, "staff");
     toast(r && r.ok ? (r.already ? "Already verified." : "Verification email sent.") : r && r.reason === "wait" ? "An email was sent in the last hour. Ask them to check Junk." : "Couldn't send it just now."); });
   const names = v => v.split(",").map(x => x.trim().replace(/\s+/g, " ")).filter(Boolean).slice(0, 4);
   $("tqTbl").querySelectorAll("[data-ok]").forEach(b => b.onclick = async () => { const r = P[+b.dataset.ok], nm = names($("tqTbl").querySelector(`[data-as="${b.dataset.ok}"]`).value); if (!nm.length) return toast("Type the name students pick for this teacher.");
     b.disabled = true; const old = STATE.teachers.find(t => t.email === r.email) || {};
-    if (SDC.verifyOn() && VSTAT[r.email] !== true && !r.access){ b.disabled = false; return toast("Wait until " + (r.full || r.name) + " has verified their SISD email."); }
+    if (SDC.verifyOn() && !(SDC.VERIFY.mode === "approve") && VSTAT[r.email] !== true && !r.access){ b.disabled = false; return toast("Wait until " + (r.full || r.name) + " has verified their SISD email."); }
     const entry = { email:r.email, name:nm[0], names:nm, full:String(r.full || old.full || r.name || "").slice(0, 80), salt: old.salt || r.salt, hash: old.hash || r.hash, req: old.req || r.t || "" };
     if (r.access && old.hash && r.hash !== old.hash){ entry.salt = old.salt; entry.hash = old.hash; }
     if (r.pub){ entry.pub = r.pub; entry.wpriv = r.wpriv; entry.cfg = await lockFor(r.pub, await teacherCfg(entry)); }
@@ -945,7 +946,8 @@ async function renderTeachers(){
   $("tqTbl").querySelectorAll("[data-no]").forEach(b => b.onclick = async () => { const r = P[+b.dataset.no]; b.disabled = true;
     done(await publishCourseState(Object.assign({}, STATE, { declined: [...new Set(STATE.declined.concat([r.email]))] })), "Declined."); });
   $("taTbl").querySelectorAll("[data-sv]").forEach(b => b.onclick = async () => { const i = +b.dataset.sv, nm = names($("taTbl").querySelector(`[data-nm="${i}"]`).value); if (!nm.length) return toast("Type at least one name.");
-    b.disabled = true; const teachers = STATE.teachers.map((t, k) => k === i ? Object.assign({}, t, { name:nm[0], names:nm }) : t);
+    b.disabled = true; const pick = $("taTbl").querySelector(`[data-pk="${i}"]`).checked;
+    const teachers = STATE.teachers.map((t, k) => k === i ? Object.assign({}, t, { name:nm[0], names:nm, pick }) : t);
     done(await publishCourseState(Object.assign({}, STATE, { teachers })), "Saved."); });
   $("taTbl").querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => { const t = STATE.teachers[+b.dataset.rm]; if (!confirmBox("Remove " + t.name + "'s access? They can no longer sign in to the dashboard or Design teacher tools.")) return;
     b.disabled = true; done(await publishCourseState(Object.assign({}, STATE, { teachers: STATE.teachers.filter(x => x.email !== t.email), declined: [...new Set(STATE.declined.concat([t.email]))] })), "Removed."); });
@@ -1046,7 +1048,7 @@ function renderLog(){
     .filter(r => { if (r.type !== "unverified") return true; const k = SDC.keyOf(r.acct.email, r.acct.name); tries[k] = (tries[k] || 0) + 1; if (tries[k] > 1) return false; r._k = k; return true; }).slice(0, 400);
   $("lgCount").textContent = list.length;
   const what = r => r.type === "wrongcourse" ? `<span class="pill bad">⛔ Stopped</span> tried ${esc(C[r.acct.course] ? C[r.acct.course].name : r.acct.course)}${r.registered ? `, registered for <b>${esc(C[r.registered] ? C[r.registered].name : r.registered)}</b>` : r.reason === "grade" ? " (not Grade 10)" : ""}${r.signup ? " (sign-up)" : ""}`
-    : r.type === "signup" ? `<span class="pill ok">New</span> signed up` : r.type === "unverified" ? `<span class="pill warn">⏳ Not in yet</span> waiting for them to verify their email${tries[r._k] > 1 ? ` (tried ${tries[r._k]} times)` : ""}` : `signed in${r.unchecked ? ` <span class="pill warn">offline: not checked</span>` : ""}`;
+    : r.type === "signup" ? `<span class="pill ok">New</span> signed up` : r.type === "unverified" ? `<span class="pill warn">⏳ Not in yet</span> waiting for approval${tries[r._k] > 1 ? ` (tried ${tries[r._k]} times)` : ""}` : `signed in${r.unchecked ? ` <span class="pill warn">offline: not checked</span>` : ""}`;
   $("lgTbl").innerHTML = `<tr><th>When</th><th>Student</th><th>Course chosen</th><th>What happened</th></tr>` +
     (list.length ? list.map(r => `<tr><td class="small">${esc(fmtDT(r.when))}</td><td><b>${esc(r.acct.name || "Unknown")}</b><div class="em">${esc([r.acct.email, r.acct.grade ? "G" + r.acct.grade : "", r.acct.teacher].filter(Boolean).join(" · "))}</div></td><td>${pill(r.acct.course)}</td><td>${what(r)}</td></tr>`).join("")
       : `<tr><td colspan="4" class="muted">No sign-ins yet.</td></tr>`);
@@ -1058,25 +1060,31 @@ function renderAll(){ renderHP(); renderVerifyWaiting(); renderDesignRequests();
 function renderVerifyWaiting(){
   const last = {}, okd = {};
   ROWS.forEach(r => { if (!r.acct || !r.acct.email) return; const k = SDC.keyOf(r.acct.email, r.acct.name);
-    if (r.type === "manualverify") okd[k] = Math.max(okd[k] || 0, r.when);
+    if (r.type === "manualverify" || r.type === "manualdecline") okd[k] = Math.max(okd[k] || 0, r.when);
     if (["unverified", "signin", "signup"].indexOf(r.type) >= 0 && (!last[k] || last[k].when <= r.when)) last[k] = r; });
   const list = Object.entries(last).filter(([k, r]) => r.type === "unverified" && !(okd[k] >= r.when) && canSee(r.acct.teacher)).map(x => x[1]).sort((a, b) => b.when - a.when);
   const box = $("vwait"); if (!box) return;
   if (!list.length){ box.innerHTML = ""; return; }
-  box.innerHTML = `<div class="card" style="margin:10px 0;border-left:6px solid var(--warn,#8A4B00);padding:14px 16px"><h3 style="margin:0">⏳ Signed up but can't get in yet (${list.length})</h3>
-    <p class="small muted" style="margin:4px 0 8px">These students haven't pressed the link in their verification email yet. Ask them to check their SISD inbox (and Junk). If the email never arrived and you know it's really them, press <b>Let them in</b>.</p>
+  box.innerHTML = `<div class="card" style="margin:10px 0;border-left:6px solid var(--warn,#8A4B00);padding:14px 16px"><h3 style="margin:0">🆕 New sign-ups waiting for approval (${list.length})</h3>
+    <p class="small muted" style="margin:4px 0 8px">These students made an account but can't get in until you approve it. Check it's really one of your students, then press <b>Approve</b>. They can sign in straight away after that.</p>
     ${canChange() ? "" : `<div class="notice warn small">Letting students in isn't set up for your account yet. Ask the super admin to sign in to this page once, then sign in again.</div>`}
     <div class="scroll"><table class="tbl"><tr><th>Student</th><th>Course</th><th>Last tried</th><th></th></tr>${list.map((r, i) => `<tr><td><b>${esc(r.acct.name)}</b><div class="em">${esc(r.acct.email)}${r.acct.grade ? " · G" + esc(r.acct.grade) : ""}${r.acct.teacher ? " · " + esc(r.acct.teacher) : ""}</div></td>
-      <td>${pill(r.acct.course)}</td><td class="small">${esc(fmtDT(r.when))}</td><td><button class="btn sm" data-vok="${i}"${canChange() ? "" : " disabled"}>✓ Let them in</button></td></tr>`).join("")}</table></div></div>`;
+      <td>${pill(r.acct.course)}</td><td class="small">${esc(fmtDT(r.when))}</td><td style="white-space:nowrap"><button class="btn sm" data-vok="${i}"${canChange() ? "" : " disabled"}>✓ Approve</button> <button class="btn ghost sm" data-vno="${i}">Don't approve</button></td></tr>`).join("")}</table></div></div>`;
   box.querySelectorAll("[data-vok]").forEach(b => b.onclick = async () => {
     const r = list[+b.dataset.vok], a = r.acct; b.disabled = true;
     try { const id = await SDC.idOf(a.email, ""), at = Date.now();
       SDC.sendRow("V", id, await signAssign({ k:id, verified:true, at }));
       SDC.log("manualverify", { name:a.name, email:a.email, grade:a.grade, teacher:a.teacher, course:a.course }, { by: isSuper() ? "(admin)" : (ME && ME.name) || "" });
       ROWS.push({ sdc:1, type:"manualverify", when:at, acct:{ name:a.name, email:a.email, teacher:a.teacher } });
-      toast(a.name.split(" ")[0] + " can now sign in. Ask them to sign in again in a minute.");
+      toast(a.name.split(" ")[0] + " is approved and can sign in now.");
     } catch(e){ toast("Couldn't do it: " + e.message); b.disabled = false; return; }
     renderVerifyWaiting();
+  });
+  box.querySelectorAll("[data-vno]").forEach(b => b.onclick = () => {
+    const r = list[+b.dataset.vno], a = r.acct, at = Date.now();
+    SDC.log("manualdecline", { name:a.name, email:a.email, grade:a.grade, teacher:a.teacher, course:a.course }, { by: isSuper() ? "(admin)" : (ME && ME.name) || "" });
+    ROWS.push({ sdc:1, type:"manualdecline", when:at, acct:{ name:a.name, email:a.email, teacher:a.teacher } });
+    toast("Not approved: " + a.name.split(" ")[0] + " still can't get in."); renderVerifyWaiting();
   });
 }
 /* ---------- Computer Science students asking to join Design: the teacher approves once, with the grade and class ---------- */

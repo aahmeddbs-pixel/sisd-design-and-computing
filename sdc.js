@@ -262,8 +262,12 @@ async function loadState(csvUrl){
 /* which teacher a student chose: matched on surname, so "Ms. Abdelaziz" and "Miss Abdelaziz" are the same person */
 const surname = n => String(n || "").toLowerCase().replace(/[^a-z\s'-]/g, " ").trim().split(/\s+/).pop() || "";
 function sameTeacher(a, b){ const x = surname(a), y = surname(b); return !!x && x === y; }
+/* teachers the super admin took out of the students' sign-up list (built-in names included) */
+async function hiddenTeacherNames(){
+  try { const { state } = await loadState(); return ((state && state.teachers) || []).filter(t => t.pick === false).flatMap(t => (t.names && t.names.length ? t.names : [t.name])).filter(Boolean); } catch(e){ return []; }
+}
 async function teacherNames(){
-  try { const { state } = await loadState(); return ((state && state.teachers) || []).map(t => t.name).filter(Boolean); } catch(e){ return []; }
+  try { const { state } = await loadState(); return ((state && state.teachers) || []).filter(t => t.pick !== false).map(t => t.name).filter(Boolean); } catch(e){ return []; }
 }
 
 /* ---------- teacher feedback to students ----------
@@ -350,7 +354,7 @@ async function confirm(a, signup){
   let L = null;
   try { L = await lookup(a.email, a.name); } catch(e){ L = null; }
   if (!L){ // sheet unreachable: let them in, it is checked again next time (new sign-ups must still verify)
-    const made0 = createdMs(a), vm = c === "cs" || a.viaCS ? null : await verifyGate(a.email, "student", !!signup || (made0 ? made0 >= sinceMs() : false));   // new accounts must verify even when the online register can't be read if (vm){ log("unverified", Object.assign({}, a, { course:c }), { signup:!!signup }); return { ok:false, verify:true, msg:vm }; }
+    const made0 = createdMs(a), vm = c === "cs" || a.viaCS ? null : await verifyGate(a.email, "student", !!signup || (made0 ? made0 >= sinceMs() : false), a);   // new accounts must verify even when the online register can't be read if (vm){ log("unverified", Object.assign({}, a, { course:c }), { signup:!!signup }); return { ok:false, verify:true, msg:vm }; }
     patchGate({ who:{ email:normEmail(a.email), name:a.name } });
     if (!(g && g.logged)) { log("signin", Object.assign({}, a, { course:c }), { gate:g && g.mode, unchecked:true }); patchGate({ logged:true }); }
     return { ok:true, assign:null };
@@ -372,7 +376,7 @@ async function confirm(a, signup){
   // only accounts made after verification was switched on must verify (judged by when the account was made,
   // not by when it first reached the online register). Computer Science students never need to verify.
   const made = createdMs(a), isNew = !!signup || (made ? made >= sinceMs() : (!!L.reg && L.reg.ver >= sinceMs()));
-  const vm = c === "cs" || a.viaCS ? null : await verifyGate(a.email, "student", isNew);
+  const vm = c === "cs" || a.viaCS ? null : await verifyGate(a.email, "student", isNew, a);
   if (vm){ log("unverified", Object.assign({}, a, { course:c }), { signup:!!signup }); return { ok:false, verify:true, msg:vm }; }
   patchGate({ who:{ email:normEmail(a.email), name:a.name }, acct: acctOf(Object.assign({}, a, { course: c })) }); work(); setTimeout(showFeedbackButton, 800);
   if (!(g && g.logged)){ log(signup ? "signup" : "signin", Object.assign({}, a, { course:c }), { gate:g && g.mode }); patchGate({ logged:true }); }
@@ -382,7 +386,7 @@ async function confirm(a, signup){
    New accounts (students and staff) must click a link sent to their @sisd.ae email before they can get in.
    The email is sent by the school's verification script (Google Apps Script). Accounts made before
    verification was switched on (VERIFY.since) keep working. Off while VERIFY.url is empty. */
-const VERIFY = { url: "https://script.google.com/macros/s/AKfycbzYaxjHSKBzuhLJ3nkL7Qqb2BNL6nFHy7ojFnMTb_D2ZE5LbYRY2VnL5F_6gPGEbtqjsQ/exec", since: "2026-11-03T03:24:00Z" };
+const VERIFY = { url: "https://script.google.com/macros/s/AKfycbzYaxjHSKBzuhLJ3nkL7Qqb2BNL6nFHy7ojFnMTb_D2ZE5LbYRY2VnL5F_6gPGEbtqjsQ/exec", since: "2026-11-03T03:24:00Z", mode: "approve" };   // mode "approve": no emails to students (the school blocks them); a teacher approves each new account
 const verifyOn = () => !!VERIFY.url && !offline();
 const sinceMs = () => Date.parse(VERIFY.since) || 0;
 function jsonp(params, timeout){
@@ -427,12 +431,21 @@ async function adminVerified(email){
     for (const r of await rows("V", id, 10)){ const o = await verify(r.text); if (o && o.k === id && o.verified){ try { localStorage.setItem(VKEY(email), "1"); } catch(e){} return true; } } } catch(e){}
   return false;
 }
-async function verifyGate(email, kind, isNew){
+/* tell the super admin (email to their Gmail, from the school's script) that a new student is waiting; once a day at most */
+function notifyStudent(email, a){
+  const k = "sdc_snote_" + normEmail(email); let last = 0; try { last = +localStorage.getItem(k) || 0; } catch(e){}
+  if (Date.now() - last < 86400000) return; try { localStorage.setItem(k, String(Date.now())); } catch(e){}
+  jsonp({ a:"notify", k:"student-request", e:normEmail(email), n:String((a && a.name) || "").slice(0, 80), w:courseLabel((a && a.course) || "") + ((a && a.grade) ? ", Grade " + a.grade : "") + ((a && a.teacher) ? " · " + a.teacher : "") }, 20000).catch(() => {});
+}
+const approveMsg = () => `⏳ <b>Your account is waiting for your teacher's approval.</b> We've let them know. Once they approve it, come back here and sign in with your email and password.`;
+async function verifyGate(email, kind, isNew, a){
   if (!verifyOn() || !isNew) return null;
+  if (VERIFY.mode === "approve" && kind === "staff") return null;   // teachers are approved by the super admin anyway
   if (!/@sisd\.ae$/i.test(normEmail(email))) return verifyMsg(email, { reason:"domain" });
   let v = false; try { v = await isVerified(email); } catch(e){ v = false; }
   if (!v) v = await adminVerified(email);
   if (v) return null;
+  if (VERIFY.mode === "approve"){ notifyStudent(email, a); return approveMsg(); }
   return verifyMsg(email, await startVerify(email, kind));
 }
 
@@ -753,5 +766,5 @@ function strip(c, onSignOut, noLang, mainSel, onSignIn){
 function signedOutNotice(msg, kind){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg, kind: kind || "bad" })); } catch(e){} }
 
 return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
-  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
+  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();

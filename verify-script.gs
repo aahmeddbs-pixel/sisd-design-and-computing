@@ -73,7 +73,9 @@ function start_(email, kind){
 
 /* a teacher asked for staff access: email the owner of this script (you) straight away */
 function notify_(p){
-  if (String(p.k || "") !== "teacher-request") return { ok: false, reason: "unknown" };
+  const kind = String(p.k || "");
+  if (kind !== "teacher-request" && kind !== "student-request") return { ok: false, reason: "unknown" };
+  const student = kind === "student-request";
   const email = String(p.e || "").trim().toLowerCase().slice(0, 120);
   if (!DOMAIN.test(email)) return { ok: false, reason: "domain" };
   const cache = CacheService.getScriptCache(), n = +(cache.get("notify-count") || 0);
@@ -85,17 +87,17 @@ function notify_(p){
   const admin = SITE + "admin.html";
   MailApp.sendEmail({
     to: Session.getEffectiveUser().getEmail(), name: "SISD Design and Computing",
-    subject: "New teacher access request: " + (name || email),
+    subject: (student ? "New student waiting for approval: " : "New teacher access request: ") + (name || email),
     htmlBody: '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#16223A;max-width:520px">' +
       '<div style="background:#1B2D4E;color:#fff;padding:14px 18px;border-bottom:4px solid #DC2B3E;font-weight:bold">SISD Design and Computing</div>' +
-      '<p>A teacher has asked for staff access:</p><table style="font-size:15px">' +
+      (student ? '<p>A new student has signed up and is waiting for approval:</p>' : '<p>A teacher has asked for staff access:</p>') + '<table style="font-size:15px">' +
       '<tr><td style="color:#5B6782;padding-right:12px">Name</td><td><b>' + h(name) + '</b></td></tr>' +
       '<tr><td style="color:#5B6782;padding-right:12px">Email</td><td>' + h(email) + '</td></tr>' +
       (as ? '<tr><td style="color:#5B6782;padding-right:12px">Students see</td><td>' + h(as) + '</td></tr>' : '') +
-      (where ? '<tr><td style="color:#5B6782;padding-right:12px">Asked from</td><td>' + h(where) + '</td></tr>' : '') +
+      (where ? '<tr><td style="color:#5B6782;padding-right:12px">' + (student ? 'Course' : 'Asked from') + '</td><td>' + h(where) + '</td></tr>' : '') +
       '<tr><td style="color:#5B6782;padding-right:12px">When</td><td>' + h(new Date().toLocaleString("en-GB", { timeZone: "Asia/Dubai" })) + '</td></tr></table>' +
       '<p><a href="' + admin + '" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Open the staff dashboard</a></p>' +
-      '<p style="color:#5B6782;font-size:13px">Sign in as super admin and open the Teachers tab to approve or decline. If you don\'t know this person, decline the request.</p></div>'
+      '<p style="color:#5B6782;font-size:13px">' + (student ? 'Open Students &amp; progress and press Approve in the "Waiting for approval" box (their teacher can do this too).' : 'Sign in as super admin and open the Teachers tab to approve or decline.') + ' If you don\'t know this person, don\'t approve.</p></div>'
   });
   return { ok: true, sent: true };
 }
