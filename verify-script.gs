@@ -103,6 +103,8 @@ function notify_(p){
   return { ok: true, sent: true };
 }
 
+/* where every "student needs help" email goes (as well as the class teacher) */
+const SLOW_TO = "abdulaziz.ahmed@sisd.ae";
 /* a student has been stuck on one task for a long time: email their class teacher (and you) */
 function slow_(p){
   const email = String(p.e || "").trim().toLowerCase().slice(0, 120), te = String(p.te || "").trim().toLowerCase().slice(0, 120);
@@ -113,7 +115,7 @@ function slow_(p){
   if (cache.get("slow:" + who)) return { ok: true, already: true };       // one per student per 45 minutes
   cache.put("slow-count", String(n + 1), 3600); cache.put("slow:" + who, "1", 2700);
   const h = s => String(s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const name = String(p.n || "").slice(0, 80), where = String(p.w || "").slice(0, 160), me = Session.getEffectiveUser().getEmail();
+  const name = String(p.n || "").slice(0, 80), where = String(p.w || "").slice(0, 160), me = SLOW_TO;
   const body = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#16223A;max-width:520px">' +
     '<div style="background:#1B2D4E;color:#fff;padding:14px 18px;border-bottom:4px solid #E0A100;font-weight:bold">SISD Design and Computing · Student needs help</div>' +
     '<p><b>' + h(name || email) + '</b> has been on the same task for a long time and has already had two reminders on screen.</p>' +
@@ -122,8 +124,8 @@ function slow_(p){
     '<p><a href="' + SITE + 'admin.html" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Open the staff dashboard</a></p></div>';
   const subject = "Student needs help: " + (name || email);
   let teacherSent = false;
-  if (te && DOMAIN.test(te)){ try { MailApp.sendEmail({ to: te, name: "SISD Design and Computing", subject: subject, htmlBody: body }); teacherSent = true; } catch(err){} }
-  MailApp.sendEmail({ to: me, name: "SISD Design and Computing", subject: subject + (te ? (teacherSent ? " (also sent to " + te + ")" : " (could not email " + te + ")") : " (teacher email unknown)"), htmlBody: body });
+  if (te && DOMAIN.test(te) && te !== me){ try { MailApp.sendEmail({ to: te, name: "SISD Design and Computing", subject: subject, htmlBody: body }); teacherSent = true; } catch(err){} }
+  MailApp.sendEmail({ to: me, name: "SISD Design and Computing", subject: subject + (te === me ? "" : te ? (teacherSent ? " (also sent to " + te + ")" : " (could not email " + te + ")") : " (teacher email unknown)"), htmlBody: body });
   return { ok: true, sent: true, teacher: teacherSent };
 }
 
