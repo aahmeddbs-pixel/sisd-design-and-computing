@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261103v"></script>
+<script src="/python-pathways/pp-sync.js?v=20261103w"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261103v"></script>
+<script src="sdc.js?v=20261103w"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -148,6 +148,9 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
         <div id="dreq"></div>
         <div class="row" style="margin-top:12px"><input class="t" id="stQ" placeholder="Search name or email" style="max-width:280px">
           <select class="t" id="stC" style="max-width:190px"><option value="">All courses</option><option value="cs">Computer Science</option><option value="design">Design</option><option value="it">IT</option></select>
+          <select class="t" id="stK" style="max-width:240px"><option value="">All classes</option></select>
+          <select class="t" id="stCr" style="max-width:150px" title="Criterion for the class feedback PDF"><option value="">Latest criterion</option><option>A</option><option>B</option><option>C</option><option>D</option></select>
+          <button class="btn ghost sm" id="stPdf" title="One PDF with every listed student's feedback">📄 Class feedback (PDF)</button>
           <button class="btn ghost sm" id="stAdd" data-super>＋ Set up a student by email</button></div>
         <div class="scroll" style="margin-top:12px"><table class="tbl" id="stTbl"></table></div>
       </div>
@@ -766,7 +769,11 @@ function progressCell(s){
 }
 function renderStudents(){
   const q = $("stQ").value.trim().toLowerCase(), cf = $("stC").value;
-  const list = students().filter(s => (!cf || s.course === cf) && (!q || (s.name + " " + (s.email || "")).toLowerCase().indexOf(q) >= 0));
+  const all0 = students().filter(s => (!cf || s.course === cf) && (!q || (s.name + " " + (s.email || "")).toLowerCase().indexOf(q) >= 0));
+  { const sel = $("stK"), cur = sel.value, ks = {}; all0.forEach(s => { ks[classKey(s)] = s; });
+    sel.innerHTML = `<option value="">All classes</option>` + Object.entries(ks).sort((a, b) => classLabel(a[1]).localeCompare(classLabel(b[1]), undefined, { numeric:true })).map(([k, c]) => `<option value="${esc(k)}">${esc(classLabel(c))}</option>`).join("");
+    sel.value = ks[cur] ? cur : ""; }
+  const list = all0.filter(s => !$("stK").value || classKey(s) === $("stK").value);
   $("stCount").textContent = list.length;
   $("stWarn").innerHTML = !isSuper() && !sheetId(pyLink()) ? `<div class="notice warn">Your dashboard isn't connected to the class data yet. Ask the super admin to open <b>Setup</b> and press <b>Save setup</b>.</div>` : "";
   $("stTbl").innerHTML = `<tr><th>Student</th><th>Course</th><th>Grade</th><th>Level / class</th><th>Teacher</th><th>Progress</th><th>Last active</th><th></th></tr>` +
@@ -886,6 +893,62 @@ function designNotes(s, c){
   if (!I.length && left) I.push("Keep the same level of detail in the strands you haven't finished yet.");
   return { s: S.slice(0, 4).join("\n"), i: I.slice(0, 5).join("\n"), n: N.slice(0, 3).join("\n") };
 }
+/* ---------- automatic MYP level (1–8), strict best fit, from the course's own expectations ----------
+   Each strand gets 0–8 from how complete and detailed its parts are, measured against the year's targets
+   (designs, specification points, plan steps, tests, research questions, sources); the criterion level is the
+   lower whole number of the strand average, so a level is only given when the evidence is there. */
+const NUMS = { 1:{ src:2, q:6, spec:6, d:2, steps:8, skills:4, tests:4 }, 2:{ src:2, q:8, spec:8, d:3, steps:10, skills:5, tests:5 }, 3:{ src:3, q:8, spec:8, d:3, steps:10, skills:6, tests:6 }, 5:{ src:4, q:10, spec:10, d:3, steps:12, skills:7, tests:6 } };
+const yKey = m => +m >= 5 ? 5 : Math.max(1, +m || 1);
+function fieldScore(f, N){
+  const lab = String(f.label || "").toLowerCase();
+  const target = /test/.test(lab) ? N.tests : /spec/.test(lab) ? N.spec : /step|plan/.test(lab) ? N.steps : /question/.test(lab) ? N.q : /source|reference/.test(lab) ? N.src : /skill/.test(lab) ? N.skills : 0;
+  if (f.t === "sketch") return f.value ? 1 : 0;
+  if (f.t === "table"){ const rows = (Array.isArray(f.value) ? f.value : []).filter(r => Array.isArray(r) && r.some(x => String(x || "").trim()));
+    if (!rows.length) return 0; const width = Math.max(...rows.map(r => r.length), 1), cells = rows.flat().filter(x => String(x || "").trim()).length;
+    const need = Math.max(target || +f.min || 3, 2), fill = cells / (rows.length * width);
+    return Math.min(1, rows.length / need) * (0.4 + 0.6 * fill); }
+  if (Array.isArray(f.value) || (f.value && typeof f.value === "object")){ const n = Array.isArray(f.value) ? f.value.filter(Boolean).length : Object.values(f.value).filter(Boolean).length;
+    return Math.min(1, n / Math.max(+f.min || target || 3, 1)); }
+  const w = wordsIn(f.value), need = Math.max(+f.min || 0, target ? target * 12 : 60);
+  return Math.min(1, w / need);
+}
+function levelFor(s, c){
+  const W = s.ds && s.ds.work[c] && s.ds.work[c].w; if (!W) return null;
+  const N = NUMS[yKey(W.myp)] || NUMS[1];
+  const strands = (W.strands || []).map(x => { const fs = x.fields || [];
+    const q = fs.length ? fs.reduce((a, f) => a + fieldScore(f, N), 0) / fs.length : 0;
+    const cq = x.done ? q : Math.min(q, 0.74);   // an unfinished strand can't reach the top bands
+    const lv = cq <= 0.02 ? 0 : cq < 0.25 ? (cq < 0.15 ? 1 : 2) : cq < 0.5 ? (cq < 0.4 ? 3 : 4) : cq < 0.8 ? (cq < 0.68 ? 5 : 6) : (cq < 0.95 ? 7 : 8);
+    return { n:x.n, strand:x.strand, done:!!x.done, level:lv, q:Math.round(cq * 100) }; });
+  const level = strands.length ? Math.floor(strands.reduce((a, x) => a + x.level, 0) / strands.length) : 0;
+  return { level, strands, complete: strands.length > 0 && strands.every(x => x.done), submitted: W.kind === "submission", unit: W.unit || "", myp: W.myp };
+}
+const critOf = (s, about) => { const crits = s.ds ? Object.keys(s.ds.work).sort() : []; return (String(about || "").match(/Criterion ([A-D])/) || [])[1] || crits[crits.length - 1] || ""; };
+/* ---------- feedback PDFs: one student's criterion, or a whole class ---------- */
+function jsPDFReady(){ return new Promise((res, rej) => { if (window.jspdf) return res(window.jspdf.jsPDF);
+  const sc = document.createElement("script"); sc.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"; sc.onload = () => window.jspdf ? res(window.jspdf.jsPDF) : rej(new Error("PDF tool")); sc.onerror = () => rej(new Error("The PDF tool couldn't load. Check the internet connection.")); document.head.appendChild(sc); }); }
+function pdfFeedbackPage(doc, s, c, fb, first){
+  if (!first) doc.addPage();
+  const W = 210, M = 16, NAVY = [27,45,78], RED = [220,43,62]; let y = 0;
+  doc.setFillColor(...NAVY); doc.rect(0, 0, W, 24, "F"); doc.setFillColor(...RED); doc.rect(0, 24, W, 1.6, "F");
+  doc.setTextColor(255); doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.text("SISD Design and Computing · Feedback", M, 11);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.text(`${s.name}  ·  ${C[s.course] ? C[s.course].name : s.course}${s.grade ? " · Grade " + s.grade : ""}${s.teacher ? " · " + s.teacher : ""}`, M, 18.5);
+  y = 34; doc.setTextColor(20);
+  const L = c ? levelFor(s, c) : null;
+  doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text(c ? `Criterion ${c}${L && L.unit ? " · " + L.unit : ""}` : "Computer Science", M, y); y += 7;
+  if (L){ doc.setFontSize(11); doc.setFont("helvetica", "normal"); doc.text(`Current MYP level: ${L.level} / 8${L.submitted ? " (handed in)" : L.complete ? " (all strands complete)" : " (work in progress)"}`, M, y); y += 6;
+    doc.setFontSize(9.5); L.strands.forEach(x => { const t = doc.splitTextToSize(`Strand ${x.n}: level ${x.level}${x.done ? "" : " (not finished)"}  ${String(x.strand || "").replace(/<[^>]+>/g, "")}`, W - 2 * M); doc.text(t, M, y); y += t.length * 4.4; }); y += 3; }
+  const sec = (h, t) => { if (!String(t || "").trim()) return; if (y > 260){ doc.addPage(); y = 20; }
+    doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(...RED); doc.text(h, M, y); y += 6; doc.setTextColor(20); doc.setFont("helvetica", "normal"); doc.setFontSize(10.5);
+    String(t).split("\n").filter(Boolean).forEach(line => { const ls = doc.splitTextToSize(line, W - 2 * M); if (y + ls.length * 5 > 285){ doc.addPage(); y = 20; } doc.text(ls, M, y); y += ls.length * 5 + 1.5; }); y += 3; };
+  sec("Strengths", fb.s); sec("Improvements", fb.i); sec("Student developments", fb.n);
+  doc.setFontSize(8.5); doc.setTextColor(110); doc.text(`Generated ${new Date().toLocaleString("en-GB")} from the work saved on the platform. Levels are a strict best-fit estimate; your teacher confirms the final level.`, M, 290);
+}
+async function downloadFeedbackPDF(items, name){   // items: [{ s, c, fb }]
+  const jsPDF = await jsPDFReady(), doc = new jsPDF({ unit:"mm", format:"a4" });
+  items.forEach((it, i) => pdfFeedbackPage(doc, it.s, it.c, it.fb, i === 0));
+  doc.save(name);
+}
 function autoNotes(s, about){   // a starting point the teacher edits before sending
   if (s.course === "cs"){ const snap = s.py; const well = [], next = []; if (!snap || !snap.paths) return { s:"", i:"", n:"" };
     Object.values(snap.paths).forEach(P => Object.keys(P.lessons || {}).forEach(n => { const L = P.lessons[n], core = L.core || [];
@@ -910,13 +973,13 @@ async function openProgress(s){
       <h2>Send feedback to ${esc(s.name.split(" ")[0])}</h2>
       <p class="muted small" style="margin-top:4px">${esc(s.name.split(" ")[0])} sees it in their course (a red <b>Feedback from your teacher</b> button at the top) the next time they sign in.</p>
       <div class="grid2"><label class="f">About<select class="t" id="fAbout">${about}</select></label>
-        ${s.course !== "cs" ? `<label class="f">Suggested MYP level (optional)<select class="t" id="fLvl"><option value="">No level</option>${[1,2,3,4,5,6,7,8].map(n => `<option>${n}</option>`).join("")}</select></label>` : `<div></div>`}</div>
+        ${s.course !== "cs" ? `<label class="f">Current MYP level (automatic)<select class="t" id="fLvl" disabled title="Worked out from the student's work against the criterion expectations. It changes as they add work."><option value="">Not started</option>${[0,1,2,3,4,5,6,7,8].map(n => `<option value="${n}">${n} / 8</option>`).join("")}</select><span class="em" id="fLvlWhy"></span></label>` : `<div></div>`}</div>
       <label class="f">Strengths<textarea id="fS">${esc(a0.s)}</textarea></label>
       <label class="f">Improvements<textarea id="fI">${esc(a0.i)}</textarea></label>
       <label class="f">Student developments<textarea id="fN">${esc(a0.n)}</textarea></label>
       <p class="muted small" id="fAuto" style="margin-top:4px">${s.course === "cs" ? "" : "Filled in automatically from the work saved for this criterion, and updated when new work arrives (until you edit a box). Check and edit before sending."}</p>
       <label class="f">From<input class="t" id="fFrom" value="${esc(isSuper() ? (s.teacher || "Your teacher") : ME.name)}"></label>
-      <div class="row" style="margin-top:12px"><button class="btn red" id="fGo">Send feedback</button></div><div id="fMsg"></div>
+      <div class="row" style="margin-top:12px"><button class="btn red" id="fGo">Send feedback</button>${s.course !== "cs" ? `<button class="btn ghost" id="fPdf" disabled title="Available once all four strands of this criterion are complete">⬇ Download criterion feedback (PDF)</button>` : ""}</div><div id="fMsg"></div>
       <h3 style="margin-top:16px">Feedback already sent</h3><div id="fHist" class="small muted">Loading…</div>
     </div></div>`;
   document.body.appendChild(bg);
@@ -927,8 +990,15 @@ async function openProgress(s){
   const refill = () => { if (!document.body.contains(bg)) return clearInterval(iv);
     const now = students().find(x => x.key === s.key) || s, a = autoNotes(now, q("#fAbout").value), map = { fS:a.s, fI:a.i, fN:a.n };
     Object.keys(map).forEach(id => { const t = q("#" + id); if (t && (t.value === auto[id] || !t.value.trim())){ t.value = map[id]; auto[id] = map[id]; } }); };
-  const iv = setInterval(refill, 30000);
-  q("#fAbout").addEventListener("change", () => { auto = { fS:q("#fS").value, fI:q("#fI").value, fN:q("#fN").value }; refill(); });
+  const paintLvl = (who) => { const sel = q("#fLvl"); if (!sel) return; const c = critOf(who, q("#fAbout").value), L = c ? levelFor(who, c) : null;
+    sel.value = L ? String(L.level) : ""; q("#fLvlWhy").textContent = L ? L.strands.map(x => "Strand " + x.n + ": " + x.level).join(" · ") + (L.complete ? "" : " · still in progress") : "";
+    const b = q("#fPdf"); if (b){ b.disabled = !(L && (L.complete || L.submitted)); b.title = b.disabled ? "Available once all four strands of Criterion " + (c || "") + " are complete" : "Download this criterion's feedback"; } };
+  paintLvl(s);
+  const refill0 = refill;
+  const iv = setInterval(() => { refill0(); paintLvl(students().find(x => x.key === s.key) || s); }, 30000);
+  if (q("#fPdf")) q("#fPdf").onclick = async () => { const who = students().find(x => x.key === s.key) || s, c = critOf(who, q("#fAbout").value);
+    try { await downloadFeedbackPDF([{ s:who, c, fb:{ s:q("#fS").value, i:q("#fI").value, n:q("#fN").value } }], `${who.name.replace(/\s+/g, "-")}-Criterion-${c}-feedback.pdf`); } catch(e){ toast(e.message); } };
+  q("#fAbout").addEventListener("change", () => { auto = { fS:q("#fS").value, fI:q("#fI").value, fN:q("#fN").value }; refill(); paintLvl(students().find(x => x.key === s.key) || s); });
   if (q("#pinBtn")) q("#pinBtn").onclick = () => resetPin(s);
   bg.onclick = e => { if (e.target === bg || e.target.hasAttribute("data-x")) bg.remove(); };
   const hist = async () => { try { const l = await SDC.getFeedback(s.email, s.name);
@@ -937,7 +1007,7 @@ async function openProgress(s){
   hist();
   q("#fGo").onclick = async () => {
     const fb = { course: s.course, about: q("#fAbout").value, s: q("#fS").value.trim(), i: q("#fI").value.trim(), n: q("#fN").value.trim(), from: q("#fFrom").value.trim().slice(0, 60) };
-    if (q("#fLvl") && q("#fLvl").value) fb.lvl = q("#fLvl").value;
+    if (q("#fLvl") && q("#fLvl").value !== "") fb.lvl = q("#fLvl").value;   // the automatic level
     if (!fb.s && !fb.i && !fb.n) return q("#fMsg").innerHTML = `<div class="notice bad">Write at least one section first.</div>`;
     q("#fGo").disabled = true;
     try { await SDC.sendFeedback({ email:s.email, name:s.name }, fb);
@@ -1031,7 +1101,17 @@ $("swGo").onclick = async () => { $("swGo").disabled = true;
   const ok = await publishCourseState(Object.assign({}, STATE, { unlocks: SW }));
   $("swMsg").innerHTML = `<div class="notice ${ok ? "ok" : "bad"}">${ok ? "Applied. Students see the change within about 5 minutes." : "Google Forms couldn't be reached. Try again."}</div>`; $("swGo").disabled = false; };
 
-$("stQ").oninput = renderStudents; $("stC").onchange = renderStudents;
+$("stQ").oninput = renderStudents; $("stC").onchange = renderStudents; $("stK").onchange = renderStudents;
+$("stPdf").onclick = async () => {
+  const q = $("stQ").value.trim().toLowerCase(), cf = $("stC").value, k = $("stK").value, cr = $("stCr").value;
+  const list = students().filter(s => (!cf || s.course === cf) && (!q || (s.name + " " + (s.email || "")).toLowerCase().indexOf(q) >= 0) && (!k || classKey(s) === k));
+  if (!list.length) return toast("No students in this list.");
+  const items = list.map(s => { const c = s.course === "cs" ? "" : (cr || critOf(s, "")); const a = autoNotes(s, c ? "Criterion " + c : ""); return { s, c, fb:a }; });
+  $("stPdf").disabled = true; toast("Making the PDF for " + items.length + " student" + (items.length === 1 ? "" : "s") + "…");
+  try { const k0 = k ? classLabel(list[0]) : cf ? (C[cf] ? C[cf].name : cf) : "all-students"; await downloadFeedbackPDF(items, ("Class-feedback-" + k0 + (cr ? "-Criterion-" + cr : "")).replace(/[^\w-]+/g, "-").replace(/-+$/, "") + ".pdf"); }
+  catch(e){ toast(e.message); }
+  $("stPdf").disabled = false;
+};
 $("stAdd").onclick = () => editStudent({ name:"", email:"", course:"cs", grade:"", teacher:"", level:"", cls:"", isNew:true });
 
 const canChange = () => isSuper() ? !!(KEYS && KEYS.sig) : !!TKEY;
