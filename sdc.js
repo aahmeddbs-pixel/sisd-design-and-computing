@@ -266,6 +266,12 @@ function sameTeacher(a, b){ const x = surname(a), y = surname(b); return !!x && 
 async function hiddenTeacherNames(){
   return [];   // no longer used: every approved teacher can be chosen
 }
+/* the approved teacher's school email for the name a student picked ("" if not found) */
+async function teacherEmailFor(name){
+  try { const n = String(name || "").trim().toLowerCase(); if (!n) return ""; const { state } = await loadState();
+    const t = ((state && state.teachers) || []).find(t => String(t.name || "").toLowerCase() === n || (t.names || []).some(x => String(x || "").toLowerCase() === n));
+    return t ? normEmail(t.email) : ""; } catch(e){ return ""; }
+}
 async function teacherNames(){
   try { const { state } = await loadState(); return ((state && state.teachers) || []).map(t => t.name).filter(Boolean); } catch(e){ return []; }
 }
@@ -580,6 +586,44 @@ function textOf(el){
   box.style.cssText = "position:absolute;left:-10000px;top:0;width:700px"; box.appendChild(c); document.body.appendChild(box);
   const t = box.innerText; box.remove(); return t.replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu, " ");
 }
+/* ---------- taking a long time on one task ----------
+   1st message: encouragement. 2nd: encouragement + "this is taking longer than expected".
+   Still stuck after that: their teacher is told (a "needs help" alert in the staff dashboard, and an email to the admin).
+   Only active minutes count (typing, clicking, scrolling in the last 2 minutes), not time sitting idle. */
+const slow = (() => {
+  let cur = null, lastAct = Date.now(), tick = null;
+  const mark = () => { lastAct = Date.now(); };
+  ["keydown", "mousedown", "input", "scroll", "touchstart"].forEach(ev => { try { window.addEventListener(ev, mark, { passive:true, capture:true }); } catch(e){} });
+  function box(html, kind){
+    try { document.querySelectorAll(".sdcSlow").forEach(x => x.remove()); } catch(e){}
+    const bg = document.createElement("div"); bg.className = "sdcSlow notranslate-auto";
+    bg.setAttribute("style", "position:fixed;inset:0;background:rgba(14,26,48,.55);display:flex;align-items:center;justify-content:center;z-index:2147483600;padding:16px;font:16px/1.5 Arial,Helvetica,sans-serif");
+    bg.innerHTML = `<div role="dialog" style="background:#fff;color:#16223A;border-radius:16px;max-width:440px;width:100%;padding:22px 24px;border-top:8px solid ${kind === "warn" ? "#E0A100" : "#1E8A55"};box-shadow:0 10px 40px rgba(0,0,0,.3)">${html}<button type="button" style="margin-top:16px;width:100%;border:none;border-radius:10px;padding:11px;font:inherit;font-weight:800;background:#1B2D4E;color:#fff;cursor:pointer">Back to my task →</button></div>`;
+    bg.querySelector("button").onclick = () => bg.remove();
+    document.body.appendChild(bg);
+  }
+  function check(){
+    if (!cur) return;
+    if (document.visibilityState === "visible" && Date.now() - lastAct < 120000) cur.ms += 15000;
+    const m = cur.ms / 60000, first = String(cur.who && cur.who.name || "").split(" ")[0];
+    if (cur.stage < 1 && m >= cur.t[0]){ cur.stage = 1;
+      box(`<div style="font-size:2rem">💪</div><h2 style="margin:6px 0 8px">You can do it${first ? ", " + esc(first) : ""}!</h2><p style="margin:0">Take it one step at a time. Read the task again, look back at the example, then do the next small part. Every bit you finish counts!</p>`, "ok"); }
+    else if (cur.stage < 2 && m >= cur.t[1]){ cur.stage = 2;
+      box(`<div style="font-size:2rem">⏰</div><h2 style="margin:6px 0 8px">Keep going${first ? ", " + esc(first) : ""}: you're nearly there!</h2><p style="margin:0">You've spent <b>${Math.round(m)} minutes</b> on this task, which is <b>longer than expected</b>. Try to finish it in the next few minutes. If you're stuck, put your hand up and ask your teacher now.</p><p style="margin:10px 0 0;color:#5B6782;font-size:.92rem">If there's still no progress soon, your teacher will be told so they can come and help you.</p>`, "warn"); }
+    else if (cur.stage < 3 && m >= cur.t[2]){ cur.stage = 3;
+      log("slowalert", Object.assign({}, cur.who || {}), { task:{ t:String(cur.label || "").slice(0, 120) }, mins:Math.round(m) });
+      const W = cur.who || {}, L = cur.label;
+      teacherEmailFor(W.teacher).then(te => jsonp({ a:"notify", k:"slow-student", te, e:normEmail(W.email || ""), n:String(W.name || "").slice(0, 80), w:(courseLabel(W.course || "") + (W.grade ? ", Grade " + W.grade : "") + (W.teacher ? " · " + W.teacher : "") + " · " + String(L || "") + " · " + Math.round(m) + " min").slice(0, 160) }, 20000)).catch(() => {});
+      box(`<div style="font-size:2rem">🙋</div><h2 style="margin:6px 0 8px">Your teacher is on the way</h2><p style="margin:0">This task is taking a long time, so we've let your teacher know. They'll help you get moving again. Keep trying in the meantime!</p>`, "warn"); }
+  }
+  return {
+    /* start(key, label, who, [first, second, alert] in active minutes): same key again carries on the same timer */
+    start(key, label, who, t){ if (isTester((who || {}).email)) return; if (cur && cur.key === key) { cur.label = label; return; }
+      cur = { key, label, who, t: t || [8, 15, 22], ms:0, stage:0 }; if (!tick) tick = setInterval(check, 15000); },
+    stop(key){ if (!key || (cur && cur.key === key)) cur = null; },
+    _state(){ return cur; }, _check: check
+  };
+})();
 /* ---------- narrator for the course videos ----------
    A calm, natural voice: the best neural/natural voice on the device (male or female, the student's choice),
    spoken sentence by sentence with short breaths between them, at an easy pace, in the chosen language. */
@@ -766,5 +810,5 @@ function strip(c, onSignOut, noLang, mainSel, onSignIn){
 function signedOutNotice(msg, kind){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg, kind: kind || "bad" })); } catch(e){} }
 
 return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
-  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
+  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, slow, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();

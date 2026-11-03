@@ -74,6 +74,7 @@ function start_(email, kind){
 /* a teacher asked for staff access: email the owner of this script (you) straight away */
 function notify_(p){
   const kind = String(p.k || "");
+  if (kind === "slow-student") return slow_(p);
   if (kind !== "teacher-request" && kind !== "student-request") return { ok: false, reason: "unknown" };
   const student = kind === "student-request";
   const email = String(p.e || "").trim().toLowerCase().slice(0, 120);
@@ -100,6 +101,30 @@ function notify_(p){
       '<p style="color:#5B6782;font-size:13px">' + (student ? 'Open Students &amp; progress and press Approve in the "Waiting for approval" box (their teacher can do this too).' : 'Sign in as super admin and open the Teachers tab to approve or decline.') + ' If you don\'t know this person, don\'t approve.</p></div>'
   });
   return { ok: true, sent: true };
+}
+
+/* a student has been stuck on one task for a long time: email their class teacher (and you) */
+function slow_(p){
+  const email = String(p.e || "").trim().toLowerCase().slice(0, 120), te = String(p.te || "").trim().toLowerCase().slice(0, 120);
+  const who = email || String(p.n || "").trim().toLowerCase().slice(0, 80);
+  if (!who) return { ok: false, reason: "who" };
+  const cache = CacheService.getScriptCache(), n = +(cache.get("slow-count") || 0);
+  if (n >= 40) return { ok: false, reason: "wait" };                      // at most 40 of these an hour
+  if (cache.get("slow:" + who)) return { ok: true, already: true };       // one per student per 45 minutes
+  cache.put("slow-count", String(n + 1), 3600); cache.put("slow:" + who, "1", 2700);
+  const h = s => String(s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const name = String(p.n || "").slice(0, 80), where = String(p.w || "").slice(0, 160), me = Session.getEffectiveUser().getEmail();
+  const body = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#16223A;max-width:520px">' +
+    '<div style="background:#1B2D4E;color:#fff;padding:14px 18px;border-bottom:4px solid #E0A100;font-weight:bold">SISD Design and Computing · Student needs help</div>' +
+    '<p><b>' + h(name || email) + '</b> has been on the same task for a long time and has already had two reminders on screen.</p>' +
+    '<p style="background:#FFF6DA;border-radius:8px;padding:10px 12px">' + h(where) + '</p>' +
+    '<p>Please check in with them in class. It also shows in the staff dashboard under Students &amp; progress → "Needs help".</p>' +
+    '<p><a href="' + SITE + 'admin.html" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Open the staff dashboard</a></p></div>';
+  const subject = "Student needs help: " + (name || email);
+  let teacherSent = false;
+  if (te && DOMAIN.test(te)){ try { MailApp.sendEmail({ to: te, name: "SISD Design and Computing", subject: subject, htmlBody: body }); teacherSent = true; } catch(err){} }
+  MailApp.sendEmail({ to: me, name: "SISD Design and Computing", subject: subject + (te ? (teacherSent ? " (also sent to " + te + ")" : " (could not email " + te + ")") : " (teacher email unknown)"), htmlBody: body });
+  return { ok: true, sent: true, teacher: teacherSent };
 }
 
 function verify_(email, token){

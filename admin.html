@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261103x"></script>
+<script src="/python-pathways/pp-sync.js?v=20261103y"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261103x"></script>
+<script src="sdc.js?v=20261103y"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -144,15 +144,17 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
         <h2><span id="stTitle">Students</span> <span class="n" id="stCount">0</span></h2>
         <p class="muted small" style="margin-top:4px" id="stIntro">Open a student to see their progress and send them feedback. Press <b>✏️ Change course</b> to change a student's course, grade, level or teacher.</p>
         <div id="stWarn"></div>
+        <div id="slowBox"></div>
         <div id="vwait"></div>
         <div id="dreq"></div>
         <div class="row" style="margin-top:12px"><input class="t" id="stQ" placeholder="Search name or email" style="max-width:280px">
           <select class="t" id="stC" style="max-width:190px"><option value="">All courses</option><option value="cs">Computer Science</option><option value="design">Design</option><option value="it">IT</option></select>
           <select class="t" id="stK" style="max-width:240px"><option value="">All classes</option></select>
-          <select class="t" id="stCr" style="max-width:150px" title="Criterion for the class feedback PDF"><option value="">Latest criterion</option><option>A</option><option>B</option><option>C</option><option>D</option></select>
+          <select class="t" id="stCr" style="max-width:170px" title="Choose a class and a criterion to see the class's feedback"><option value="">Choose criterion</option><option>A</option><option>B</option><option>C</option><option>D</option></select>
           <button class="btn ghost sm" id="stPdf" title="One PDF with every listed student's feedback">📄 Class feedback (PDF)</button>
-          <button class="btn sm" id="stPdfAll" title="Every criterion each of your students has worked on, one page each">⬇ Download all feedback (PDF)</button>
+          <button class="btn sm" id="stPdfAll" data-super title="Every criterion each of your students has worked on, one page each">⬇ Download all feedback (PDF)</button>
           <button class="btn ghost sm" id="stAdd" data-super>＋ Set up a student by email</button></div>
+        <div id="clsFb"></div>
         <div class="scroll" style="margin-top:12px"><table class="tbl" id="stTbl"></table></div>
       </div>
     </section>
@@ -791,6 +793,22 @@ function renderStudents(){
     if (b.dataset.shown){ delete b.dataset.shown; b.textContent = "👁 PIN"; return; }
     b.dataset.shown = "1"; b.innerHTML = s.pin ? `PIN <b style="font-family:Consolas,Menlo,monospace;letter-spacing:.15em">${esc(s.pin)}</b>` : "No PIN on record"; b.title = s.pin ? "Click to hide" : "This student signed up before PINs were recorded. Use Reset PIN to give them a new one."; });
   $("stTbl").querySelectorAll("[data-del]").forEach(b => b.onclick = () => deleteStudent(list[+b.dataset.del]));
+  renderClassFeedback(list);
+}
+/* ---- class feedback on screen: choose a class and a criterion, and every student's feedback shows here ---- */
+function renderClassFeedback(list){
+  const box = $("clsFb"); if (!box) return;
+  const k = $("stK").value, cr = $("stCr").value, cs = list.length && list.every(s => s.course === "cs");
+  if (!k){ box.innerHTML = `<p class="small muted" style="margin:10px 0 0">👉 Choose a <b>class</b> and a <b>criterion</b> above to see the whole class's feedback here.</p>`; return; }
+  if (!cr && !cs){ box.innerHTML = `<p class="small muted" style="margin:10px 0 0">👉 Now choose a <b>criterion</b> to see ${esc(classLabel(list[0] || {}))}'s feedback.</p>`; return; }
+  const lines = t => String(t || "").split("\n").filter(Boolean).map(x => `<li>${esc(x)}</li>`).join("") || `<li class="muted">Nothing yet</li>`;
+  box.innerHTML = `<div class="card" style="margin:12px 0 0;padding:14px 16px;border-left:6px solid #1B2D4E"><h3 style="margin:0">Class feedback: ${esc(classLabel(list[0] || {}))}${cs ? "" : " · Criterion " + esc(cr)} <span class="n">${list.length}</span></h3>
+    <p class="small muted" style="margin:4px 0 10px">Made from each student's saved work. Press <b>Open &amp; send</b> to check it, edit it and send it to the student. The level is a guide for you only: it isn't sent.</p>
+    <div style="display:grid;gap:10px">${list.map((s, i) => { const c = s.course === "cs" ? "" : cr, a = autoNotes(s, c ? "Criterion " + c : ""), L = c ? levelFor(s, c) : null;
+      const has = s.course === "cs" ? !!(a.s || a.i) : !!(s.ds && s.ds.work[c]);
+      return `<div style="border:1px solid #DCE2EE;border-radius:12px;padding:10px 12px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>${esc(s.name)}</b>${L ? `<span class="pill" style="background:#EEF0F4;color:#6B7486" title="A guide from the work so far: not sent to the student">Level ${L.level} / 8${L.complete ? "" : " (working)"}</span>` : ""}${has ? "" : `<span class="pill warn">No work saved for this yet</span>`}<button class="btn ghost sm" data-cf="${i}" style="margin-left:auto">Open &amp; send</button></div>
+        ${has ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:6px" class="small"><div><b style="color:#1E8A55">Strengths</b><ul style="margin:4px 0 0;padding-left:18px">${lines(a.s)}</ul></div><div><b style="color:#B5651D">Improvements</b><ul style="margin:4px 0 0;padding-left:18px">${lines(a.i)}</ul></div><div><b style="color:#1B2D4E">Student developments</b><ul style="margin:4px 0 0;padding-left:18px">${lines(a.n)}</ul></div></div>` : ""}</div>`; }).join("")}</div></div>`;
+  box.querySelectorAll("[data-cf]").forEach(b => b.onclick = () => openProgress(list[+b.dataset.cf]));
 }
 /* ---- deleting an account (super admin only, once the student hasn't been online for a month) ---- */
 const DELETE_AFTER_DAYS = 30;
@@ -1102,7 +1120,7 @@ $("swGo").onclick = async () => { $("swGo").disabled = true;
   const ok = await publishCourseState(Object.assign({}, STATE, { unlocks: SW }));
   $("swMsg").innerHTML = `<div class="notice ${ok ? "ok" : "bad"}">${ok ? "Applied. Students see the change within about 5 minutes." : "Google Forms couldn't be reached. Try again."}</div>`; $("swGo").disabled = false; };
 
-$("stQ").oninput = renderStudents; $("stC").onchange = renderStudents; $("stK").onchange = renderStudents;
+$("stQ").oninput = renderStudents; $("stC").onchange = renderStudents; $("stK").onchange = renderStudents; $("stCr").onchange = renderStudents;
 $("stPdfAll").onclick = async () => {   // every student this teacher can see, every criterion they have work in
   const list = students(); if (!list.length) return toast("No students yet.");
   const items = [];
@@ -1212,8 +1230,26 @@ function renderLog(){
 }
 $("lgF").onchange = renderLog;
 
-function renderAll(){ renderHP(); renderVerifyWaiting(); renderDesignRequests(); renderStudents(); renderLog(); }
+function renderAll(){ renderHP(); renderSlow(); renderVerifyWaiting(); renderDesignRequests(); renderStudents(); renderLog(); }
 /* ---------- students who signed up but can't get in because they haven't verified their email ---------- */
+/* ---------- students who've been stuck on one task for a long time (after two reminders on their screen) ---------- */
+function renderSlow(){
+  const box = $("slowBox"); if (!box) return;
+  const gone = {}, moved = {}, al = {};
+  ROWS.forEach(r => { if (!r.acct) return; const k = SDC.keyOf(r.acct.email || "", r.acct.name || "");
+    if (r.type === "slowdismiss") gone[k] = Math.max(gone[k] || 0, r.upto || r.when);
+    if (r.type === "task") moved[k] = Math.max(moved[k] || 0, r.when);
+    if (r.type === "slowalert" && Date.now() - r.when < 36 * 3600000 && (!al[k] || al[k].when < r.when)) al[k] = Object.assign({ k }, r); });
+  const list = Object.values(al).filter(r => !(gone[r.k] >= r.when) && !(moved[r.k] > r.when + 60000) && canSee(r.acct.teacher)).sort((a, b) => b.when - a.when);
+  if (!list.length){ box.innerHTML = ""; return; }
+  box.innerHTML = `<div class="card" style="margin:10px 0;border-left:6px solid #E0A100;padding:14px 16px"><h3 style="margin:0">🙋 Needs help (${list.length})</h3>
+    <p class="small muted" style="margin:4px 0 8px">These students have been on the same task for a long time and have already had two reminders on their screen. Please check in with them. Press <b>Done</b> once you have.</p>
+    <div class="scroll"><table class="tbl"><tr><th>Student</th><th>Stuck on</th><th>Time on it</th><th>When</th><th></th></tr>${list.map((r, i) => `<tr><td><b>${esc(r.acct.name)}</b><div class="em">${r.acct.grade ? "G" + esc(r.acct.grade) : ""}${r.acct.teacher ? " · " + esc(r.acct.teacher) : ""}</div></td>
+      <td class="small">${pill(r.acct.course)} ${esc((r.task && r.task.t) || "")}</td><td>${esc(String(r.mins || ""))} min</td><td class="small">${esc(fmtDT(r.when))}</td><td><button class="btn sm" data-sd="${i}">✓ Done</button></td></tr>`).join("")}</table></div></div>`;
+  box.querySelectorAll("[data-sd]").forEach(b => b.onclick = () => { const r = list[+b.dataset.sd], a = r.acct, at = Date.now();
+    SDC.log("slowdismiss", { name:a.name, email:a.email || "", grade:a.grade, teacher:a.teacher, course:a.course }, { upto:r.when, by: isSuper() ? "(admin)" : (ME && ME.name) || "" });
+    ROWS.push({ sdc:1, type:"slowdismiss", when:at, upto:r.when, acct:{ name:a.name, email:a.email || "", teacher:a.teacher } }); renderSlow(); });
+}
 function renderVerifyWaiting(){
   const last = {}, okd = {};
   ROWS.forEach(r => { if (!r.acct || !r.acct.email) return; const k = SDC.keyOf(r.acct.email, r.acct.name);
