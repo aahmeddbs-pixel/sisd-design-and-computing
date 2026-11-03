@@ -624,6 +624,63 @@ const slow = (() => {
     _state(){ return cur; }, _check: check
   };
 })();
+/* ---------- weekly exercise rankings (per class) ----------
+   Each student's page reports how many exercises they've completed overall and this week (Monday to Sunday).
+   Classmates see the class table; last week's top three get House Points (3, 2 and 1). Names show as "Sara K.". */
+const rank = (() => {
+  const pad = n => String(n).padStart(2, "0");
+  function weekId(t){ const d = new Date(t || Date.now()); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function prevWeek(w){ const d = new Date((w || weekId()) + "T12:00:00"); d.setDate(d.getDate() - 7); return weekId(d.getTime()); }
+  const inWeek = (t, w) => !!t && weekId(t) === (w || weekId());
+  const short = n => { const p = String(n || "").trim().split(/\s+/).filter(Boolean); return p.length > 1 ? p[0] + " " + p[p.length - 1][0].toUpperCase() + "." : (p[0] || "?"); };
+  const classOf = a => [a.course || "", String(a.grade || "").toLowerCase(), String(a.cls || "").toLowerCase().replace(/\s+/g, ""), surname(a.teacher || "")].join("|");
+  async function classId(a){ return hex(new Uint8Array(await crypto.subtle.digest("SHA-256", TE.encode("sdc-rank|" + classOf(a))))).slice(0, 24); }
+  async function meId(a){ return (await idOf(a.email, a.name)).slice(0, 12); }
+  let lastSent = "";
+  /* counts = { total, week, last } : last = exercises completed last week */
+  async function report(a, counts){
+    try { if (!a || !a.name || isTester(a.email) || !(window.crypto && crypto.subtle)) return;
+      const w = weekId(), body = { k: await meId(a), n: short(a.name), t: +counts.total || 0, w, x: +counts.week || 0, pw: prevWeek(w), px: +counts.last || 0 };
+      const sig = JSON.stringify(body); if (sig === lastSent) return; lastSent = sig;
+      sendRow("R", await classId(a), JSON.stringify(Object.assign({ at: Date.now() }, body))); } catch(e){}
+  }
+  /* the class table: [{ k, n, total, week, last, me }] plus last week's winners */
+  async function table(a, opt){
+    const id = await classId(a), mine = a.email || a.name ? await meId(a) : "", got = {}, w = weekId(), pw = prevWeek(w), lastBy = {};
+    let rs = []; try { rs = await rows("R", id, (opt && opt.limit) || 400); } catch(e){ return null; }
+    rs.forEach(r => { let d; try { d = JSON.parse(r.text); } catch(e){ return; } if (!d || !d.k) return;
+      const cur = got[d.k]; if (!cur || (d.at || r.ver) > cur.at) got[d.k] = { k:d.k, n:d.n, at:d.at || r.ver, total:+d.t || 0, week: d.w === w ? +d.x || 0 : 0, me: d.k === mine };
+      const lw = d.w === pw ? +d.x || 0 : d.pw === pw ? +d.px || 0 : null; if (lw !== null) lastBy[d.k] = Math.max(lastBy[d.k] || 0, lw); });
+    const list = Object.values(got).map(x => Object.assign(x, { last: lastBy[x.k] || 0 }));
+    const byWeek = list.slice().sort((p, q) => q.week - p.week || q.total - p.total || p.n.localeCompare(q.n));
+    const byTotal = list.slice().sort((p, q) => q.total - p.total || q.week - p.week || p.n.localeCompare(q.n));
+    const winners = list.filter(x => x.last > 0).sort((p, q) => q.last - p.last || q.total - p.total || p.n.localeCompare(q.n)).slice(0, 3).map((x, i) => Object.assign({}, x, { place: i + 1, hp: 3 - i }));
+    return { week: w, lastWeek: pw, byWeek, byTotal, winners, mine };
+  }
+  const MED = ["🥇", "🥈", "🥉"];
+  /* a ready-made card for a student's page */
+  function card(T, opt){
+    const o = opt || {}, row = (x, i, val) => `<tr style="${x.me ? "background:#FFF6DA;font-weight:700" : ""}"><td style="padding:5px 8px;width:2.2em">${i < 3 && val(x) > 0 ? MED[i] : i + 1}</td><td style="padding:5px 8px">${esc(x.n)}${x.me ? " (you)" : ""}</td><td style="padding:5px 8px;text-align:right">${val(x)}</td></tr>`;
+    const tbl = (list, val, empty) => list.length ? `<table style="width:100%;border-collapse:collapse;font-size:14px">${list.slice(0, o.max || 10).map((x, i) => row(x, i, val)).join("")}${(() => { const i = list.findIndex(x => x.me); return i >= (o.max || 10) ? `<tr><td colspan="3" style="padding:2px 8px;color:#7A859C">…</td></tr>` + row(list[i], i, val) : ""; })()}</table>` : `<p style="margin:6px 0;color:#5B6782">${empty}</p>`;
+    const meW = T.byWeek.findIndex(x => x.me), meT = T.byTotal.findIndex(x => x.me);
+    const days = 7 - ((new Date().getDay() + 6) % 7);
+    return `<div class="sdcRank" style="border:1px solid #DCE2EE;border-radius:16px;padding:16px 18px;background:#fff;color:#16223A;font:15px/1.45 Arial,Helvetica,sans-serif">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline"><b style="font-size:1.15rem">🏆 Class rankings</b><span style="color:#5B6782;font-size:13px">Resets every Monday · ${days} day${days === 1 ? "" : "s"} left this week</span></div>
+      ${meW >= 0 ? `<p style="margin:6px 0 0">You're <b>#${meW + 1}</b> this week and <b>#${meT + 1}</b> overall.${meW > 2 ? " Complete more exercises to reach the top three!" : T.byWeek[meW].week > 0 ? " Keep it up: the top three on Monday get House Points!" : ""}</p>` : ""}
+      ${T.winners.length ? `<div style="margin:12px 0 0;padding:10px 12px;border-radius:12px;background:#EEF6F1"><b>Last week's House Points</b><div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px">${T.winners.map(x => `<span>${MED[x.place - 1]} <b>${esc(x.n)}</b>${x.me ? " (you)" : ""} · ${x.last} exercises · <b>+${x.hp} HP</b></span>`).join("")}</div></div>` : ""}
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;margin-top:12px">
+        <div><b>This week</b> <span style="color:#5B6782;font-size:13px">exercises completed</span>${tbl(T.byWeek, x => x.week, "No exercises completed yet this week. Be the first!")}</div>
+        <div><b>Overall</b> <span style="color:#5B6782;font-size:13px">exercises completed</span>${tbl(T.byTotal, x => x.total, "No one has completed an exercise yet.")}</div></div>
+      <p style="margin:10px 0 0;color:#5B6782;font-size:12.5px">Every Monday the top three of the week get House Points: 🥇 3, 🥈 2, 🥉 1.</p></div>`;
+  }
+  /* fill a box on the page (and keep it fresh every 2 minutes while visible) */
+  function mount(box, a, opt){
+    if (!box || !a || isTester(a.email)) { if (box) box.innerHTML = ""; return; }
+    const go = async () => { if (!box.isConnected) return clearInterval(box._rk); const T = await table(a); if (T && box.isConnected) box.innerHTML = card(T, opt); };
+    clearInterval(box._rk); box._rk = setInterval(() => { if (document.visibilityState === "visible") go(); }, 120000); go();
+  }
+  return { weekId, prevWeek, inWeek, report, table, card, mount, classOf, classId, short };
+})();
 /* ---------- narrator for the course videos ----------
    A calm, natural voice: the best neural/natural voice on the device (male or female, the student's choice),
    spoken sentence by sentence with short breaths between them, at an easy pace, in the chosen language. */
@@ -810,5 +867,5 @@ function strip(c, onSignOut, noLang, mainSel, onSignIn){
 function signedOutNotice(msg, kind){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg, kind: kind || "bad" })); } catch(e){} }
 
 return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
-  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, slow, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
+  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, slow, rank, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();
