@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261103n"></script>
+<script src="/python-pathways/pp-sync.js?v=20261103o"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261103n"></script>
+<script src="sdc.js?v=20261103o"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -144,6 +144,7 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
         <h2><span id="stTitle">Students</span> <span class="n" id="stCount">0</span></h2>
         <p class="muted small" style="margin-top:4px" id="stIntro">Open a student to see their progress and send them feedback. Press <b>✏️ Change course</b> to change a student's course, grade, level or teacher.</p>
         <div id="stWarn"></div>
+        <div id="vwait"></div>
         <div id="dreq"></div>
         <div class="row" style="margin-top:12px"><input class="t" id="stQ" placeholder="Search name or email" style="max-width:280px">
           <select class="t" id="stC" style="max-width:190px"><option value="">All courses</option><option value="cs">Computer Science</option><option value="design">Design</option><option value="it">IT</option></select>
@@ -156,7 +157,7 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
       <div class="card">
         <h2>Sign-in log <span class="n" id="lgCount">0</span></h2>
         <p class="muted small" style="margin-top:4px">Every sign-in and sign-up through the platform, with the course the student chose. Wrong-course attempts are marked in red and included in the lesson email.</p>
-        <div class="row" style="margin-top:12px"><select class="t" id="lgF" style="max-width:240px"><option value="">Everything</option><option value="wrongcourse">Wrong-course attempts only</option><option value="signup">Sign-ups only</option></select></div>
+        <div class="row" style="margin-top:12px"><select class="t" id="lgF" style="max-width:240px"><option value="">Everything</option><option value="wrongcourse">Wrong-course attempts only</option><option value="signup">Sign-ups only</option><option value="unverified">Waiting for email verification</option></select></div>
         <div class="scroll" style="margin-top:12px"><table class="tbl" id="lgTbl"></table></div>
       </div>
     </section>
@@ -703,12 +704,13 @@ function students(){
   const S = {};
   Object.keys(PYACCTS).forEach(k => { S[k] = Object.assign({ key:k, last:0, signins:0 }, PYACCTS[k]); });
   ROWS.forEach(r => {
-    if (["signin","signup","task","wrongcourse"].indexOf(r.type) < 0 || !r.acct.name || r.acct.name === "(admin)") return;
+    if (["signin","signup","task","wrongcourse","unverified"].indexOf(r.type) < 0 || !r.acct.name || r.acct.name === "(admin)") return;
     const k = SDC.keyOf(r.acct.email, r.acct.name), s = S[k] = S[k] || { key:k, last:0, signins:0 };
     if (r.type !== "wrongcourse"){ Object.assign(s, { name:r.acct.name, email:r.acct.email || s.email || "", grade:r.acct.grade || s.grade, teacher:r.acct.teacher || s.teacher, course:r.acct.course || s.course, level:r.acct.level || s.level, cls:r.acct.cls || s.cls || "" }); }
     else { s.name = s.name || r.acct.name; s.email = s.email || r.acct.email; s.wrong = (s.wrong || 0) + 1; }
     if (r.type === "signin" || r.type === "signup"){ s.signins++; s.last = Math.max(s.last, r.when); }
     if (r.type === "task") s.active = Math.max(s.active || 0, r.when);
+    if (r.type === "unverified") s.unv = Math.max(s.unv || 0, r.when);
   });
   Object.values(DS).forEach(d => {   // Design and IT students who haven't signed in through the platform yet
     const k = "e:" + d.email; if (S[k]) return;
@@ -750,7 +752,7 @@ function renderStudents(){
   $("stCount").textContent = list.length;
   $("stWarn").innerHTML = !isSuper() && !sheetId(pyLink()) ? `<div class="notice warn">Your dashboard isn't connected to the class data yet. Ask the super admin to open <b>Setup</b> and press <b>Save setup</b>.</div>` : "";
   $("stTbl").innerHTML = `<tr><th>Student</th><th>Course</th><th>Grade</th><th>Level / class</th><th>Teacher</th><th>Progress</th><th>Last active</th><th></th></tr>` +
-    (list.length ? list.map((s, i) => `<tr><td><b>${esc(s.name)}</b><div class="em">${esc(s.email || "no email on record")}</div>${s.wrong ? `<span class="pill bad">${s.wrong} wrong-course</span>` : ""}</td>
+    (list.length ? list.map((s, i) => `<tr><td><b>${esc(s.name)}</b><div class="em">${esc(s.email || "no email on record")}</div>${s.wrong ? `<span class="pill bad">${s.wrong} wrong-course</span>` : ""}${s.unv && s.unv > (s.last || 0) ? ` <span class="pill warn" title="Signed up, but hasn't verified their email yet">⏳ not verified</span>` : ""}</td>
       <td>${pill(s.course)}</td><td>${s.grade ? "G" + esc(s.grade) : ""}</td><td>${esc(s.course === "cs" ? levelName("cs", s.level) : s.cls || "")}</td><td>${esc(s.teacher || "")}</td>
       <td class="small">${progressCell(s)}</td>
       <td class="small">${s.active || s.last ? esc(fmtDT(s.active || s.last)) : "<span class='muted'>—</span>"}</td>
@@ -1038,17 +1040,42 @@ function editStudent(s){
 /* ---------------- sign-in log ---------------- */
 function renderLog(){
   const f = $("lgF").value;
-  const list = ROWS.filter(r => ["signin","signup","wrongcourse"].indexOf(r.type) >= 0 && (!f || r.type === f) && canSee(r.acct.teacher)).slice().reverse().slice(0, 400);
+  const list = ROWS.filter(r => ["signin","signup","wrongcourse","unverified"].indexOf(r.type) >= 0 && (!f || r.type === f) && canSee(r.acct.teacher)).slice().reverse().slice(0, 400);
   $("lgCount").textContent = list.length;
   const what = r => r.type === "wrongcourse" ? `<span class="pill bad">⛔ Stopped</span> tried ${esc(C[r.acct.course] ? C[r.acct.course].name : r.acct.course)}${r.registered ? `, registered for <b>${esc(C[r.registered] ? C[r.registered].name : r.registered)}</b>` : r.reason === "grade" ? " (not Grade 10)" : ""}${r.signup ? " (sign-up)" : ""}`
-    : r.type === "signup" ? `<span class="pill ok">New</span> signed up` : `signed in${r.unchecked ? ` <span class="pill warn">offline: not checked</span>` : ""}`;
+    : r.type === "signup" ? `<span class="pill ok">New</span> signed up` : r.type === "unverified" ? `<span class="pill warn">⏳ Not in yet</span> waiting for them to verify their email${r.signup ? " (just signed up)" : ""}` : `signed in${r.unchecked ? ` <span class="pill warn">offline: not checked</span>` : ""}`;
   $("lgTbl").innerHTML = `<tr><th>When</th><th>Student</th><th>Course chosen</th><th>What happened</th></tr>` +
     (list.length ? list.map(r => `<tr><td class="small">${esc(fmtDT(r.when))}</td><td><b>${esc(r.acct.name || "Unknown")}</b><div class="em">${esc([r.acct.email, r.acct.grade ? "G" + r.acct.grade : "", r.acct.teacher].filter(Boolean).join(" · "))}</div></td><td>${pill(r.acct.course)}</td><td>${what(r)}</td></tr>`).join("")
       : `<tr><td colspan="4" class="muted">No sign-ins yet.</td></tr>`);
 }
 $("lgF").onchange = renderLog;
 
-function renderAll(){ renderHP(); renderDesignRequests(); renderStudents(); renderLog(); }
+function renderAll(){ renderHP(); renderVerifyWaiting(); renderDesignRequests(); renderStudents(); renderLog(); }
+/* ---------- students who signed up but can't get in because they haven't verified their email ---------- */
+function renderVerifyWaiting(){
+  const last = {}, okd = {};
+  ROWS.forEach(r => { if (!r.acct || !r.acct.email) return; const k = SDC.keyOf(r.acct.email, r.acct.name);
+    if (r.type === "manualverify") okd[k] = Math.max(okd[k] || 0, r.when);
+    if (["unverified", "signin", "signup"].indexOf(r.type) >= 0 && (!last[k] || last[k].when <= r.when)) last[k] = r; });
+  const list = Object.entries(last).filter(([k, r]) => r.type === "unverified" && !(okd[k] >= r.when) && canSee(r.acct.teacher)).map(x => x[1]).sort((a, b) => b.when - a.when);
+  const box = $("vwait"); if (!box) return;
+  if (!list.length){ box.innerHTML = ""; return; }
+  box.innerHTML = `<div class="card" style="margin:10px 0;border-left:6px solid var(--warn,#8A4B00);padding:14px 16px"><h3 style="margin:0">⏳ Signed up but can't get in yet (${list.length})</h3>
+    <p class="small muted" style="margin:4px 0 8px">These students haven't pressed the link in their verification email yet. Ask them to check their SISD inbox (and Junk). If the email never arrived and you know it's really them, press <b>Let them in</b>.</p>
+    ${canChange() ? "" : `<div class="notice warn small">Letting students in isn't set up for your account yet. Ask the super admin to sign in to this page once, then sign in again.</div>`}
+    <div class="scroll"><table class="tbl"><tr><th>Student</th><th>Course</th><th>Last tried</th><th></th></tr>${list.map((r, i) => `<tr><td><b>${esc(r.acct.name)}</b><div class="em">${esc(r.acct.email)}${r.acct.grade ? " · G" + esc(r.acct.grade) : ""}${r.acct.teacher ? " · " + esc(r.acct.teacher) : ""}</div></td>
+      <td>${pill(r.acct.course)}</td><td class="small">${esc(fmtDT(r.when))}</td><td><button class="btn sm" data-vok="${i}"${canChange() ? "" : " disabled"}>✓ Let them in</button></td></tr>`).join("")}</table></div></div>`;
+  box.querySelectorAll("[data-vok]").forEach(b => b.onclick = async () => {
+    const r = list[+b.dataset.vok], a = r.acct; b.disabled = true;
+    try { const id = await SDC.idOf(a.email, ""), at = Date.now();
+      SDC.sendRow("V", id, await signAssign({ k:id, verified:true, at }));
+      SDC.log("manualverify", { name:a.name, email:a.email, grade:a.grade, teacher:a.teacher, course:a.course }, { by: isSuper() ? "(admin)" : (ME && ME.name) || "" });
+      ROWS.push({ sdc:1, type:"manualverify", when:at, acct:{ name:a.name, email:a.email, teacher:a.teacher } });
+      toast(a.name.split(" ")[0] + " can now sign in. Ask them to sign in again in a minute.");
+    } catch(e){ toast("Couldn't do it: " + e.message); b.disabled = false; return; }
+    renderVerifyWaiting();
+  });
+}
 /* ---------- Computer Science students asking to join Design: the teacher approves once, with the grade and class ---------- */
 function renderDesignRequests(){
   const last = {};

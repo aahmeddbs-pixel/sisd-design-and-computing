@@ -417,10 +417,17 @@ function verifyMsg(email, r){
   return `Your email isn't verified yet, and the verification email couldn't be sent just now. Check your internet connection and try again.`;
 }
 /* returns null when the person may continue, or a message explaining what to do */
+/* a teacher or the super admin let this student in by hand (e.g. the verification email never arrived) */
+async function adminVerified(email){
+  try { const id = await idOf(email, "");
+    for (const r of await rows("V", id, 10)){ const o = await verify(r.text); if (o && o.k === id && o.verified){ try { localStorage.setItem(VKEY(email), "1"); } catch(e){} return true; } } } catch(e){}
+  return false;
+}
 async function verifyGate(email, kind, isNew){
   if (!verifyOn() || !isNew) return null;
   if (!/@sisd\.ae$/i.test(normEmail(email))) return verifyMsg(email, { reason:"domain" });
-  let v = false; try { v = await isVerified(email); } catch(e){ return `Your email verification couldn't be checked just now. Check your internet connection and try again.`; }
+  let v = false; try { v = await isVerified(email); } catch(e){ v = false; }
+  if (!v) v = await adminVerified(email);
   if (v) return null;
   return verifyMsg(email, await startVerify(email, kind));
 }
