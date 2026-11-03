@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261103i"></script>
+<script src="/python-pathways/pp-sync.js?v=20261103j"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261103i"></script>
+<script src="sdc.js?v=20261103j"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -1003,7 +1003,7 @@ function editStudent(s){
     const tn = TEACHERS[c].find(x => x.split(" ").pop() === String(t || "").split(" ").pop()); if (tn) q("#eT").value = tn;
     const from = s.course;
     q("#eWarn").innerHTML = !s.isNew && from && from !== c ? `<div class="notice warn small"><b>Changing course.</b> ${esc(s.name)} will be stopped from ${esc(C[from].name)} and can only sign into ${esc(C[c].name)}.` +
-      ((from === "cs") !== (c === "cs") ? ` These are separate courses, so they will need to <b>sign up</b> for ${esc(C[c].name)} once. Their ${esc(C[from].name)} work is kept.` : ` Their account and work move with them.`) + `</div>` : "";
+      ((from === "cs") !== (c === "cs") ? ` These are separate courses, so they will need to <b>sign up</b> for ${esc(C[c].name)} once. Their ${esc(C[from].name)} work is kept.` + (["cs","design"].includes(from) && ["cs","design"].includes(c) && ["6","7","8"].includes(String(q("#eG").value)) ? ` Grades 6–8 can take both, so ${esc(C[from].name)} stays open for them too.` : ``) : ` Their account and work move with them.`) + `</div>` : "";
   };
   q("#eC").value = C[s.course] ? s.course : "cs"; fill();
   if (s.grade) { q("#eG").value = String(s.grade); } fill();

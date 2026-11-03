@@ -364,8 +364,10 @@ async function confirm(a, signup){
     }
     A = null; if (L.reg && L.reg.ver <= L.assign.at) L.reg = null;   // a new account made after the deletion: start fresh
   }
+  if (A && A.c !== c && bothOk(A.c, c, a.grade, A.g, g && g.grade)) A = null;   // also taking the other course: fine, the change was for that one
   if (A && A.c !== c){ log("wrongcourse", Object.assign({}, a, { course:c }), { registered:A.c, byAdmin:true }); return { ok:false, msg:MSG.other(A.c, true), registered:A.c }; }
-  if (!A && L.reg && L.reg.c !== c){ log("wrongcourse", Object.assign({}, a, { course:c }), { registered:L.reg.c }); return { ok:false, msg:MSG.other(L.reg.c, false), registered:L.reg.c }; }
+  if (!A && L.reg && L.reg.c !== c && bothOk(L.reg.c, c, a.grade, L.reg.g, g && g.grade)){ /* Grade 6–8: registered for both is allowed */ }
+  else if (!A && L.reg && L.reg.c !== c){ log("wrongcourse", Object.assign({}, a, { course:c }), { registered:L.reg.c }); return { ok:false, msg:MSG.other(L.reg.c, false), registered:L.reg.c }; }
   if (!L.reg) register(a.email, a.name, c, (A && A.g) || a.grade);
   // only accounts made after verification was switched on must verify (judged by when the account was made,
   // not by when it first reached the online register). Computer Science students never need to verify.
@@ -427,11 +429,20 @@ async function verifyGate(email, kind, isNew){
 const createdMs = a => { const v = a && a.created; return typeof v === "number" ? v : Date.parse(v || "") || 0; };
 /* has the super admin deleted this (old) account? Then signing up again is allowed and starts fresh */
 async function isDeleted(email, name){ try { const L = await lookup(email, name); return !!(L.assign && L.assign.del); } catch(e){ return false; } }
+/* Grades 6–8 can take Computer Science AND Design: one course never blocks the other for them */
+const BOTH_GRADES = ["6", "7", "8"];
+function bothOk(c1, c2, ...grades){
+  if (!((c1 === "cs" && c2 === "design") || (c1 === "design" && c2 === "cs"))) return false;
+  return grades.some(g => BOTH_GRADES.indexOf(String(g == null ? "" : g).replace(/^G/i, "").split(/\s/)[0]) >= 0);
+}
 async function canSignUp(email, name, c){
   if (offline() || isTester(email)) return { ok:true };
   let L = null; try { L = await lookup(email, name); } catch(e){ return { ok:true }; }
   if (L.assign && L.assign.del){ if (!L.reg || L.reg.ver <= L.assign.at) return { ok:true, deleted:true }; L.assign = null; }
+  const gg = (gate() || {}).grade;
+  if (L.assign && L.assign.c !== c && bothOk(L.assign.c, c, gg, L.assign.g)) return { ok:true, assign:null };
   if (L.assign && L.assign.c !== c){ log("wrongcourse", { email, name, course:c }, { registered:L.assign.c, byAdmin:true, signup:true }); return { ok:false, msg:MSG.other(L.assign.c, true) }; }
+  if (!L.assign && L.reg && L.reg.c !== c && bothOk(L.reg.c, c, gg, L.reg.g)) return { ok:true, assign:null };
   if (!L.assign && L.reg && L.reg.c !== c){ log("wrongcourse", { email, name, course:c }, { registered:L.reg.c, signup:true }); return { ok:false, msg:MSG.other(L.reg.c, false) }; }
   return { ok:true, assign:L.assign };
 }
