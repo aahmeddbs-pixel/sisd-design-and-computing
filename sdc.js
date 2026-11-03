@@ -686,13 +686,30 @@ function listen(sels, fine, whole){
 }
 
 /* ---------- the strip at the top of each course page ---------- */
-function strip(c, onSignOut, noLang, mainSel){
+/* the platform bar at the top of a course page:
+   [Change course ▾] lists the student's other courses (CS any grade, Design Grades 6–10, IT Grade 10),
+   [Sign out] signs out and stays on the course's sign-in screen; it then reads [Sign in].
+   onSignOut() must sign the student out WITHOUT leaving the page; onSignIn() shows the sign-in form. */
+let STRIP = null;
+function courseChoices(cur){
+  const g0 = gate() || {}, a = g0.acct || {}, n = parseInt(String(a.grade || g0.grade || "").replace(/^G/i, ""), 10);
+  return Object.keys(COURSES).filter(k => k !== cur && (isNaN(n) || (k === "cs" ? n >= 6 && n <= 12 : k === "design" ? n >= 6 && n <= 10 : n === 10)));
+}
+function paintStrip(){
+  if (!STRIP) return;
+  const sel = document.getElementById("sdcCourse"), b = document.getElementById("sdcLeave");
+  if (b) b.textContent = STRIP.signedIn ? "Sign out" : "Sign in";
+  if (sel){ const opts = courseChoices(STRIP.c);
+    sel.innerHTML = `<option value="">Change course ▾</option>` + opts.map(k => `<option value="${k}">${esc(COURSES[k].name)}</option>`).join("") + `<option value="__portal">＋ Sign up for a course</option>`; sel.value = ""; }
+}
+function setSignedIn(on){ if (STRIP){ STRIP.signedIn = !!on; paintStrip(); } }
+function strip(c, onSignOut, noLang, mainSel, onSignIn){
   if (document.getElementById("sdcStrip")) return;
   const C = course(c); if (!C) return;
   const d = document.createElement("div"); d.id = "sdcStrip";
   d.setAttribute("style", "background:#0f1c33;color:#fff;font:600 13px/1.3 Arial,Helvetica,sans-serif;padding:6px 14px;display:flex;gap:8px 10px;align-items:center;flex-wrap:wrap;position:fixed;top:0;left:0;right:0;z-index:2147483000;box-shadow:0 1px 4px rgba(0,0,0,.25)");
   d.innerHTML = `<style>@media(max-width:560px){#sdcStrip .sdcHide{display:none}}</style><span style="background:#DC2B3E;border-radius:5px;padding:2px 7px;font-weight:900;letter-spacing:.04em">SISD</span><span class="sdcHide">Design and Computing</span><span class="sdcHide" style="opacity:.6">·</span><span>You are in: <b>${esc(C.name)}</b></span>
-    <span style="margin-left:auto;display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap">${noLang ? "" : langPicker(true)}</span><button type="button" id="sdcLeave" style="background:none;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:999px;padding:3px 10px;font:inherit;cursor:pointer">Change course / sign out</button>`;
+    <span style="margin-left:auto;display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap">${noLang ? "" : langPicker(true)}</span><select id="sdcCourse" aria-label="Change course" title="Go to another of your courses" style="background:#0f1c33;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:999px;padding:3px 8px;font:inherit;cursor:pointer;max-width:200px"></select><button type="button" id="sdcLeave" style="background:#DC2B3E;border:1px solid #DC2B3E;color:#fff;border-radius:999px;padding:3px 12px;font:inherit;font-weight:800;cursor:pointer">Sign out</button>`;
   document.body.insertBefore(d, document.body.firstChild); bindPickers(); setTimeout(showFeedbackButton, 1500);
   const rp = document.getElementById("sdcReadPage");
   if (rp) rp.onclick = () => { const m = [...document.querySelectorAll(mainSel || "main, #app")].find(e => e.offsetParent !== null) || document.body; readEl(m, rp); };
@@ -702,10 +719,21 @@ function strip(c, onSignOut, noLang, mainSel){
   sticky.forEach(e => e.classList.add("sdc-under"));
   const fit = () => { const h = Math.ceil(d.getBoundingClientRect().height); css.textContent = `body{padding-top:${h}px!important}.sdc-under{top:${h}px!important}html{scroll-padding-top:${h + 70}px}`; };
   fit(); try { new ResizeObserver(fit).observe(d); } catch(e){ window.addEventListener("resize", fit); }
-  document.getElementById("sdcLeave").onclick = () => { if (onSignOut) onSignOut(); else leave("out"); };
+  STRIP = { c, signedIn:false, onSignOut, onSignIn };
+  paintStrip();
+  document.getElementById("sdcLeave").onclick = () => {
+    if (STRIP.signedIn){ if (onSignOut) onSignOut(); else leave("out"); return; }
+    if (onSignIn) onSignIn(); else { patchGate({ mode:"signin" }); location.reload(); }
+  };
+  document.getElementById("sdcCourse").onchange = e => {
+    const to = e.target.value; if (!to) return;
+    if (STRIP.signedIn && onSignOut){ try { onSignOut(true); } catch(x){} }   // save and sign out of this course first
+    if (to === "__portal"){ leave(""); return; }
+    setGate({ mode:"signin", course:to }); location.href = COURSES[to].app;
+  };
 }
 function signedOutNotice(msg, kind){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg, kind: kind || "bad" })); } catch(e){} }
 
 return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
-  log, task, strip, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
+  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();
