@@ -361,7 +361,7 @@ async function confirm(a, signup){
    New accounts (students and staff) must click a link sent to their @sisd.ae email before they can get in.
    The email is sent by the school's verification script (Google Apps Script). Accounts made before
    verification was switched on (VERIFY.since) keep working. Off while VERIFY.url is empty. */
-const VERIFY = { url: "", since: "" };
+const VERIFY = { url: "https://script.google.com/macros/s/AKfycbzYaxjHSKBzuhLJ3nkL7Qqb2BNL6nFHy7ojFnMTb_D2ZE5LbYRY2VnL5F_6gPGEbtqjsQ/exec", since: "2026-11-03T03:24:00Z" };
 const verifyOn = () => !!VERIFY.url && !offline();
 const sinceMs = () => Date.parse(VERIFY.since) || 0;
 function jsonp(params, timeout){
