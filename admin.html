@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261103g"></script>
+<script src="/python-pathways/pp-sync.js?v=20261103h"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261103g"></script>
+<script src="sdc.js?v=20261103h"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -59,6 +59,7 @@ input.t:focus,select.t:focus{outline:none;border-color:var(--navy)}
 .tbl td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
 .tbl tr:hover td{background:color-mix(in srgb,var(--soft) 60%,transparent)}
 .scroll{overflow-x:auto}
+.acts{display:flex;flex-wrap:wrap;gap:6px;min-width:230px;max-width:330px}
 .pill{display:inline-block;border-radius:999px;padding:1px 9px;font-size:.78rem;font-weight:800;background:var(--soft);white-space:nowrap}
 .pill.cs{background:#e3e9f6;color:#1B2D4E} .pill.design{background:#fbe5e8;color:#A3172A} .pill.it{background:#e3f4ea;color:#1E6B45}
 @media (prefers-color-scheme: dark){.pill.cs{background:#22375E;color:#cfe0ff}.pill.design{background:#4a1c25;color:#ffc2cb}.pill.it{background:#143326;color:#9be3bd}}
@@ -141,7 +142,7 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
     <section id="t-students">
       <div class="card">
         <h2><span id="stTitle">Students</span> <span class="n" id="stCount">0</span></h2>
-        <p class="muted small" style="margin-top:4px" id="stIntro">Open a student to see their progress and send them feedback. Only the super admin can change a student's course, grade, level or teacher.</p>
+        <p class="muted small" style="margin-top:4px" id="stIntro">Open a student to see their progress and send them feedback. Press <b>✏️ Change course</b> to change a student's course, grade, level or teacher.</p>
         <div id="stWarn"></div>
         <div class="row" style="margin-top:12px"><input class="t" id="stQ" placeholder="Search name or email" style="max-width:280px">
           <select class="t" id="stC" style="max-width:190px"><option value="">All courses</option><option value="cs">Computer Science</option><option value="design">Design</option><option value="it">IT</option></select>
@@ -748,7 +749,7 @@ function renderStudents(){
       <td>${pill(s.course)}</td><td>${s.grade ? "G" + esc(s.grade) : ""}</td><td>${esc(s.course === "cs" ? levelName("cs", s.level) : s.cls || "")}</td><td>${esc(s.teacher || "")}</td>
       <td class="small">${progressCell(s)}</td>
       <td class="small">${s.active || s.last ? esc(fmtDT(s.active || s.last)) : "<span class='muted'>—</span>"}</td>
-      <td style="white-space:nowrap"><button class="btn sm" data-pr="${i}">Progress &amp; feedback</button>${s.course === "cs" ? ` <button class="btn ghost sm" data-vp="${i}" title="Show or hide this student's PIN">👁 PIN</button> <button class="btn ghost sm" data-pin="${i}">🔑 Reset PIN</button>` : ""}${isSuper() || TKEY ? ` <button class="btn ghost sm" data-ed="${i}" title="Change course, grade, level or teacher">✏️ Change course</button>` : ""}${isSuper() ? delBtn(s, i) : ""}</td></tr>`).join("")
+      <td><div class="acts">${isSuper() || TKEY ? `<button class="btn sm" data-ed="${i}" title="Change course, grade, level or teacher">✏️ Change course</button>` : ""}<button class="btn ghost sm" data-pr="${i}">Progress &amp; feedback</button>${s.course === "cs" ? `<button class="btn ghost sm" data-vp="${i}" title="Show or hide this student's PIN">👁 PIN</button><button class="btn ghost sm" data-pin="${i}">🔑 Reset PIN</button>` : ""}${isSuper() ? delBtn(s, i) : ""}</div></td></tr>`).join("")
       : `<tr><td colspan="8" class="muted">${isSuper() ? "No students yet. They appear here after signing in through the platform." : "No students have chosen you as their teacher yet."}</td></tr>`);
   $("stTbl").querySelectorAll("[data-ed]").forEach(b => b.onclick = () => editStudent(list[+b.dataset.ed]));
   $("stTbl").querySelectorAll("[data-pr]").forEach(b => b.onclick = () => openProgress(list[+b.dataset.pr]));
