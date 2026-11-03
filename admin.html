@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261103s"></script>
+<script src="/python-pathways/pp-sync.js?v=20261103t"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261103s"></script>
+<script src="sdc.js?v=20261103t"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -104,7 +104,7 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
     <div id="l-request" class="hidden">
       <p class="muted small">Teachers ask once. The super admin approves you and chooses which classes you see. The same email and password also work in the Design teacher tools.</p>
       <label class="f" for="rName">Your full name</label><input class="t" id="rName" autocomplete="name" placeholder="First and last name">
-      <label class="f" for="rAs">Name students pick when they sign up</label><input class="t" id="rAs" placeholder="e.g. Mr. Ahmed" list="knownTeachers"><datalist id="knownTeachers"></datalist>
+      <datalist id="knownTeachers"></datalist>
       <label class="f" for="rEmail">School email</label><input class="t" id="rEmail" type="email" autocomplete="username" placeholder="firstname.lastname@sisd.ae">
       <label class="f" for="rPw">Choose a password</label><input class="t" id="rPw" type="password" autocomplete="new-password">
       <label class="f" for="rPw2">Type it again</label><input class="t" id="rPw2" type="password" autocomplete="new-password">
@@ -429,9 +429,11 @@ async function postRequest(req){
   await gfSend(f ? `https://docs.google.com/forms/d/${f[1] || ""}${f[2]}/formResponse` : SDC.CONTROL.form, p);
 }
 $("rGo").onclick = async () => {
-  const name = $("rName").value.trim().replace(/\s+/g, " "), as = $("rAs").value.trim().replace(/\s+/g, " "), email = $("rEmail").value.trim().toLowerCase(), pw = $("rPw").value;
+  const name = $("rName").value.trim().replace(/\s+/g, " "), email = $("rEmail").value.trim().toLowerCase(), pw = $("rPw").value;
   if (name.split(" ").length < 2) return note("rMsg", "bad", "Type your first and last name.");
-  if (!as) return note("rMsg", "bad", "Type the name students pick for you, e.g. Mr. Ahmed.");
+  // the name students see is not typed by the teacher: it is the school's existing name for them (matched on surname),
+  // otherwise their own name until the super admin sets it when approving. This stops one teacher appearing twice.
+  const known = [...new Set(Object.values(TEACHERS).flat())], as = known.find(k => SDC.sameTeacher(k, name)) || name;
   if (!SCHOOL.test(email)) return note("rMsg", "bad", "Use your full SISD email address.");
   if (pw.length < 10 || !/[a-z]/i.test(pw) || !/\d/.test(pw)) return note("rMsg", "bad", "Use at least 10 characters with letters and a number.");
   if (pw !== $("rPw2").value) return note("rMsg", "bad", "The two passwords don't match.");
@@ -441,7 +443,7 @@ $("rGo").onclick = async () => {
     await postRequest({ email, name: as, full: name, as, salt:h.salt, hash:h.hash, t:new Date().toISOString(), pub:k.pub, wpriv:k.wpriv });
     SDC.log("staffrequest", { name, email, course:"" }, { as });
     SDC.notifyRequest({ email, name, as, where:"Staff dashboard" });   // emails the super admin straight away
-    ["rName","rAs","rEmail","rPw","rPw2"].forEach(id => $(id).value = "");
+    ["rName","rEmail","rPw","rPw2"].forEach(id => $(id).value = "");
     if (SDC.verifyOn() && !(SDC.VERIFY.mode === "approve")){ const v = await SDC.startVerify(email, "staff");
       note("rMsg", "ok", "Request sent. " + SDC.verifyMsg(email, v) + " The super admin can approve you once your email is verified."); }
     else note("rMsg", "ok", "Request sent. Once the super admin approves it, sign in on the <b>Teacher</b> tab.");
@@ -923,13 +925,12 @@ async function renderTeachers(){
   const vcell = e => !SDC.verifyOn() || SDC.VERIFY.mode === "approve" ? "" : VSTAT[e] === true ? `<div><span class="pill ok">✓ email verified</span></div>` : VSTAT[e] === false ? `<div><span class="pill warn">email not verified</span> <button class="btn ghost sm" data-vs="${esc(e)}">Send verification email</button></div>` : "";
   $("tqCount").textContent = P.length;
   $("tqTbl").innerHTML = `<tr><th>Teacher</th><th>Email</th><th>Students pick them as</th><th>Requested</th><th></th></tr>` + (P.length ? P.map((r, i) => `<tr><td><b>${esc(r.full || r.name)}</b>${vcell(r.email)}${r.access ? `<div class="em">already approved: asking for dashboard access</div>` : ""}${r.pub ? "" : `<div class="em">requested in the Design course: dashboard data needs a request from this page</div>`}</td><td>${esc(r.email)}</td>
-      <td><input class="t" data-as="${i}" value="${esc(r.as || r.name)}" list="knownTeachers" style="min-width:150px"><div class="em">Separate several names with commas</div></td><td class="small">${esc(r.t ? fmtDT(Date.parse(r.t)) : "")}</td>
+      <td><input class="t" data-as="${i}" value="${esc([...new Set(Object.values(TEACHERS).flat())].find(k => SDC.sameTeacher(k, r.full || r.name)) || r.as || r.name)}" list="knownTeachers" style="min-width:150px"><div class="em">Separate several names with commas</div></td><td class="small">${esc(r.t ? fmtDT(Date.parse(r.t)) : "")}</td>
       <td style="white-space:nowrap"><button class="btn sm" data-ok="${i}" ${SDC.verifyOn() && !(SDC.VERIFY.mode === "approve") && VSTAT[r.email] !== true && !r.access ? 'title="Waiting for the teacher to verify their SISD email"' : ""}>Approve</button> <button class="btn ghost sm" data-no="${i}">Decline</button></td></tr>`).join("") : `<tr><td colspan="5" class="muted">No requests.</td></tr>`);
   $("taCount").textContent = STATE.teachers.length;
-  $("taTbl").innerHTML = `<tr><th>Teacher</th><th>Email</th><th>Sees students who chose</th><th>In students' sign-up list</th><th>Dashboard</th><th></th></tr>` + (STATE.teachers.length ? STATE.teachers.map((t, i) => `<tr><td><b>${esc(t.full || t.name)}</b>${vcell(t.email)}</td><td>${esc(t.email)}</td>
-      <td><input class="t" data-nm="${i}" value="${esc((t.names && t.names.length ? t.names : [t.name]).join(", "))}" style="min-width:150px"></td>
-      <td><label class="small" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" data-pk="${i}"${t.pick === false ? "" : " checked"}> ${t.pick === false ? "hidden" : "shown"}</label><div class="em">Untick so students can't pick ${esc(t.name)} when signing up</div></td><td>${t.cfg ? "<span class='pill ok'>connected</span>" : t.pub ? "<span class='pill warn'>press Save setup</span>" : "<span class='pill warn'>waiting for their first sign-in here</span>"}</td>
-      <td style="white-space:nowrap"><button class="btn sm" data-sv="${i}">Save</button> <button class="btn ghost sm" data-rm="${i}">Remove access</button></td></tr>`).join("") : `<tr><td colspan="6" class="muted">No teacher admins yet.</td></tr>`);
+  $("taTbl").innerHTML = `<tr><th>Teacher</th><th>Email</th><th>Sees students who chose</th><th>Dashboard</th><th></th></tr>` + (STATE.teachers.length ? STATE.teachers.map((t, i) => `<tr><td><b>${esc(t.full || t.name)}</b>${vcell(t.email)}</td><td>${esc(t.email)}</td>
+      <td><input class="t" data-nm="${i}" value="${esc((t.names && t.names.length ? t.names : [t.name]).join(", "))}" style="min-width:150px"></td><td>${t.cfg ? "<span class='pill ok'>connected</span>" : t.pub ? "<span class='pill warn'>press Save setup</span>" : "<span class='pill warn'>waiting for their first sign-in here</span>"}</td>
+      <td style="white-space:nowrap"><button class="btn sm" data-sv="${i}">Save</button> <button class="btn ghost sm" data-rm="${i}">Remove access</button></td></tr>`).join("") : `<tr><td colspan="5" class="muted">No teacher admins yet.</td></tr>`);
   const done = (ok, what) => { $("taMsg").innerHTML = `<div class="notice ${ok ? "ok" : "bad"}">${ok ? esc(what) + " Teachers' computers update within about 5 minutes." : "Google Forms couldn't be reached. Try again."}</div>`; renderTeachers(); };
   document.querySelectorAll("#t-teachers [data-vs]").forEach(b => b.onclick = async () => { b.disabled = true; const r = await SDC.startVerify(b.dataset.vs, "staff");
     toast(r && r.ok ? (r.already ? "Already verified." : "Verification email sent.") : r && r.reason === "wait" ? "An email was sent in the last hour. Ask them to check Junk." : "Couldn't send it just now."); });
@@ -946,8 +947,8 @@ async function renderTeachers(){
   $("tqTbl").querySelectorAll("[data-no]").forEach(b => b.onclick = async () => { const r = P[+b.dataset.no]; b.disabled = true;
     done(await publishCourseState(Object.assign({}, STATE, { declined: [...new Set(STATE.declined.concat([r.email]))] })), "Declined."); });
   $("taTbl").querySelectorAll("[data-sv]").forEach(b => b.onclick = async () => { const i = +b.dataset.sv, nm = names($("taTbl").querySelector(`[data-nm="${i}"]`).value); if (!nm.length) return toast("Type at least one name.");
-    b.disabled = true; const pick = $("taTbl").querySelector(`[data-pk="${i}"]`).checked;
-    const teachers = STATE.teachers.map((t, k) => k === i ? Object.assign({}, t, { name:nm[0], names:nm, pick }) : t);
+    b.disabled = true;
+    const teachers = STATE.teachers.map((t, k) => { if (k !== i) return t; const x = Object.assign({}, t, { name:nm[0], names:nm }); delete x.pick; return x; });
     done(await publishCourseState(Object.assign({}, STATE, { teachers })), "Saved."); });
   $("taTbl").querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => { const t = STATE.teachers[+b.dataset.rm]; if (!confirmBox("Remove " + t.name + "'s access? They can no longer sign in to the dashboard or Design teacher tools.")) return;
     b.disabled = true; done(await publishCourseState(Object.assign({}, STATE, { teachers: STATE.teachers.filter(x => x.email !== t.email), declined: [...new Set(STATE.declined.concat([t.email]))] })), "Removed."); });

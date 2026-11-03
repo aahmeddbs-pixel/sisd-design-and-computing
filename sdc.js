@@ -264,10 +264,10 @@ const surname = n => String(n || "").toLowerCase().replace(/[^a-z\s'-]/g, " ").t
 function sameTeacher(a, b){ const x = surname(a), y = surname(b); return !!x && x === y; }
 /* teachers the super admin took out of the students' sign-up list (built-in names included) */
 async function hiddenTeacherNames(){
-  try { const { state } = await loadState(); return ((state && state.teachers) || []).filter(t => t.pick === false).flatMap(t => (t.names && t.names.length ? t.names : [t.name])).filter(Boolean); } catch(e){ return []; }
+  return [];   // no longer used: every approved teacher can be chosen
 }
 async function teacherNames(){
-  try { const { state } = await loadState(); return ((state && state.teachers) || []).filter(t => t.pick !== false).map(t => t.name).filter(Boolean); } catch(e){ return []; }
+  try { const { state } = await loadState(); return ((state && state.teachers) || []).map(t => t.name).filter(Boolean); } catch(e){ return []; }
 }
 
 /* ---------- teacher feedback to students ----------
