@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261103w"></script>
+<script src="/python-pathways/pp-sync.js?v=20261103x"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261103w"></script>
+<script src="sdc.js?v=20261103x"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -151,6 +151,7 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
           <select class="t" id="stK" style="max-width:240px"><option value="">All classes</option></select>
           <select class="t" id="stCr" style="max-width:150px" title="Criterion for the class feedback PDF"><option value="">Latest criterion</option><option>A</option><option>B</option><option>C</option><option>D</option></select>
           <button class="btn ghost sm" id="stPdf" title="One PDF with every listed student's feedback">📄 Class feedback (PDF)</button>
+          <button class="btn sm" id="stPdfAll" title="Every criterion each of your students has worked on, one page each">⬇ Download all feedback (PDF)</button>
           <button class="btn ghost sm" id="stAdd" data-super>＋ Set up a student by email</button></div>
         <div class="scroll" style="margin-top:12px"><table class="tbl" id="stTbl"></table></div>
       </div>
@@ -1007,7 +1008,7 @@ async function openProgress(s){
   hist();
   q("#fGo").onclick = async () => {
     const fb = { course: s.course, about: q("#fAbout").value, s: q("#fS").value.trim(), i: q("#fI").value.trim(), n: q("#fN").value.trim(), from: q("#fFrom").value.trim().slice(0, 60) };
-    if (q("#fLvl") && q("#fLvl").value !== "") fb.lvl = q("#fLvl").value;   // the automatic level
+    // the automatic level is for staff only: it is not sent to the student
     if (!fb.s && !fb.i && !fb.n) return q("#fMsg").innerHTML = `<div class="notice bad">Write at least one section first.</div>`;
     q("#fGo").disabled = true;
     try { await SDC.sendFeedback({ email:s.email, name:s.name }, fb);
@@ -1102,6 +1103,18 @@ $("swGo").onclick = async () => { $("swGo").disabled = true;
   $("swMsg").innerHTML = `<div class="notice ${ok ? "ok" : "bad"}">${ok ? "Applied. Students see the change within about 5 minutes." : "Google Forms couldn't be reached. Try again."}</div>`; $("swGo").disabled = false; };
 
 $("stQ").oninput = renderStudents; $("stC").onchange = renderStudents; $("stK").onchange = renderStudents;
+$("stPdfAll").onclick = async () => {   // every student this teacher can see, every criterion they have work in
+  const list = students(); if (!list.length) return toast("No students yet.");
+  const items = [];
+  list.forEach(s => { if (s.course === "cs"){ items.push({ s, c:"", fb:autoNotes(s, "") }); return; }
+    const crits = s.ds ? Object.keys(s.ds.work).sort() : [];
+    if (!crits.length) items.push({ s, c:"", fb:{ s:"", i:"", n:"No Design work has been saved yet." } });
+    crits.forEach(c => items.push({ s, c, fb:autoNotes(s, "Criterion " + c) })); });
+  $("stPdfAll").disabled = true; toast("Making the PDF: " + items.length + " page" + (items.length === 1 ? "" : "s") + "…");
+  try { await downloadFeedbackPDF(items, ("All-feedback-" + (isSuper() ? "all-students" : (ME && ME.name) || "teacher") + "-" + new Date().toISOString().slice(0, 10)).replace(/[^\w-]+/g, "-") + ".pdf"); }
+  catch(e){ toast(e.message); }
+  $("stPdfAll").disabled = false;
+};
 $("stPdf").onclick = async () => {
   const q = $("stQ").value.trim().toLowerCase(), cf = $("stC").value, k = $("stK").value, cr = $("stCr").value;
   const list = students().filter(s => (!cf || s.course === cf) && (!q || (s.name + " " + (s.email || "")).toLowerCase().indexOf(q) >= 0) && (!k || classKey(s) === k));
