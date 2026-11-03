@@ -408,6 +408,10 @@ async function notifyRequest(r){ if (!VERIFY.url || offline()) return false;
   try { const x = await jsonp({ a:"notify", k:"teacher-request", e:normEmail(r.email), n:String(r.name || "").slice(0, 80), as:String(r.as || "").slice(0, 60), w:String(r.where || "").slice(0, 40) }, 20000); return !!(x && x.ok); } catch(e){ return false; } }
 async function startVerify(email, kind){ try { return await jsonp({ a:"start", e:normEmail(email), k:kind || "student" }, 30000); } catch(e){ return { ok:false, reason:"reach" }; } }
 function verifyMsg(email, r){
+  const m = verifyMsg0(email, r);
+  return r && (r.reason === "domain" || (r.ok && r.already)) ? m : m + ` <br><b>No email after a few minutes?</b> Ask your teacher to let you in: they can do it from their dashboard.`;
+}
+function verifyMsg0(email, r){
   const e = `<b>${esc(normEmail(email))}</b>`;
   if (r && r.ok && r.sent) return `📧 <b>Check your SISD email.</b> We've sent a verification link to ${e}. Open it, press <b>Verify my email</b>, then come back and sign in. (Check your Junk folder if you can't see it.)`;
   if (r && r.ok && r.already) return `Your email is verified. Please sign in again.`;

@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261103p"></script>
+<script src="/python-pathways/pp-sync.js?v=20261103q"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261103p"></script>
+<script src="sdc.js?v=20261103q"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -1040,10 +1040,13 @@ function editStudent(s){
 /* ---------------- sign-in log ---------------- */
 function renderLog(){
   const f = $("lgF").value;
-  const list = ROWS.filter(r => ["signin","signup","wrongcourse","unverified"].indexOf(r.type) >= 0 && (!f || r.type === f) && canSee(r.acct.teacher)).slice().reverse().slice(0, 400);
+  // repeated "waiting to verify" attempts by the same student show once (the latest), with how many times they tried
+  const tries = {};
+  const list = ROWS.filter(r => ["signin","signup","wrongcourse","unverified"].indexOf(r.type) >= 0 && (!f || r.type === f) && canSee(r.acct.teacher)).slice().reverse()
+    .filter(r => { if (r.type !== "unverified") return true; const k = SDC.keyOf(r.acct.email, r.acct.name); tries[k] = (tries[k] || 0) + 1; if (tries[k] > 1) return false; r._k = k; return true; }).slice(0, 400);
   $("lgCount").textContent = list.length;
   const what = r => r.type === "wrongcourse" ? `<span class="pill bad">⛔ Stopped</span> tried ${esc(C[r.acct.course] ? C[r.acct.course].name : r.acct.course)}${r.registered ? `, registered for <b>${esc(C[r.registered] ? C[r.registered].name : r.registered)}</b>` : r.reason === "grade" ? " (not Grade 10)" : ""}${r.signup ? " (sign-up)" : ""}`
-    : r.type === "signup" ? `<span class="pill ok">New</span> signed up` : r.type === "unverified" ? `<span class="pill warn">⏳ Not in yet</span> waiting for them to verify their email${r.signup ? " (just signed up)" : ""}` : `signed in${r.unchecked ? ` <span class="pill warn">offline: not checked</span>` : ""}`;
+    : r.type === "signup" ? `<span class="pill ok">New</span> signed up` : r.type === "unverified" ? `<span class="pill warn">⏳ Not in yet</span> waiting for them to verify their email${tries[r._k] > 1 ? ` (tried ${tries[r._k]} times)` : ""}` : `signed in${r.unchecked ? ` <span class="pill warn">offline: not checked</span>` : ""}`;
   $("lgTbl").innerHTML = `<tr><th>When</th><th>Student</th><th>Course chosen</th><th>What happened</th></tr>` +
     (list.length ? list.map(r => `<tr><td class="small">${esc(fmtDT(r.when))}</td><td><b>${esc(r.acct.name || "Unknown")}</b><div class="em">${esc([r.acct.email, r.acct.grade ? "G" + r.acct.grade : "", r.acct.teacher].filter(Boolean).join(" · "))}</div></td><td>${pill(r.acct.course)}</td><td>${what(r)}</td></tr>`).join("")
       : `<tr><td colspan="4" class="muted">No sign-ins yet.</td></tr>`);
