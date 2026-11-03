@@ -39,6 +39,7 @@ function doGet(e){
     const m = {}; String(p.list || "").toLowerCase().split(",").slice(0, 60).forEach(x => { x = x.trim(); if (x) m[x] = isVerified_(x); });
     return out_(e, m);
   }
+  if (a === "notify") return out_(e, notify_(p));
   if (a === "start"){
     const lock = LockService.getScriptLock(); lock.waitLock(20000);
     try { return out_(e, start_(email, String(p.k || "student").slice(0, 20))); } finally { lock.releaseLock(); }
@@ -66,6 +67,35 @@ function start_(email, kind){
       '<p><a href="' + link + '" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Verify my email</a></p>' +
       '<p>Then go back to the sign-in page and sign in. The link works for ' + LINK_HOURS + ' hours.</p>' +
       '<p style="color:#5B6782;font-size:13px">If you did not sign up, ignore this email: nothing will happen.</p></div>'
+  });
+  return { ok: true, sent: true };
+}
+
+/* a teacher asked for staff access: email the owner of this script (you) straight away */
+function notify_(p){
+  if (String(p.k || "") !== "teacher-request") return { ok: false, reason: "unknown" };
+  const email = String(p.e || "").trim().toLowerCase().slice(0, 120);
+  if (!DOMAIN.test(email)) return { ok: false, reason: "domain" };
+  const cache = CacheService.getScriptCache(), n = +(cache.get("notify-count") || 0);
+  if (n >= 15) return { ok: false, reason: "wait" };                 // at most 15 emails an hour
+  if (cache.get("notify:" + email)) return { ok: true, already: true };   // one email per teacher per 6 hours
+  cache.put("notify-count", String(n + 1), 3600); cache.put("notify:" + email, "1", 21600);
+  const h = s => String(s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const name = String(p.n || "").slice(0, 80), as = String(p.as || "").slice(0, 60), where = String(p.w || "").slice(0, 40);
+  const admin = SITE + "admin.html";
+  MailApp.sendEmail({
+    to: Session.getEffectiveUser().getEmail(), name: "SISD Design and Computing",
+    subject: "New teacher access request: " + (name || email),
+    htmlBody: '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#16223A;max-width:520px">' +
+      '<div style="background:#1B2D4E;color:#fff;padding:14px 18px;border-bottom:4px solid #DC2B3E;font-weight:bold">SISD Design and Computing</div>' +
+      '<p>A teacher has asked for staff access:</p><table style="font-size:15px">' +
+      '<tr><td style="color:#5B6782;padding-right:12px">Name</td><td><b>' + h(name) + '</b></td></tr>' +
+      '<tr><td style="color:#5B6782;padding-right:12px">Email</td><td>' + h(email) + '</td></tr>' +
+      (as ? '<tr><td style="color:#5B6782;padding-right:12px">Students see</td><td>' + h(as) + '</td></tr>' : '') +
+      (where ? '<tr><td style="color:#5B6782;padding-right:12px">Asked from</td><td>' + h(where) + '</td></tr>' : '') +
+      '<tr><td style="color:#5B6782;padding-right:12px">When</td><td>' + h(new Date().toLocaleString("en-GB", { timeZone: "Asia/Dubai" })) + '</td></tr></table>' +
+      '<p><a href="' + admin + '" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Open the staff dashboard</a></p>' +
+      '<p style="color:#5B6782;font-size:13px">Sign in as super admin and open the Teachers tab to approve or decline. If you don\'t know this person, decline the request.</p></div>'
   });
   return { ok: true, sent: true };
 }

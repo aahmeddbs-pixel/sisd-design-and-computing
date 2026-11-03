@@ -384,6 +384,9 @@ async function isVerified(email){
   return false;
 }
 async function verifyStatuses(emails){ if (!verifyOn() || !emails.length) return {}; try { return await jsonp({ a:"statuses", list: emails.map(normEmail).slice(0, 60).join(",") }); } catch(e){ return {}; } }
+/* tell the super admin (by email, from the verification script) that a teacher asked for access */
+async function notifyRequest(r){ if (!VERIFY.url || offline()) return false;
+  try { const x = await jsonp({ a:"notify", k:"teacher-request", e:normEmail(r.email), n:String(r.name || "").slice(0, 80), as:String(r.as || "").slice(0, 60), w:String(r.where || "").slice(0, 40) }, 20000); return !!(x && x.ok); } catch(e){ return false; } }
 async function startVerify(email, kind){ try { return await jsonp({ a:"start", e:normEmail(email), k:kind || "student" }, 30000); } catch(e){ return { ok:false, reason:"reach" }; } }
 function verifyMsg(email, r){
   const e = `<b>${esc(normEmail(email))}</b>`;
@@ -676,5 +679,5 @@ function strip(c, onSignOut, noLang, mainSel){
 function signedOutNotice(msg, kind){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg, kind: kind || "bad" })); } catch(e){} }
 
 return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
-  log, task, strip, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
+  log, task, strip, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();
