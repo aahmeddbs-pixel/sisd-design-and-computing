@@ -63,6 +63,7 @@ video{width:100%;border-radius:12px;background:#000;display:block}
       <li>Speak like you're talking to one student: warm, calm and a little slower than normal.</li>
       <li><b>Computer Science videos:</b> the video plays silently while you record. Read each line when it lights up; it stops by itself at the end.</li>
       <li><b>Design and IT videos:</b> read the paragraphs in order at a steady pace, with a short pause between them. Press <b>Next line</b> (or the space bar) to move the highlight, then <b>Stop</b> when you finish.</li>
+      <li>Need a break? Press <b>❚❚ Pause</b>, then <b>▶ Continue</b> when you are ready: the video waits for you, so your voice stays in step.</li>
       <li>Made a mistake? Press <b>Record again</b>. Only the last take is kept.</li></ul></details>
   </div>
   <div class="grid">
@@ -137,7 +138,8 @@ async function liveOnSite(x){
   for (const e of ["webm", "m4a", "mp4", "mp3", "ogg"]){ try { const r = await fetch("/" + x.file + "." + e, { method:"HEAD", cache:"no-store" }); if (r.ok) return e; } catch(err){} }
   return "";
 }
-let state = { rec:null, stream:null, recording:false, audio:null, url:"", line:0, t0:0, tick:null };
+let state = { rec:null, stream:null, recording:false, audio:null, url:"", line:0, t0:0, tick:null, paused:false, pauseAt:0, pausedMs:0 };
+const elapsed = () => (Date.now() - state.t0 - state.pausedMs - (state.paused ? Date.now() - state.pauseAt : 0)) / 1000;
 function stopAll(){
   try { if (state.recording && state.rec) state.rec.stop(); } catch(e){}
   state.recording = false; clearInterval(state.tick);
@@ -153,7 +155,7 @@ function open(x){
     ${isVid ? `<video id="v" playsinline muted preload="metadata" src="${esc(x.video)}" poster="${esc(x.poster || "")}" style="margin-top:12px"></video>` : `<p class="small muted" style="margin-top:10px">This is the introduction video for this criterion. Read all ${lines.length} paragraphs in order.</p>`}
     <div class="count" id="cnt"></div>
     <div class="row" style="margin-top:10px">
-      <button class="btn red" id="rec">● Record</button><button class="btn ghost hidden" id="next">Next line ⏎</button><button class="btn ghost hidden" id="stop">■ Stop</button>
+      <button class="btn red" id="rec">● Record</button><button class="btn ghost hidden" id="next">Next line ⏎</button><button class="btn ghost hidden" id="pause">❚❚ Pause</button><button class="btn ghost hidden" id="stop">■ Stop</button>
       <button class="btn ghost hidden" id="play">▶ Play back</button><button class="btn ghost hidden" id="dl">⬇ Save this file</button><button class="btn ghost hidden" id="del">🗑 Delete</button>
       <button class="btn ghost" id="nxt" style="margin-left:auto">Next script →</button></div>
     <div id="msg" class="small" style="margin-top:8px;font-weight:700"></div>
@@ -168,11 +170,27 @@ function open(x){
     ["play", "dl", "del"].forEach(id => $(id).classList.toggle("hidden", !r)); $("rec").textContent = r ? "● Record again" : "● Record"; };
   paint();
   liveOnSite(x).then(e => { if (cur !== x) return; $("live").textContent = e ? "Your voice is live on the site" : "Students hear the computer voice"; $("live").className = "pill" + (e ? " ok" : ""); });
-  const finish = () => { if (!state.recording) return; state.recording = false; clearInterval(state.tick); $("cnt").textContent = ""; try { state.rec.stop(); } catch(e){} if (v) v.pause(); $("stop").classList.add("hidden"); $("next").classList.add("hidden"); };
+  const finish = () => { if (!state.recording) return; if (state.paused){ state.pausedMs += Date.now() - state.pauseAt; state.paused = false; }
+    state.secs = elapsed(); state.recording = false; clearInterval(state.tick); $("cnt").textContent = ""; try { state.rec.stop(); } catch(e){} if (v) v.pause(); ["stop", "next", "pause"].forEach(id => $(id).classList.add("hidden")); };
+  /* pause midway and carry on later: the recording and the video stop together, so they stay in step */
+  $("pause").onclick = async () => {
+    if (!state.recording) return;
+    if (!state.paused){
+      try { state.rec.pause(); } catch(e){} if (v) v.pause();
+      state.paused = true; state.pauseAt = Date.now(); $("pause").textContent = "▶ Continue";
+      msg("⏸ Paused. Take your time. Press <b>Continue</b> when you're ready" + (v ? ": the video carries on from the same moment." : "."));
+      return;
+    }
+    $("pause").disabled = true;
+    for (const n of ["3", "2", "1"]){ $("cnt").textContent = n; await new Promise(r => setTimeout(r, 700)); if (cur !== x || !state.recording) return; }
+    state.pausedMs += Date.now() - state.pauseAt; state.paused = false;
+    try { state.rec.resume(); } catch(e){} if (v) v.play().catch(() => {});
+    $("pause").disabled = false; $("pause").textContent = "❚❚ Pause"; msg("🔴 Recording again…");
+  };
   if (v) v.addEventListener("ended", finish);
   $("stop").onclick = finish;
   $("next").onclick = () => { if (!v && state.recording) mark(Math.min(lines.length - 1, state.line + 1)); };
-  document.onkeydown = e => { if (e.code === "Space" && state.recording && !v && e.target === document.body){ e.preventDefault(); $("next").click(); } };
+  document.onkeydown = e => { if (e.code === "Space" && state.recording && !state.paused && !v && e.target === document.body){ e.preventDefault(); $("next").click(); } };
   $("rec").onclick = async () => {
     if (!window.MediaRecorder || !navigator.mediaDevices){ msg("This browser can't record sound. Use Chrome or Edge on a laptop."); return; }
     stopAll(); msg("");
@@ -182,7 +200,7 @@ function open(x){
     rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
     rec.onstop = async () => {
       state.stream.getTracks().forEach(t => t.stop());
-      const type = rec.mimeType || mime || "audio/webm", blob = new Blob(chunks, { type }), secs = (Date.now() - state.t0) / 1000;
+      const type = rec.mimeType || mime || "audio/webm", blob = new Blob(chunks, { type }), secs = state.secs || elapsed();
       if (secs < 2){ msg("That was too short to keep. Press Record and read the script."); return; }
       const val = { blob, ext: extOf(type), at: Date.now(), secs };
       try { await dbPut(x.file, val); REC[x.file] = val; } catch(e){ REC[x.file] = val; msg("Saved for now, but this browser couldn't keep it after closing. Press Save all before you leave."); }
@@ -192,11 +210,12 @@ function open(x){
     $("rec").disabled = true; ["play", "dl", "del"].forEach(id => $(id).classList.add("hidden"));
     if (v){ v.muted = true; v.pause(); v.currentTime = 0; } mark(0);
     for (const n of ["3", "2", "1"]){ $("cnt").textContent = n; await new Promise(r => setTimeout(r, 800)); if (cur !== x) return; }
-    $("cnt").textContent = ""; state.recording = true; state.t0 = Date.now(); rec.start(250);
+    $("cnt").textContent = ""; state.recording = true; state.t0 = Date.now(); state.paused = false; state.pausedMs = 0; state.secs = 0; rec.start(250);
     if (v){ v.play().catch(() => {}); msg("🔴 Recording… read each line as it lights up. It stops by itself at the end of the video."); }
     else { $("next").classList.remove("hidden"); msg("🔴 Recording… read the highlighted paragraph, then press <b>Next line</b> (or the space bar). Press <b>Stop</b> when you've finished."); }
-    $("stop").classList.remove("hidden");
-    state.tick = setInterval(() => { if (state.recording && cur === x) $("cnt").innerHTML = `<span style="font-size:1.1rem;color:var(--red)">⏺ ${fmt((Date.now() - state.t0) / 1000)}</span>`; }, 500);
+    $("stop").classList.remove("hidden"); $("pause").classList.remove("hidden"); $("pause").textContent = "❚❚ Pause"; $("pause").disabled = false;
+    state.tick = setInterval(() => { if (state.recording && !state.paused && cur === x && !/^[123]$/.test($("cnt").textContent)) $("cnt").innerHTML = `<span style="font-size:1.1rem;color:var(--red)">⏺ ${fmt(elapsed())}</span>`;
+      else if (state.paused && cur === x) $("cnt").innerHTML = `<span style="font-size:1.1rem;color:var(--muted)">⏸ ${fmt(elapsed())}</span>`; }, 500);
   };
   $("play").onclick = () => {
     const r = REC[x.file]; if (!r) return;
@@ -218,7 +237,7 @@ $("zipAll").onclick = async () => {
     a.href = u; a.download = "sisd-voice-recordings-" + new Date().toISOString().slice(0, 10) + ".zip"; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(u); a.remove(); }, 2000); }
   finally { $("zipAll").textContent = "⬇ Save all my recordings (one zip file)"; $("zipAll").disabled = false; }
 };
-Promise.all([fetch("voice-scripts.json?v=20261103e", { cache:"no-store" }).then(r => r.json()), dbAll().catch(() => ({}))]).then(([items, rec]) => {
+Promise.all([fetch("voice-scripts.json?v=20261103f", { cache:"no-store" }).then(r => r.json()), dbAll().catch(() => ({}))]).then(([items, rec]) => {
   ITEMS = items; REC = rec; renderList(); open(ITEMS.find(x => !REC[x.file]) || ITEMS[0]);
 }).catch(() => { $("progTxt").textContent = "The scripts couldn't be loaded. Check the internet connection and refresh."; });
 window.addEventListener("beforeunload", () => stopAll());
