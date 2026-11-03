@@ -374,9 +374,10 @@ async function confirm(a, signup){
     }
     A = null; if (L.reg && L.reg.ver <= L.assign.at) L.reg = null;   // a new account made after the deletion: start fresh
   }
+  const both = !!(A && A.also && (A.also === c || A.c === c));   // set up for both courses (Computer Science + Design)
   if (A && A.c !== c && (A.also === c || bothOk(A.c, c, a.grade, A.g, g && g.grade))) A = null;   // approved for both: this change was for the other course   // also taking the other course: fine, the change was for that one
   if (A && A.c !== c){ log("wrongcourse", Object.assign({}, a, { course:c }), { registered:A.c, byAdmin:true }); return { ok:false, msg:MSG.other(A.c, true), registered:A.c }; }
-  if (!A && L.reg && L.reg.c !== c && bothOk(L.reg.c, c, a.grade, L.reg.g, g && g.grade)){ /* Grade 6–8: registered for both is allowed */ }
+  if (!A && L.reg && L.reg.c !== c && (both || bothOk(L.reg.c, c, a.grade, L.reg.g, g && g.grade))){ /* Grade 6–8: registered for both is allowed */ }
   else if (!A && L.reg && L.reg.c !== c){ log("wrongcourse", Object.assign({}, a, { course:c }), { registered:L.reg.c }); return { ok:false, msg:MSG.other(L.reg.c, false), registered:L.reg.c }; }
   if (!L.reg) register(a.email, a.name, c, (A && A.g) || a.grade);
   // only accounts made after verification was switched on must verify (judged by when the account was made,

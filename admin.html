@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261103z"></script>
+<script src="/python-pathways/pp-sync.js?v=20261104a"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261103z"></script>
+<script src="sdc.js?v=20261104a"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -742,24 +742,33 @@ function renderHP(){
 }
 
 /* ---------------- students ---------------- */
+/* one row per student per course: a student taking Computer Science and Design has two rows, each with that course's progress */
 function students(){
-  const S = {};
-  Object.keys(PYACCTS).forEach(k => { S[k] = Object.assign({ key:k, last:0, signins:0 }, PYACCTS[k]); });
+  const S = {}, csOf = c => c === "cs" ? "cs" : c === "it" ? "it" : c ? "design" : "";
+  const rec = (k, c) => { const id = k + "#" + c; return S[id] = S[id] || { key:k, course:c, last:0, signins:0 }; };
+  const anyRec = k => Object.values(S).find(x => x.key === k);
+  Object.keys(PYACCTS).forEach(k => { Object.assign(rec(k, "cs"), PYACCTS[k], { course:"cs" }); });
   ROWS.forEach(r => {
     if (["signin","signup","task","wrongcourse","unverified"].indexOf(r.type) < 0 || !r.acct.name || r.acct.name === "(admin)") return;
-    const k = SDC.keyOf(r.acct.email, r.acct.name), s = S[k] = S[k] || { key:k, last:0, signins:0 };
-    if (r.type !== "wrongcourse"){ Object.assign(s, { name:r.acct.name, email:r.acct.email || s.email || "", grade:r.acct.grade || s.grade, teacher:r.acct.teacher || s.teacher, course:r.acct.course || s.course, level:r.acct.level || s.level, cls:r.acct.cls || s.cls || "" }); }
+    const k = SDC.keyOf(r.acct.email, r.acct.name), c = csOf(r.acct.course);
+    const s = r.type === "wrongcourse" ? (anyRec(k) || rec(k, c)) : c ? rec(k, c) : (anyRec(k) || rec(k, ""));
+    if (r.type !== "wrongcourse"){ Object.assign(s, { name:r.acct.name, email:r.acct.email || s.email || "", grade:r.acct.grade || s.grade, teacher:r.acct.teacher || s.teacher, level:r.acct.level || s.level, cls:r.acct.cls || s.cls || "" }); }
     else { s.name = s.name || r.acct.name; s.email = s.email || r.acct.email; s.wrong = (s.wrong || 0) + 1; }
     if (r.type === "signin" || r.type === "signup"){ s.signins++; s.last = Math.max(s.last, r.when); }
     if (r.type === "task"){ s.active = Math.max(s.active || 0, r.when); s.done = s.done || new Set(); if (r.task && r.task.t) s.done.add(r.task.t); if (!s.lastTask || s.lastTask.when <= r.when) s.lastTask = { when:r.when, t:(r.task && r.task.t) || "" }; }
     if (r.type === "unverified") s.unv = Math.max(s.unv || 0, r.when);
   });
+  Object.keys(S).forEach(id => { const s = S[id]; if (s.course) return; const sib = Object.values(S).find(x => x !== s && x.key === s.key && x.course);   // older rows without a course
+    if (sib){ ["last","signins","active"].forEach(f => { sib[f] = Math.max(sib[f] || 0, s[f] || 0); }); if (s.done){ sib.done = sib.done || new Set(); s.done.forEach(t => sib.done.add(t)); } delete S[id]; } else s.course = "cs"; });
   Object.values(DS).forEach(d => {   // Design and IT students who haven't signed in through the platform yet
-    const k = "e:" + d.email; if (S[k]) return;
-    S[k] = { key:k, name:d.name, email:d.email, grade:String(d.grade || "").replace(/^G/, "").split(/\s/)[0], teacher:d.teacher, course: Object.keys(d.work).length && Object.values(d.work).every(w => w.w && (w.w.g === "10IT" || w.w.g === "10HH")) ? "it" : "design", last:0, signins:0 };
+    const k = "e:" + d.email; if (Object.values(S).some(x => x.key === k && x.course !== "cs")) return;
+    const ex = Object.values(S).find(x => x.key === k);
+    S[k + "#ds"] = { key:k, name:d.name, email:d.email, grade:String(d.grade || "").replace(/^G/, "").split(/\s/)[0], teacher:d.teacher, course: Object.keys(d.work).length && Object.values(d.work).every(w => w.w && (w.w.g === "10IT" || w.w.g === "10HH")) ? "it" : "design", last:0, signins:0 };
   });
-  Object.values(S).forEach(s => { if (s.course === "cs" && PINS[s.key]) s.pin = PINS[s.key].pin; const ps = PYSNAP[s.key]; s.py = ps ? ps.snap : null; s.ds = DS[(s.email || "").toLowerCase()] || null;
-    s.active = Math.max(s.active || 0, ps ? ps.when : 0, s.ds ? s.ds.last : 0); });
+  Object.values(S).forEach(s => { if (s.course === "cs" && PINS[s.key]) s.pin = PINS[s.key].pin; const ps = s.course === "cs" ? PYSNAP[s.key] : null; s.py = ps ? ps.snap : null; s.ds = s.course !== "cs" ? DS[(s.email || "").toLowerCase()] || null : null;
+    s.active = Math.max(s.active || 0, ps ? ps.when : 0, s.ds ? s.ds.last : 0);
+    s.also = Object.values(S).filter(x => x !== s && x.key === s.key && x.course && x.course !== s.course).map(x => x.course); s.both = s.also.length > 0;
+    if (s.both && s.course !== "cs"){ s.dcls = s.cls; } else if (s.both){ const d = Object.values(S).find(x => x.key === s.key && x.course === "design"); s.dcls = d && d.cls; } });
   const gone = {};   // accounts the super admin deleted: hidden unless the student has been active since (a new account)
   ROWS.forEach(r => { if (r.type === "admindelete" && r.student && r.student.key) gone[r.student.key] = Math.max(gone[r.student.key] || 0, r.when); });
   SDC.DELETED.forEach(d => { gone["e:" + d.email] = Math.max(gone["e:" + d.email] || 0, d.at); });
@@ -801,7 +810,7 @@ function renderStudents(){
   $("stWarn").innerHTML = !isSuper() && !sheetId(pyLink()) ? `<div class="notice warn">Your dashboard isn't connected to the class data yet. Ask the super admin to open <b>Setup</b> and press <b>Save setup</b>.</div>` : "";
   $("stTbl").innerHTML = `<tr><th>Student</th><th>Course</th><th>Grade</th><th>Level / class</th><th>Teacher</th><th>Progress</th><th>Last active</th><th></th></tr>` +
     (list.length ? list.map((s, i) => `<tr><td><b>${esc(s.name)}</b><div class="em">${esc(s.email || "no email on record")}</div>${s.wrong ? `<span class="pill bad">${s.wrong} wrong-course</span>` : ""}${s.unv && s.unv > (s.last || 0) ? ` <span class="pill warn" title="Signed up, waiting for a teacher to approve the account">⏳ waiting for approval</span>` : ""}</td>
-      <td>${pill(s.course)}</td><td>${s.grade ? "G" + esc(s.grade) : ""}</td><td>${esc(s.course === "cs" ? levelName("cs", s.level) : s.cls || "")}</td><td>${esc(s.teacher || "")}</td>
+      <td>${pill(s.course)}${s.also && s.also.length ? `<div class="em" title="Also takes ${esc(s.also.map(x => C[x] ? C[x].name : x).join(", "))}">also ${esc(s.also.map(x => C[x] ? C[x].short : x).join(", "))}</div>` : ""}</td><td>${s.grade ? "G" + esc(s.grade) : ""}</td><td>${esc(s.course === "cs" ? levelName("cs", s.level) : s.cls || "")}</td><td>${esc(s.teacher || "")}</td>
       <td class="small">${progressCell(s)}</td>
       <td class="small">${s.active || s.last ? esc(fmtDT(s.active || s.last)) : "<span class='muted'>—</span>"}</td>
       <td><div class="acts">${isSuper() || TKEY ? `<button class="btn sm" data-ed="${i}" title="Change course, grade, level or teacher">✏️ Change course</button>` : ""}<button class="btn ghost sm" data-pr="${i}">Progress &amp; feedback</button>${s.course === "cs" ? `<button class="btn ghost sm" data-vp="${i}" title="Show or hide this student's PIN">👁 PIN</button><button class="btn ghost sm" data-pin="${i}">🔑 Reset PIN</button>` : ""}${isSuper() ? delBtn(s, i) : ""}</div></td></tr>`).join("")
@@ -1027,17 +1036,17 @@ async function openProgress(s){
   /* keep the three boxes filled from the latest work, unless the teacher has typed in them */
   let auto = { fS:a0.s, fI:a0.i, fN:a0.n };
   const refill = () => { if (!document.body.contains(bg)) return clearInterval(iv);
-    const now = students().find(x => x.key === s.key) || s, a = autoNotes(now, q("#fAbout").value), map = { fS:a.s, fI:a.i, fN:a.n };
+    const now = students().find(x => x.key === s.key && x.course === s.course) || s, a = autoNotes(now, q("#fAbout").value), map = { fS:a.s, fI:a.i, fN:a.n };
     Object.keys(map).forEach(id => { const t = q("#" + id); if (t && (t.value === auto[id] || !t.value.trim())){ t.value = map[id]; auto[id] = map[id]; } }); };
   const paintLvl = (who) => { const sel = q("#fLvl"); if (!sel) return; const c = critOf(who, q("#fAbout").value), L = c ? levelFor(who, c) : null;
     sel.value = L ? String(L.level) : ""; q("#fLvlWhy").textContent = L ? L.strands.map(x => "Strand " + x.n + ": " + x.level).join(" · ") + (L.complete ? "" : " · still in progress") : "";
     const b = q("#fPdf"); if (b){ b.disabled = !(L && (L.complete || L.submitted)); b.title = b.disabled ? "Available once all four strands of Criterion " + (c || "") + " are complete" : "Download this criterion's feedback"; } };
   paintLvl(s);
   const refill0 = refill;
-  const iv = setInterval(() => { refill0(); paintLvl(students().find(x => x.key === s.key) || s); }, 30000);
-  if (q("#fPdf")) q("#fPdf").onclick = async () => { const who = students().find(x => x.key === s.key) || s, c = critOf(who, q("#fAbout").value);
+  const iv = setInterval(() => { refill0(); paintLvl(students().find(x => x.key === s.key && x.course === s.course) || s); }, 30000);
+  if (q("#fPdf")) q("#fPdf").onclick = async () => { const who = students().find(x => x.key === s.key && x.course === s.course) || s, c = critOf(who, q("#fAbout").value);
     try { await downloadFeedbackPDF([{ s:who, c, fb:{ s:q("#fS").value, i:q("#fI").value, n:q("#fN").value } }], `${who.name.replace(/\s+/g, "-")}-Criterion-${c}-feedback.pdf`); } catch(e){ toast(e.message); } };
-  q("#fAbout").addEventListener("change", () => { auto = { fS:q("#fS").value, fI:q("#fI").value, fN:q("#fN").value }; refill(); paintLvl(students().find(x => x.key === s.key) || s); });
+  q("#fAbout").addEventListener("change", () => { auto = { fS:q("#fS").value, fI:q("#fI").value, fN:q("#fN").value }; refill(); paintLvl(students().find(x => x.key === s.key && x.course === s.course) || s); });
   if (q("#pinBtn")) q("#pinBtn").onclick = () => resetPin(s);
   bg.onclick = e => { if (e.target === bg || e.target.hasAttribute("data-x")) bg.remove(); };
   const hist = async () => { try { const l = await SDC.getFeedback(s.email, s.name);
@@ -1182,20 +1191,25 @@ function editStudent(s){
     <p class="muted small" style="margin-top:4px">${s.isNew ? "Use this before a student signs up, to put them in the right course and grade. Use the exact school email they will sign up with." : esc(s.email || "Older Python account without an email: matched by name.")}</p>
     ${s.isNew ? `<label class="f">Full name<input class="t" id="eName"></label><label class="f">School email<input class="t" id="eEmail" type="email" placeholder="name@sisd.ae"></label>` : ""}
     <div id="eNow" class="notice ok small">Checking current settings…</div>
-    <div class="grid2"><label class="f">Course<select class="t" id="eC">${Object.keys(C).map(c => `<option value="${c}">${esc(C[c].name)}</option>`).join("")}</select></label>
+    <div class="grid2"><label class="f">Course<select class="t" id="eC">${Object.keys(C).map(c => `<option value="${c}">${esc(C[c].name)}</option>`).join("")}<option value="both">Computer Science + Design (both)</option></select></label>
       <label class="f">Grade<select class="t" id="eG"></select></label></div>
     <div class="grid2"><label class="f" id="eLRow">Level<select class="t" id="eL"></select></label>
       <label class="f">Teacher<select class="t" id="eT"></select></label></div>
+    <label class="f hidden" id="eDCRow">Design class<select class="t" id="eDC"></select></label>
     <div id="eWarn"></div><div id="eMsg"></div>
     <div class="row" style="margin-top:16px"><button class="btn" id="eSave">Save change</button><button class="btn ghost" id="eCancel">Cancel</button></div></div>`;
   document.body.appendChild(bg);
   const q = sel => bg.querySelector(sel), close = () => bg.remove();
   bg.onclick = e => { if (e.target === bg) close(); }; q("#eCancel").onclick = close;
+  const BOTH = { name:"Computer Science + Design", grades:["6","7","8"] };
+  const CC = c => c === "both" ? BOTH : C[c];
   const fill = () => {
-    const c = q("#eC").value, g = q("#eG").value;
-    q("#eG").innerHTML = C[c].grades.map(x => `<option value="${x}">Grade ${x}</option>`).join("");
-    if (C[c].grades.indexOf(g) >= 0) q("#eG").value = g;
+    const c0 = q("#eC").value, both = c0 === "both", c = both ? "cs" : c0, g = q("#eG").value;
+    q("#eG").innerHTML = CC(c0).grades.map(x => `<option value="${x}">Grade ${x}</option>`).join("");
+    if (CC(c0).grades.indexOf(g) >= 0) q("#eG").value = g;
     const G = q("#eG").value, l = q("#eL").value;
+    { const dc = q("#eDC").value, cl = CLASSES[G] || []; q("#eDCRow").classList.toggle("hidden", !both || cl.length < 2);
+      q("#eDC").innerHTML = cl.map(o => `<option value="${o[0]}">${esc(o[1])}</option>`).join(""); if (cl.some(o => o[0] === dc)) q("#eDC").value = dc; }
     let opts = [];
     if (c === "cs") opts = pathsFor(G).map(p => [p, PATHS[p]]);
     else if (c === "design" && CLASSES[G] && CLASSES[G].length > 1) opts = CLASSES[G];
@@ -1206,30 +1220,33 @@ function editStudent(s){
     const t = q("#eT").value; q("#eT").innerHTML = TEACHERS[c].map(x => `<option>${esc(x)}</option>`).join("");
     const tn = TEACHERS[c].find(x => x.split(" ").pop() === String(t || "").split(" ").pop()); if (tn) q("#eT").value = tn;
     const from = s.course;
+    if (both){ q("#eWarn").innerHTML = `<div class="notice ok small"><b>Both courses.</b> ${esc(s.name || "The student")} keeps Computer Science (same PIN and work) and can also use Design, switching with the course menu at the top. Nothing to approve and no new sign-up.</div>`; return; }
     q("#eWarn").innerHTML = !s.isNew && from && from !== c ? `<div class="notice warn small"><b>Changing course.</b> ${esc(s.name)} will be stopped from ${esc(C[from].name)} and can only sign into ${esc(C[c].name)}.` +
       ((from === "cs") !== (c === "cs") ? ` These are separate courses, so they will need to <b>sign up</b> for ${esc(C[c].name)} once. Their ${esc(C[from].name)} work is kept.` + (["cs","design"].includes(from) && ["cs","design"].includes(c) && ["6","7","8"].includes(String(q("#eG").value)) ? ` Grades 6–8 can take both, so ${esc(C[from].name)} stays open for them too.` : ``) : ` Their account and work move with them.`) + `</div>` : "";
   };
-  q("#eC").value = C[s.course] ? s.course : "cs"; fill();
+  q("#eC").value = s.both ? "both" : C[s.course] ? s.course : "cs"; fill();
+  if (s.both && s.dcls) q("#eDC").value = s.dcls;
   if (s.grade) { q("#eG").value = String(s.grade); } fill();
   if (s.course === "cs" && s.level) q("#eL").value = s.level; if (s.course !== "cs" && s.cls) q("#eL").value = s.cls;
-  q("#eT").value = TEACHERS[q("#eC").value].indexOf(s.teacher) >= 0 ? s.teacher : q("#eT").value; fill();
+  { const tl = TEACHERS[q("#eC").value === "both" ? "cs" : q("#eC").value] || []; q("#eT").value = tl.indexOf(s.teacher) >= 0 ? s.teacher : q("#eT").value; } fill();
   ["#eC", "#eG", "#eL"].forEach(x => q(x).onchange = fill);
   if (!s.isNew) SDC.lookup(s.email, s.name).then(L => {
     const A = L.assign, R = L.reg;
-    q("#eNow").innerHTML = A ? `Set by you: <b>${esc(C[A.c] ? C[A.c].name : A.c)}, Grade ${esc(A.g)}</b>${A.l ? " · " + esc(PATHS[A.l] || A.l) : ""}${A.t ? " · " + esc(A.t) : ""} (${esc(fmtDT(A.at))})`
+    if (A && A.c === "design" && A.also === "cs" && !s.isNew){ q("#eC").value = "both"; fill(); if (A.cls) q("#eDC").value = A.cls; }
+    q("#eNow").innerHTML = A ? `Set by you: <b>${esc(A.also ? "Computer Science + Design" : C[A.c] ? C[A.c].name : A.c)}, Grade ${esc(A.g)}</b>${A.l ? " · " + esc(PATHS[A.l] || A.l) : ""}${A.t ? " · " + esc(A.t) : ""} (${esc(fmtDT(A.at))})`
       : R ? `Registered at sign-up: <b>${esc(C[R.c] ? C[R.c].name : R.c)}${R.g ? ", Grade " + esc(R.g) : ""}</b>. Not changed by you yet.` : "Not registered through the platform yet (registers at their next sign-in).";
   }).catch(() => { q("#eNow").className = "notice warn small"; q("#eNow").textContent = "Couldn't check the current settings (no connection). You can still save."; });
   else q("#eNow").classList.add("hidden");
   q("#eSave").onclick = async () => {
     const name = s.isNew ? q("#eName").value.trim().replace(/\s+/g, " ") : s.name, email = s.isNew ? q("#eEmail").value.trim().toLowerCase() : (s.email || "");
     if (s.isNew && (name.split(" ").length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))){ q("#eMsg").innerHTML = `<div class="notice bad">Type the student's full name and school email.</div>`; return; }
-    const c = q("#eC").value, g = q("#eG").value, lv = q("#eL").value || "", t = q("#eT").value;
+    const c0 = q("#eC").value, both = c0 === "both", c = both ? "design" : c0, g = q("#eG").value, lv = q("#eL").value || "", t = q("#eT").value;
     const id = await SDC.idOf(email, name);
-    const o = { k:id, c, g, t, l: c === "cs" ? lv : "", cls: c === "design" ? lv : "", at: Date.now() };
+    const o = both ? { k:id, c:"design", also:"cs", g, t, l: lv, cls: q("#eDC").value || "", at: Date.now() } : { k:id, c, g, t, l: c === "cs" ? lv : "", cls: c === "design" ? lv : "", at: Date.now() };
     q("#eSave").disabled = true;
     try { SDC.sendRow("S", id, await signAssign(o)); }
     catch(e){ q("#eMsg").innerHTML = `<div class="notice bad">Could not sign the change: ${esc(e.message)}</div>`; q("#eSave").disabled = false; return; }
-    SDC.log("adminchange", { name: isSuper() ? "(admin)" : (ME && ME.name) || "(teacher)", course:c, grade:g, teacher:t }, { student:{ name, email }, to:{ c, g, l:o.l, cls:o.cls, t }, from:{ c:s.course || "", g:s.grade || "", l:s.level || "", t:s.teacher || "" } });
+    SDC.log("adminchange", { name: isSuper() ? "(admin)" : (ME && ME.name) || "(teacher)", course:c, grade:g, teacher:t }, { student:{ name, email }, to:{ c: both ? "cs+design" : c, g, l:o.l, cls:o.cls, t }, from:{ c:s.course || "", g:s.grade || "", l:s.level || "", t:s.teacher || "" } });
     close(); toast("Saved. " + name.split(" ")[0] + " gets this at their next sign-in.");
   };
 }
