@@ -67,6 +67,13 @@ const d64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 const u8ToB64Text = t => e64(TE.encode(t)), b64ToText = s => new TextDecoder().decode(d64(s));
 const hex = u8 => [...u8].map(v => v.toString(16).padStart(2, "0")).join("");
 const normEmail = e => String(e || "").trim().toLowerCase();
+/* ---------- school years: every student moves up a grade on 1 September ----------
+   ay(t) = the school year a moment belongs to (2026 means September 2026 to August 2027). */
+function ay(t){ const d = new Date(t == null ? Date.now() : t); if (isNaN(d)) return ay(); return d.getMonth() >= 8 ? d.getFullYear() : d.getFullYear() - 1; }
+/* a grade that was right at moment `since`, moved up one for every 1 September since then */
+function rolled(g, since){ const n = parseInt(g, 10); if (!/^\d+$/.test(String(g || "")) || isNaN(n)) return g; const yrs = Math.max(0, ay() - ay(since || Date.now())); return String(n + yrs); }
+/* switches set in an earlier school year are off again from 1 September, until the teacher opens them */
+const freshSwitches = st => !!(st && st.t && ay(Date.parse(st.t)) >= ay());
 /* the teacher's test student: can enter every course and see every grade, level and criterion */
 const TESTERS = ["test@sisd.ae"];
 const isTester = e => TESTERS.indexOf(normEmail(e)) >= 0;
@@ -666,6 +673,6 @@ function strip(c, onSignOut, noLang, mainSel){
 }
 function signedOutNotice(msg, kind){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg, kind: kind || "bad" })); } catch(e){} }
 
-return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
+return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
   log, task, strip, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();
