@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261103t"></script>
+<script src="/python-pathways/pp-sync.js?v=20261103u"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261103t"></script>
+<script src="sdc.js?v=20261103u"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -637,10 +637,11 @@ const weekOf = ms => { const x = new Date(ms); x.setHours(12, 0, 0, 0); x.setDat
 /* House Points this week (restarts every Monday): lesson awards (top 5) + Python House Points earned this week */
 function weekTotals(){
   const wk = weekOf(Date.now()), T = {};
-  const add = (k, name, course, teacher, f, n) => { const t = T[k] = T[k] || { name, course, teacher, lessons:0, cs:0 }; t[f] += n; };
-  lessons().filter(L => L.lesson && L.ended && weekOf(L.start) === wk).forEach(L => L.top.forEach(s => add(s.key, s.name, s.course, L.cls.teacher, "lessons", 1)));
+  const add = (k, name, cls, f, n) => { const t = T[k] = T[k] || { name, course:cls.course, teacher:cls.teacher, cls, lessons:0, cs:0 }; t[f] += n; };
+  lessons().filter(L => L.lesson && L.ended && weekOf(L.start) === wk).forEach(L => L.top.forEach(s => add(s.key, s.name, L.cls, "lessons", 1)));
   Object.keys(PYSNAP).forEach(k => { const sn = PYSNAP[k].snap, a = sn.acct || {}; if (!canSee(a.teacher)) return;
-    Object.values(sn.paths || {}).forEach(P => { const n = (P.hpLedger || []).filter(x => x.week === wk).length; if (n) add(k, a.name, "cs", a.teacher, "cs", n); }); });
+    const cls = { course:"cs", grade:String(a.grade || ""), teacher:a.teacher || "", cls:a.cls || "" };
+    Object.values(sn.paths || {}).forEach(P => { const n = (P.hpLedger || []).filter(x => x.week === wk).length; if (n) add(k, a.name, cls, "cs", n); }); });
   return Object.values(T).sort((a, b) => (b.lessons + b.cs) - (a.lessons + a.cs) || a.name.localeCompare(b.name));
 }
 function emailText(L){
@@ -674,15 +675,27 @@ async function autoSend(){
   finally { sending = false; }
   renderHP();
 }
+/* filters: teacher, then class (course, grade and class group) */
+let HPF = { t:"", c:"" };
 function renderHP(){
-  const all = lessons().filter(L => L.lesson || !L.ended).slice(0, 40), wk = weekTotals();
+  const all0 = lessons().filter(L => L.lesson || !L.ended).slice(0, 80), wk0 = weekTotals();
+  const clsOf = x => x.cls || {}, tOK = c => !HPF.t || SDC.sameTeacher(HPF.t, c.teacher), cOK = c => !HPF.c || classKey(c) === HPF.c;
+  const teachers = []; wk0.map(clsOf).concat(all0.map(L => L.cls)).forEach(c => { if (c.teacher && !teachers.some(t => SDC.sameTeacher(t, c.teacher))) teachers.push(c.teacher); });
+  const classes = {}; wk0.map(clsOf).concat(all0.map(L => L.cls)).filter(tOK).forEach(c => { classes[classKey(c)] = c; });
+  if (HPF.c && !classes[HPF.c]) HPF.c = "";
+  const wk = wk0.filter(t => tOK(clsOf(t)) && cOK(clsOf(t))), all = all0.filter(L => tOK(L.cls) && cOK(L.cls)).slice(0, 40);
+  const filters = `<div class="card row" style="gap:10px;align-items:flex-end"><label class="f" style="margin:0">Teacher<select class="t" id="hpT"><option value="">All teachers</option>${teachers.sort().map(t => `<option${SDC.sameTeacher(t, HPF.t) && HPF.t ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
+    <label class="f" style="margin:0">Class<select class="t" id="hpC"><option value="">All classes${HPF.t ? " for " + esc(HPF.t) : ""}</option>${Object.entries(classes).sort((a, b) => classLabel(a[1]).localeCompare(classLabel(b[1]), undefined, { numeric:true })).map(([k, c]) => `<option value="${esc(k)}"${k === HPF.c ? " selected" : ""}>${esc(classLabel(c))}</option>`).join("")}</select></label></div>`;
+  const groups = {}; wk.forEach(t => { const k = classKey(clsOf(t)); (groups[k] = groups[k] || { cls:clsOf(t), list:[] }).list.push(t); });
   const weekCard = `<div class="card"><h2>🏠 House Points this week <span class="n">week of ${esc(fmtD(Date.parse(weekOf(Date.now()) + "T12:00:00")))}</span></h2>
-    <p class="muted small" style="margin-top:4px">Restarts every Monday. Lesson awards = times in a lesson's top 5. Python = House Points earned in the course (exercise target + 30 minutes of work, one per session).</p>
-    <div class="scroll" style="margin-top:8px"><table class="tbl"><tr><th>Student</th><th>Course</th><th>Teacher</th><th>Lesson awards</th><th>Python House Points</th><th>Total</th></tr>
-    ${wk.length ? wk.map(t => `<tr><td><b>${esc(t.name)}</b></td><td>${pill(t.course)}</td><td>${esc(t.teacher || "")}</td><td>${t.lessons}</td><td>${t.cs}</td><td><b>${t.lessons + t.cs}</b></td></tr>`).join("") : `<tr><td colspan="6" class="muted">No House Points yet this week.</td></tr>`}</table></div></div>`;
-  if (!all.length){ $("hpList").innerHTML = weekCard + `<div class="card muted">No lessons yet. Once students complete tasks through the platform, each class's lesson appears here.</div>`; return; }
+    <p class="muted small" style="margin-top:4px">Restarts every Monday. Lesson awards = times in a lesson's top 5. Python = House Points earned in the course (exercise target + 30 minutes of work, one per session). Grouped by class.</p>
+    ${wk.length ? Object.values(groups).sort((a, b) => classLabel(a.cls).localeCompare(classLabel(b.cls), undefined, { numeric:true })).map(g => `<h3 style="margin-top:14px">${pill(g.cls.course)} ${esc(classLabel(g.cls))}</h3>
+    <div class="scroll" style="margin-top:6px"><table class="tbl"><tr><th>Student</th><th>Lesson awards</th><th>Python House Points</th><th>Total</th></tr>
+    ${g.list.map(t => `<tr><td><b>${esc(t.name)}</b></td><td>${t.lessons}</td><td>${t.cs}</td><td><b>${t.lessons + t.cs}</b></td></tr>`).join("")}</table></div>`).join("") : `<p class="muted" style="margin-top:8px">No House Points yet this week${HPF.t || HPF.c ? " for this selection" : ""}.</p>`}</div>`;
+  const bindF = () => { const t = $("hpT"), c = $("hpC"); if (t) t.onchange = () => { HPF = { t:t.value, c:"" }; renderHP(); }; if (c) c.onchange = () => { HPF.c = c.value; renderHP(); }; };
+  if (!all.length){ $("hpList").innerHTML = filters + weekCard + `<div class="card muted">No lessons yet. Once students complete tasks through the platform, each class's lesson appears here.</div>`; bindF(); return; }
   const canMail = isSuper() && !!parseForm(load(NOTIFY_KEY, ""));
-  $("hpList").innerHTML = weekCard + all.map((L, i) => {
+  $("hpList").innerHTML = filters + weekCard + all.map((L, i) => {
     const state = !L.ended ? `<span class="pill bad">● Live, last work ${fmtT(L.last)}</span>` : L.sent ? `<span class="pill ok">✓ Emailed ${fmtT(L.sent)}</span>` : !L.lesson ? `<span class="pill">Fewer than ${MIN_STUDENTS} students</span>` : `<span class="pill warn">Not emailed yet</span>`;
     const btn = !isSuper() ? "" : !L.ended ? `<button class="btn red sm" data-end="${i}">End lesson now and email</button>` : `<button class="btn ghost sm" data-send="${i}" ${canMail ? "" : "disabled"}>${L.sent ? "Email again" : "Email now"}</button>`;
     return `<div class="card lesson ${L.ended ? "" : "live"}"><h3>${pill(L.cls.course)} ${esc(classLabel(L.cls))} ${state}</h3>
@@ -699,6 +712,7 @@ function renderHP(){
     if (canMail) await sendLesson(L2, true); else toast("Lesson ended. Add the alerts form in Setup to email it.");
     renderHP();
   });
+  bindF();
 }
 
 /* ---------------- students ---------------- */
@@ -711,7 +725,7 @@ function students(){
     if (r.type !== "wrongcourse"){ Object.assign(s, { name:r.acct.name, email:r.acct.email || s.email || "", grade:r.acct.grade || s.grade, teacher:r.acct.teacher || s.teacher, course:r.acct.course || s.course, level:r.acct.level || s.level, cls:r.acct.cls || s.cls || "" }); }
     else { s.name = s.name || r.acct.name; s.email = s.email || r.acct.email; s.wrong = (s.wrong || 0) + 1; }
     if (r.type === "signin" || r.type === "signup"){ s.signins++; s.last = Math.max(s.last, r.when); }
-    if (r.type === "task") s.active = Math.max(s.active || 0, r.when);
+    if (r.type === "task"){ s.active = Math.max(s.active || 0, r.when); s.done = s.done || new Set(); if (r.task && r.task.t) s.done.add(r.task.t); if (!s.lastTask || s.lastTask.when <= r.when) s.lastTask = { when:r.when, t:(r.task && r.task.t) || "" }; }
     if (r.type === "unverified") s.unv = Math.max(s.unv || 0, r.when);
   });
   Object.values(DS).forEach(d => {   // Design and IT students who haven't signed in through the platform yet
@@ -742,10 +756,12 @@ function dsSummary(d){
     if (done || sub || ev.length) out[c] = { done, sub, prac: w ? w.practice.correct : (ev.some(e => /Practice passed/.test(e.event)) ? "✓" : 0) }; });
   return out;
 }
+/* when the detailed record hasn't arrived, count the completed tasks the platform logged */
+const taskCell = s => s.done && s.done.size ? `<b>${s.done.size}</b> task${s.done.size === 1 ? "" : "s"} completed<div class="em">Last: ${esc((s.lastTask && s.lastTask.t) || "")}</div>` : "<span class='muted'>no work yet</span>";
 function progressCell(s){
-  if (s.course === "cs"){ const p = pySummary(s.py); if (!p) return "<span class='muted'>no work yet</span>";
+  if (s.course === "cs"){ const p = pySummary(s.py); if (!p || (!p.solved && s.done && s.done.size)) return taskCell(s);
     return `<b>${p.solved}</b> exercises · <b>${p.house}</b> 🏠 this week<div class="em">${p.lessons} lesson${p.lessons === 1 ? "" : "s"} started</div>`; }
-  const d = dsSummary(s.ds); if (!d || !Object.keys(d).length) return "<span class='muted'>no work yet</span>";
+  const d = dsSummary(s.ds); if (!d || !Object.keys(d).length) return taskCell(s);
   return Object.keys(d).map(c => `<span class="pill ${d[c].sub ? "ok" : ""}" title="Criterion ${c}">${c}: ${d[c].done}/4${d[c].sub ? " ✓" : ""}</span>`).join(" ");
 }
 function renderStudents(){
@@ -771,18 +787,16 @@ function renderStudents(){
 /* ---- deleting an account (super admin only, once the student hasn't been online for a month) ---- */
 const DELETE_AFTER_DAYS = 30;
 const idleDays = s => s.seen ? Math.floor((Date.now() - s.seen) / 86400000) : Infinity;
-function delBtn(s, i){
-  const d = idleDays(s), ok = d >= DELETE_AFTER_DAYS;
-  const tip = ok ? (s.seen ? "Not online for " + d + " days" : "Never seen online") + ": you can delete this account"
-    : "Delete becomes available after " + DELETE_AFTER_DAYS + " days without signing in (" + (DELETE_AFTER_DAYS - d) + " day" + (DELETE_AFTER_DAYS - d === 1 ? "" : "s") + " to go)";
-  return ` <button class="btn ${ok ? "red" : "ghost"} sm" data-del="${i}" title="${esc(tip)}"${ok ? "" : " disabled"}>🗑 Delete</button>`;
+function delBtn(s, i){   // super admin only: always available (a recently active account gets an extra warning)
+  const d = idleDays(s), tip = s.seen ? (d < 1 ? "Online today" : "Last online " + d + " day" + (d === 1 ? "" : "s") + " ago") + ": delete this account" : "Never seen online: delete this account";
+  return ` <button class="btn red sm" data-del="${i}" title="${esc(tip)}">🗑 Delete</button>`;
 }
 function deleteStudent(s){
-  if (!isSuper() || idleDays(s) < DELETE_AFTER_DAYS) return;
+  if (!isSuper()) return;
   const bg = document.createElement("div"); bg.className = "modal-bg";
   bg.innerHTML = `<div class="modal" role="dialog" aria-label="Delete account"><h2>Delete ${esc(s.name)}?</h2>
     <p class="small" style="margin-top:6px">${esc(s.email || "No email on record")} · ${esc(C[s.course] ? C[s.course].name : s.course || "")}${s.grade ? " · Grade " + esc(s.grade) : ""}</p>
-    <div class="notice warn small" style="margin-top:10px">${s.seen ? "Last online <b>" + esc(fmtDT(s.seen)) + "</b> (" + idleDays(s) + " days ago)." : "This student has never been seen online."}
+    <div class="notice warn small" style="margin-top:10px">${s.seen ? "Last online <b>" + esc(fmtDT(s.seen)) + "</b> (" + idleDays(s) + " days ago)." + (idleDays(s) < DELETE_AFTER_DAYS ? " <b>This student has been active recently: make sure this is the right account.</b>" : "") : "This student has never been seen online."}
       Deleting removes the account from the dashboard and from every computer the next time someone tries to sign in with it. Their old work is not brought back.
       The student can <b>sign up again</b> with the same name and email to start fresh.</div>
     <label class="f" style="margin-top:12px">Type <b>DELETE</b> to confirm<input class="t" id="dConf" autocomplete="off"></label>
