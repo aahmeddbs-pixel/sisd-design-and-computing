@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261103u"></script>
+<script src="/python-pathways/pp-sync.js?v=20261103v"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261103u"></script>
+<script src="sdc.js?v=20261103v"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -847,14 +847,55 @@ function dsDetail(s){
         ${x.fields.map(f => `<div style="margin-top:6px"><div class="small" style="font-weight:700">${esc(f.label)}</div>${fieldVal(f)}</div>`).join("")}</div>`).join("")}
       <div class="em" style="margin-top:8px">Saved ${esc(fmtDT(d.work[c].when || Date.parse(W.at) || 0))}</div></details>`; }).join("");
 }
-function autoNotes(s){   // a starting point the teacher edits before sending
+/* ---------- automatic feedback for a Design/IT criterion, from the work the student has saved ----------
+   Strengths, Improvements and Student developments, written to the student. Rebuilt whenever new work arrives. */
+const wordsIn = v => { const t = Array.isArray(v) ? v.flat(2).join(" ") : v && typeof v === "object" ? Object.values(v).join(" ") : String(v || ""); return (t.match(/[A-Za-z0-9\u00C0-\u024F]+/g) || []).length; };
+const shortLabel = l => String(l || "").replace(/\s+/g, " ").replace(/[:.]+$/, "").slice(0, 70);
+function fieldState(f){
+  if (f.t === "sketch") return f.value ? "ok" : "empty";
+  if (f.t === "table"){ const rows = (Array.isArray(f.value) ? f.value : []).filter(r => Array.isArray(r) && r.some(x => String(x || "").trim()));
+    if (!rows.length) return "empty"; const cells = rows.flat().filter(x => String(x || "").trim()).length, total = rows.length * ((rows[0] || []).length || 1);
+    return rows.length < 2 || cells < total * 0.6 ? "thin" : "ok"; }
+  if (Array.isArray(f.value) || (f.value && typeof f.value === "object")) return wordsIn(f.value) ? "ok" : "empty";
+  const w = wordsIn(f.value); return !w ? "empty" : w < 20 ? "thin" : "ok";
+}
+function designNotes(s, c){
+  const W = s.ds && s.ds.work[c] && s.ds.work[c].w; if (!W) return { s:"", i:"", n:"" };
+  const S = [], I = [], N = [], strands = W.strands || [];
+  strands.forEach(x => {
+    const fs = x.fields || [], st = fs.map(fieldState), good = fs.filter((f, k) => st[k] === "ok"), words = fs.reduce((a, f) => a + (f.t === "sketch" ? 0 : wordsIn(f.value)), 0);
+    const tag = "Strand " + x.n;
+    if (x.done && good.length === fs.length && fs.length) S.push(`${tag}: you completed every part with clear detail (${words} words)${fs.some(f => f.t === "sketch" && f.value) ? ", including your sketch or image" : ""}.`);
+    else if (good.length) S.push(`${tag}: good work on ${good.slice(0, 2).map(f => "“" + shortLabel(f.label) + "”").join(" and ")}.`);
+    fs.forEach((f, k) => {
+      if (st[k] === "empty") I.push(`${tag}: “${shortLabel(f.label)}” is still empty${f.t === "sketch" ? ": add your sketch or a screenshot" : f.t === "table" ? ": fill in the table" : ""}.`);
+      else if (st[k] === "thin") I.push(`${tag}: add more detail to “${shortLabel(f.label)}”${f.t === "table" ? " (complete every row and column)" : " (" + wordsIn(f.value) + " words so far): explain why, with an example"}.`);
+    });
+    if (x.self && x.done && st.some(v => v !== "ok")) I.push(`${tag}: you rated yourself ${x.self}. Check the rubric: some parts still need more before that level is secure.`);
+  });
+  const prac = W.practice || {};
+  if (prac.correct) S.push(`You passed the practice questions (${prac.correct} correct), so you understand the method.`);
+  else N.push("Do the practice questions so you're sure of the method before you finish the task.");
+  const next = strands.find(x => !x.done);
+  if (next) N.push(`Next, complete Strand ${next.n}: ${shortLabel(next.strand)}.`);
+  const left = strands.filter(x => !x.done).length;
+  if (left > 1) N.push(`You have ${left} strands left in Criterion ${c}. Aim to finish one strand each lesson.`);
+  if (!left && strands.length && W.kind !== "submission") N.push(`All four strands are done: download your PDF and hand in Criterion ${c}.`);
+  if (!left && W.kind === "submission") N.push(`Criterion ${c} is handed in. Read your feedback, make the improvements, and get ready for the next criterion.`);
+  if (!S.length) S.push(`You've started Criterion ${c}${W.unit ? " for " + W.unit : ""}. Keep going: every strand you finish builds your evidence.`);
+  if (!I.length && left) I.push("Keep the same level of detail in the strands you haven't finished yet.");
+  return { s: S.slice(0, 4).join("\n"), i: I.slice(0, 5).join("\n"), n: N.slice(0, 3).join("\n") };
+}
+function autoNotes(s, about){   // a starting point the teacher edits before sending
   if (s.course === "cs"){ const snap = s.py; const well = [], next = []; if (!snap || !snap.paths) return { s:"", i:"", n:"" };
     Object.values(snap.paths).forEach(P => Object.keys(P.lessons || {}).forEach(n => { const L = P.lessons[n], core = L.core || [];
       if (core.length && core.every(x => x.ok)) well.push("Completed all exercises in Lesson " + n + " (" + L.title + ")");
       core.filter(x => !x.ok).slice(0, 2).forEach(x => next.push("Finish \"" + x.t + "\" in Lesson " + n));
       if ((L.prac || []).length >= 3) well.push("Kept practising in Lesson " + n + " (" + L.prac.length + " practice questions)"); }));
     return { s: well.slice(0, 3).join("\n"), i: next.slice(0, 3).join("\n"), n: "" }; }
-  return { s:"", i:"", n:"" };
+  const crits = s.ds ? Object.keys(s.ds.work).sort() : [];
+  const c = (String(about || "").match(/Criterion ([A-D])/) || [])[1] || crits[crits.length - 1];
+  return c ? designNotes(s, c) : { s:"", i:"", n:"" };
 }
 async function openProgress(s){
   const bg = document.createElement("div"); bg.className = "modal-bg";
@@ -872,7 +913,8 @@ async function openProgress(s){
         ${s.course !== "cs" ? `<label class="f">Suggested MYP level (optional)<select class="t" id="fLvl"><option value="">No level</option>${[1,2,3,4,5,6,7,8].map(n => `<option>${n}</option>`).join("")}</select></label>` : `<div></div>`}</div>
       <label class="f">Strengths<textarea id="fS">${esc(a0.s)}</textarea></label>
       <label class="f">Improvements<textarea id="fI">${esc(a0.i)}</textarea></label>
-      <label class="f">Next steps<textarea id="fN">${esc(a0.n)}</textarea></label>
+      <label class="f">Student developments<textarea id="fN">${esc(a0.n)}</textarea></label>
+      <p class="muted small" id="fAuto" style="margin-top:4px">${s.course === "cs" ? "" : "Filled in automatically from the work saved for this criterion, and updated when new work arrives (until you edit a box). Check and edit before sending."}</p>
       <label class="f">From<input class="t" id="fFrom" value="${esc(isSuper() ? (s.teacher || "Your teacher") : ME.name)}"></label>
       <div class="row" style="margin-top:12px"><button class="btn red" id="fGo">Send feedback</button></div><div id="fMsg"></div>
       <h3 style="margin-top:16px">Feedback already sent</h3><div id="fHist" class="small muted">Loading…</div>
@@ -880,6 +922,13 @@ async function openProgress(s){
   document.body.appendChild(bg);
   if (window.PPAnswerView) PPAnswerView.bind(bg);
   const q = sel => bg.querySelector(sel);
+  /* keep the three boxes filled from the latest work, unless the teacher has typed in them */
+  let auto = { fS:a0.s, fI:a0.i, fN:a0.n };
+  const refill = () => { if (!document.body.contains(bg)) return clearInterval(iv);
+    const now = students().find(x => x.key === s.key) || s, a = autoNotes(now, q("#fAbout").value), map = { fS:a.s, fI:a.i, fN:a.n };
+    Object.keys(map).forEach(id => { const t = q("#" + id); if (t && (t.value === auto[id] || !t.value.trim())){ t.value = map[id]; auto[id] = map[id]; } }); };
+  const iv = setInterval(refill, 30000);
+  q("#fAbout").addEventListener("change", () => { auto = { fS:q("#fS").value, fI:q("#fI").value, fN:q("#fN").value }; refill(); });
   if (q("#pinBtn")) q("#pinBtn").onclick = () => resetPin(s);
   bg.onclick = e => { if (e.target === bg || e.target.hasAttribute("data-x")) bg.remove(); };
   const hist = async () => { try { const l = await SDC.getFeedback(s.email, s.name);

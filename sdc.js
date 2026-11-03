@@ -304,7 +304,7 @@ async function showFeedbackButton(){
       ${mine.map(f => `<div class="sdcFbItem" style="border:1px solid #D8DEEA;border-left:4px solid #DC2B3E;border-radius:10px;padding:12px 14px;margin-top:14px">
         <div style="font-size:12.5px;color:#5B6782;font-weight:700">${esc(f.about || "")}${f.about ? " · " : ""}${esc(new Date(f.at || f.ver).toLocaleDateString("en-GB", { day:"numeric", month:"short" }))}${f.from ? " · " + esc(f.from) : ""}</div>
         ${f.lvl ? `<div style="margin-top:6px;font-weight:800">Suggested level: ${esc(f.lvl)} / 8</div>` : ""}
-        ${sec("Strengths", f.s)}${sec("Improvements", f.i)}${sec("Next steps", f.n)}${sec("Note", f.note)}</div>`).join("")}</div>`;
+        ${sec("Strengths", f.s)}${sec("Improvements", f.i)}${sec("Student developments", f.n)}${sec("Note", f.note)}</div>`).join("")}</div>`;
     document.body.appendChild(bg);
     bg.onclick = e => { if (e.target === bg || e.target.hasAttribute("data-x")) bg.remove(); };
   };
