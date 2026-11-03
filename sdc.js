@@ -333,7 +333,7 @@ async function confirm(a, signup){
   let L = null;
   try { L = await lookup(a.email, a.name); } catch(e){ L = null; }
   if (!L){ // sheet unreachable: let them in, it is checked again next time (new sign-ups must still verify)
-    const vm = await verifyGate(a.email, "student", !!signup); if (vm){ log("unverified", Object.assign({}, a, { course:c }), { signup:!!signup }); return { ok:false, verify:true, msg:vm }; }
+    const vm = c === "cs" ? null : await verifyGate(a.email, "student", !!signup); if (vm){ log("unverified", Object.assign({}, a, { course:c }), { signup:!!signup }); return { ok:false, verify:true, msg:vm }; }
     patchGate({ who:{ email:normEmail(a.email), name:a.name } });
     if (!(g && g.logged)) { log("signin", Object.assign({}, a, { course:c }), { gate:g && g.mode, unchecked:true }); patchGate({ logged:true }); }
     return { ok:true, assign:null };
@@ -350,8 +350,10 @@ async function confirm(a, signup){
   if (A && A.c !== c){ log("wrongcourse", Object.assign({}, a, { course:c }), { registered:A.c, byAdmin:true }); return { ok:false, msg:MSG.other(A.c, true), registered:A.c }; }
   if (!A && L.reg && L.reg.c !== c){ log("wrongcourse", Object.assign({}, a, { course:c }), { registered:L.reg.c }); return { ok:false, msg:MSG.other(L.reg.c, false), registered:L.reg.c }; }
   if (!L.reg) register(a.email, a.name, c, (A && A.g) || a.grade);
-  const isNew = !!signup || (!!L.reg && L.reg.ver >= sinceMs());
-  const vm = await verifyGate(a.email, "student", isNew);
+  // only accounts made after verification was switched on must verify (judged by when the account was made,
+  // not by when it first reached the online register). Computer Science students never need to verify.
+  const made = createdMs(a), isNew = !!signup || (made ? made >= sinceMs() : (!!L.reg && L.reg.ver >= sinceMs()));
+  const vm = c === "cs" ? null : await verifyGate(a.email, "student", isNew);
   if (vm){ log("unverified", Object.assign({}, a, { course:c }), { signup:!!signup }); return { ok:false, verify:true, msg:vm }; }
   patchGate({ who:{ email:normEmail(a.email), name:a.name }, acct: acctOf(Object.assign({}, a, { course: c })) }); work(); setTimeout(showFeedbackButton, 800);
   if (!(g && g.logged)){ log(signup ? "signup" : "signin", Object.assign({}, a, { course:c }), { gate:g && g.mode }); patchGate({ logged:true }); }
