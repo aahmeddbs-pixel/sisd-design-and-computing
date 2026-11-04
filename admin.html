@@ -152,7 +152,6 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
           <select class="t" id="stK" style="max-width:240px"><option value="">All classes</option></select>
           <select class="t" id="stCr" style="max-width:170px" title="Choose a class and a criterion to see the class's feedback"><option value="">Choose criterion</option><option>A</option><option>B</option><option>C</option><option>D</option></select>
           <button class="btn ghost sm" id="stPdf" title="One PDF with every listed student's feedback">📄 Class feedback (PDF)</button>
-          <button class="btn sm" id="stPdfAll" data-super title="Every criterion each of your students has worked on, one page each">⬇ Download all feedback (PDF)</button>
           <button class="btn ghost sm" id="stAdd" data-super>＋ Set up a student by email</button></div>
         <div id="clsFb"></div>
         <div class="scroll" style="margin-top:12px"><table class="tbl" id="stTbl"></table></div>
@@ -286,7 +285,7 @@ async function loadCourseState(){
   let st = r.state;
   const pend = load(PENDING_KEY, null);   // a change published from this computer that Google hasn't republished yet
   if (pend && (!st || String(pend.t) > String(st.t)) && Date.now() - Date.parse(pend.t) < 30 * 60000) st = pend;
-  STATE = st ? { unlocks: SDC.freshSwitches(st) ? (st.unlocks || {}) : {}, teachers: st.teachers || [], declined: st.declined || [], t: st.t } : { unlocks: dc.unlocks || {}, teachers: dc.teachers || [], declined: dc.declined || [], t: "" };
+  STATE = st ? { unlocks: SDC.freshSwitches(st) ? (st.unlocks || {}) : {}, teachers: st.teachers || [], declined: st.declined || [], t: st.t, acfg: st.acfg || null } : { unlocks: dc.unlocks || {}, teachers: dc.teachers || [], declined: dc.declined || [], t: "" };
   REQS = r.requests || [];
   return STATE;
 }
@@ -294,12 +293,13 @@ async function publishCourseState(next){
   const dc = await designConfig();
   const body = { unlocks: next.unlocks, teachers: next.teachers || [], declined: next.declined || [], t: new Date().toISOString() };
   const sig = new Uint8Array(await crypto.subtle.sign({ name:"ECDSA", hash:"SHA-256" }, KEYS.sig, TE.encode(SDC.canon(body))));
-  const signed = Object.assign({}, body, { sig: b64(sig) });
+  const acfg = next.acfg || (STATE && STATE.acfg) || null;
+  const signed = Object.assign({}, body, { sig: b64(sig) }, acfg ? { acfg } : {});
   const form = (dc.controlForm && (dc.controlForm.match(/docs\.google\.com\/forms\/(?:u\/\d+\/)?d\/(e\/)?([^/]+)\//) || [])) || [];
   const action = form[2] ? `https://docs.google.com/forms/d/${form[1] || ""}${form[2]}/formResponse` : SDC.CONTROL.form;
   const entry = ((dc.controlForm || "").match(/entry\.(\d+)=/) || [])[1]; const p = new URLSearchParams(); p.append(entry ? "entry." + entry : SDC.CONTROL.entry, JSON.stringify(signed));
   if (!(await gfSend(action, p))) return false;
-  store(PENDING_KEY, signed); STATE = Object.assign({}, body); return true;
+  store(PENDING_KEY, signed); STATE = Object.assign({}, body, acfg ? { acfg } : {}); return true;
 }
 
 /* ---- teacher keys: each teacher has a key pair; the private half is locked with their own password.
@@ -364,11 +364,24 @@ async function openAnswers(ak){
   (0, eval)(code); return !!window.PPAnswers;
 }
 /* lock the current links and answer key for every approved teacher (their own public key) and publish */
-async function shareWithTeachers(){
+/* the super admin's Setup links, locked with the super admin password, so the dashboard works on any computer */
+let ADMPW = "";   // memory only
+async function admKey(salt){ const base = await crypto.subtle.importKey("raw", TE.encode(ADMPW), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name:"PBKDF2", salt, iterations:250000, hash:"SHA-256" }, base, { name:"AES-GCM", length:256 }, false, ["encrypt", "decrypt"]); }
+async function sealAdmin(o){ const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name:"AES-GCM", iv }, await admKey(salt), TE.encode(JSON.stringify(o))));
+  return { s: b64(salt), iv: b64(iv), ct: b64(ct), h: (o.py || "").length + "." + (o.ds || "").length }; }
+async function openAdmin(a){ const pt = await crypto.subtle.decrypt({ name:"AES-GCM", iv: unb64(a.iv) }, await admKey(unb64(a.s)), unb64(a.ct)); return JSON.parse(new TextDecoder().decode(pt)); }
+const admSetup = () => ({ py: sheetLink() || "", ds: load(DS_KEY, "") || "", n: load(NOTIFY_KEY, "") || "" });
+async function shareWithTeachers(force){
   await loadCourseState();
-  if (!STATE.teachers.some(t => t.pub)) return null;
+  const mine = admSetup(), haveLinks = !!(mine.py || mine.ds);
+  let acfg = STATE.acfg || null, acfgChanged = false;
+  if (ADMPW && haveLinks){ let cur = null; try { cur = acfg ? await openAdmin(acfg) : null; } catch(e){}
+    if (!cur || cur.py !== mine.py || cur.ds !== mine.ds || cur.n !== mine.n){ acfg = await sealAdmin(mine); acfgChanged = true; } }
+  if (!STATE.teachers.some(t => t.pub) && !acfgChanged && !force) return null;
   const teachers = await Promise.all(STATE.teachers.map(async t => t.pub ? Object.assign({}, t, { cfg: await lockFor(t.pub, await teacherCfg(t)) }) : t));
-  const ok = await publishCourseState(Object.assign({}, STATE, { teachers }));
+  const ok = await publishCourseState(Object.assign({}, STATE, { teachers, acfg }));
   if (ok && AKEY) store("sdc_ak_shared", "v3:" + AKEY.slice(0, 12));
   return ok;
 }
@@ -389,10 +402,14 @@ $("pwGo").onclick = async () => {
   try { KEYS = await unlock(pwTyped); store("sdc_admin_fail_super", { n:0, until:0 }); }
   catch(e){ KEYS = null; failNote("super", f); SDC.log("adminfail", { name:"(unknown)", course:"" }, { tries:f.n }); note("pwMsg", "bad", "That password is not right."); }
   $("pwGo").disabled = false; $("pw").value = "";
-  if (KEYS){ ROLE = "super"; ME = { name:"Super admin" };
+  if (KEYS){ ROLE = "super"; ME = { name:"Super admin" }; ADMPW = pwTyped;
     try { AKEY = await vaultKeyFromPassword(pwTyped); await openAnswers(AKEY); } catch(e){ AKEY = ""; }
+    // a computer that has never been set up: bring in the Setup links saved from another computer
+    let pulled = false;
+    try { await loadCourseState(); if (STATE.acfg && !(sheetLink() || load(DS_KEY, ""))){ const c = await openAdmin(STATE.acfg); if (c.py) store(SHEET_KEY, c.py); if (c.ds) store(DS_KEY, c.ds); if (c.n) store(NOTIFY_KEY, c.n); pulled = true; } } catch(e){}
     enter();
-    if (AKEY && load("sdc_ak_shared", "") !== "v3:" + AKEY.slice(0, 12)) shareWithTeachers().catch(() => {});   // give teachers the answer key and PIN reset key once
+    if (pulled) toast("Connected to the class data saved from your other computer.");
+    if ((AKEY && load("sdc_ak_shared", "") !== "v3:" + AKEY.slice(0, 12)) || ((sheetLink() || load(DS_KEY, "")) && !STATE.acfg)) shareWithTeachers().catch(() => {});   // give teachers the answer key and PIN reset key once
   }
 };
 $("pw").addEventListener("keydown", e => { if (e.key === "Enter") $("pwGo").click(); });
@@ -807,16 +824,18 @@ function renderStudents(){
     sel.value = ks[cur] ? cur : ""; }
   const list = all0.filter(s => !$("stK").value || classKey(s) === $("stK").value);
   $("stCount").textContent = list.length;
-  $("stWarn").innerHTML = !isSuper() && !sheetId(pyLink()) ? `<div class="notice warn">Your dashboard isn't connected to the class data yet. Ask the super admin to open <b>Setup</b> and press <b>Save setup</b>.</div>` : "";
+  $("stWarn").innerHTML = !isSuper() && !sheetId(pyLink()) ? `<div class="notice warn">Your dashboard isn't connected to the class data yet. Ask the super admin to open <b>Setup</b> and press <b>Save setup</b>.</div>`
+    : isSuper() && !sheetId(pyLink()) && !sheetId(dsLink()) ? `<div class="notice warn"><b>This computer isn't connected to the class data yet</b>, so no students show. Open <b>⚙️ Setup</b>, paste the two sheet links and press <b>Save setup</b> once: after that every computer you sign in on connects by itself.</div>` : "";
   $("stTbl").innerHTML = `<tr><th>Student</th><th>Course</th><th>Grade</th><th>Level / class</th><th>Teacher</th><th>Progress</th><th>Last active</th><th></th></tr>` +
     (list.length ? list.map((s, i) => `<tr><td><b>${esc(s.name)}</b><div class="em">${esc(s.email || "no email on record")}</div>${s.wrong ? `<span class="pill bad">${s.wrong} wrong-course</span>` : ""}${s.unv && s.unv > (s.last || 0) ? ` <span class="pill warn" title="Signed up, waiting for a teacher to approve the account">⏳ waiting for approval</span>` : ""}</td>
       <td>${pill(s.course)}${s.also && s.also.length ? `<div class="em" title="Also takes ${esc(s.also.map(x => C[x] ? C[x].name : x).join(", "))}">also ${esc(s.also.map(x => C[x] ? C[x].short : x).join(", "))}</div>` : ""}</td><td>${s.grade ? "G" + esc(s.grade) : ""}</td><td>${esc(s.course === "cs" ? levelName("cs", s.level) : s.cls || "")}</td><td>${esc(s.teacher || "")}</td>
       <td class="small">${progressCell(s)}</td>
       <td class="small">${s.active || s.last ? esc(fmtDT(s.active || s.last)) : "<span class='muted'>—</span>"}</td>
-      <td><div class="acts">${isSuper() || TKEY ? `<button class="btn sm" data-ed="${i}" title="Change course, grade, level or teacher">✏️ Change course</button>` : ""}<button class="btn ghost sm" data-pr="${i}">Progress &amp; feedback</button>${s.course === "cs" ? `<button class="btn ghost sm" data-vp="${i}" title="Show or hide this student's PIN">👁 PIN</button><button class="btn ghost sm" data-pin="${i}">🔑 Reset PIN</button>` : ""}${isSuper() ? delBtn(s, i) : ""}</div></td></tr>`).join("")
+      <td><div class="acts">${isSuper() || TKEY ? `<button class="btn sm" data-ed="${i}" title="Change course, grade, level or teacher">✏️ Change course</button>` : ""}<button class="btn ghost sm" data-pr="${i}">Progress &amp; feedback</button><button class="btn ghost sm" data-fp="${i}" title="Download this student's feedback as a PDF">📄 Feedback PDF</button>${s.course === "cs" ? `<button class="btn ghost sm" data-vp="${i}" title="Show or hide this student's PIN">👁 PIN</button><button class="btn ghost sm" data-pin="${i}">🔑 Reset PIN</button>` : ""}${isSuper() ? delBtn(s, i) : ""}</div></td></tr>`).join("")
       : `<tr><td colspan="8" class="muted">${isSuper() ? "No students yet. They appear here after signing in through the platform." : "No students have chosen you as their teacher yet."}</td></tr>`);
   $("stTbl").querySelectorAll("[data-ed]").forEach(b => b.onclick = () => editStudent(list[+b.dataset.ed]));
   $("stTbl").querySelectorAll("[data-pr]").forEach(b => b.onclick = () => openProgress(list[+b.dataset.pr]));
+  $("stTbl").querySelectorAll("[data-fp]").forEach(b => b.onclick = () => studentPdf(list[+b.dataset.fp], b));
   $("stTbl").querySelectorAll("[data-pin]").forEach(b => b.onclick = () => resetPin(list[+b.dataset.pin]));
   $("stTbl").querySelectorAll("[data-vp]").forEach(b => b.onclick = () => { const s = list[+b.dataset.vp];
     if (b.dataset.shown){ delete b.dataset.shown; b.textContent = "👁 PIN"; return; }
@@ -1150,18 +1169,18 @@ $("swGo").onclick = async () => { $("swGo").disabled = true;
   $("swMsg").innerHTML = `<div class="notice ${ok ? "ok" : "bad"}">${ok ? "Applied. Students see the change within about 5 minutes." : "Google Forms couldn't be reached. Try again."}</div>`; $("swGo").disabled = false; };
 
 $("stQ").oninput = renderStudents; $("stC").onchange = renderStudents; $("stK").onchange = renderStudents; $("stCr").onchange = renderStudents;
-$("stPdfAll").onclick = async () => {   // every student this teacher can see, every criterion they have work in
-  const list = students(); if (!list.length) return toast("No students yet.");
+/* one student's feedback: Computer Science on one page, Design / IT one page per criterion they have work in */
+async function studentPdf(s0, b){
   const items = [];
-  list.forEach(s => { if (s.course === "cs"){ items.push({ s, c:"", fb:autoNotes(s, "") }); return; }
-    const crits = s.ds ? Object.keys(s.ds.work).sort() : [];
-    if (!crits.length) items.push({ s, c:"", fb:{ s:"", i:"", n:"No Design work has been saved yet." } });
-    crits.forEach(c => items.push({ s, c, fb:autoNotes(s, "Criterion " + c) })); });
-  $("stPdfAll").disabled = true; toast("Making the PDF: " + items.length + " page" + (items.length === 1 ? "" : "s") + "…");
-  try { await downloadFeedbackPDF(items, ("All-feedback-" + (isSuper() ? "all-students" : (ME && ME.name) || "teacher") + "-" + new Date().toISOString().slice(0, 10)).replace(/[^\w-]+/g, "-") + ".pdf"); }
+  if (s0.course === "cs") items.push({ s:s0, c:"", fb:autoNotes(s0, "") });
+  else { const crits = s0.ds ? Object.keys(s0.ds.work).sort() : [];
+    if (!crits.length) items.push({ s:s0, c:"", fb:{ s:"", i:"", n:"No Design work has been saved yet." } });
+    crits.forEach(c => items.push({ s:s0, c, fb:autoNotes(s0, "Criterion " + c) })); }
+  if (b) b.disabled = true; toast("Making " + s0.name.split(" ")[0] + "'s feedback PDF…");
+  try { await downloadFeedbackPDF(items, ("Feedback-" + s0.name + "-" + (C[s0.course] ? C[s0.course].short : s0.course) + "-" + new Date().toISOString().slice(0, 10)).replace(/[^\w-]+/g, "-") + ".pdf"); }
   catch(e){ toast(e.message); }
-  $("stPdfAll").disabled = false;
-};
+  if (b) b.disabled = false;
+}
 $("stPdf").onclick = async () => {
   const q = $("stQ").value.trim().toLowerCase(), cf = $("stC").value, k = $("stK").value, cr = $("stCr").value;
   const list = students().filter(s => (!cf || s.course === cf) && (!q || (s.name + " " + (s.email || "")).toLowerCase().indexOf(q) >= 0) && (!k || classKey(s) === k));
