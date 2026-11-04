@@ -682,6 +682,41 @@ const rank = (() => {
   }
   return { weekId, prevWeek, inWeek, report, table, card, mount, classOf, classId, short };
 })();
+/* ---------- "Saving… / ✓ Saved" badge in the top bar ----------
+   The course page passes a function that says whether anything is still waiting to go online:
+   { on: signed in, pending: unsent changes, offline }. Checked twice a second; typing shows "Saving…" straight away. */
+const saveBadge = (() => {
+  let fn = null, lastType = 0, state = "", savedAt = 0, since = 0;
+  const STY = {
+    saving: "background:#FFF1D6;color:#7A4B00;border:1px solid #F0C36B",
+    saved: "background:#1E8A55;color:#fff;border:1px solid #1E8A55",
+    offline: "background:#FDE2E2;color:#8A1C1C;border:1px solid #F1A7A7"
+  };
+  const base = "display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font:700 12.5px/1.2 Arial,Helvetica,sans-serif;white-space:nowrap;transition:background .3s";
+  try { ["input", "change"].forEach(ev => document.addEventListener(ev, e => { const t = e.target; if (t && (t.matches("textarea, input:not([type=password]):not([type=email]), select, [contenteditable]")) && !(t.closest && t.closest("#sdcStrip"))) lastType = Date.now(); }, true)); } catch(e){}
+  function paint(st){
+    const el = document.getElementById("sdcSave"); if (!el) return;
+    if (!st){ el.style.display = "none"; state = ""; return; }
+    if (st === state) { if (st === "saved") el.title = "Your work is saved online at " + new Date(savedAt).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit", second:"2-digit" }) + ". You can open it on any computer."; return; }
+    state = st; since = Date.now();
+    el.setAttribute("style", base + ";" + STY[st]);
+    el.innerHTML = st === "saving" ? `<span class="sdcSpin" style="display:inline-block;width:10px;height:10px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sdcSpin .8s linear infinite"></span>Saving…`
+      : st === "saved" ? `<span aria-hidden="true">✓</span>Saved` : `<span aria-hidden="true">⚠</span>Saved on this computer · will upload when online`;
+    el.title = st === "saving" ? "Saving your work online…" : st === "offline" ? "No internet: your work is safe on this computer and goes online as soon as the internet is back." : "Your work is saved online. You can open it on any computer.";
+  }
+  function tick(){
+    let r = null; try { r = fn ? fn() : null; } catch(e){ r = null; }
+    if (!r || !r.on) return paint("");
+    const typing = Date.now() - lastType < 1500, busy = r.pending || typing;
+    if (busy){ if (!navigator.onLine || r.offline) return paint("offline"); return paint("saving"); }
+    if (state === "saving" && Date.now() - since < 700) return;   // let "Saving…" show for a moment
+    if (state !== "saved") savedAt = Date.now();
+    paint(state === "" && !r.everSaved ? "saved" : "saved");
+  }
+  try { const st = document.createElement("style"); st.textContent = "@keyframes sdcSpin{to{transform:rotate(360deg)}}"; document.head.appendChild(st); } catch(e){}
+  setInterval(tick, 500);
+  return { watch(f){ fn = f; tick(); }, tick };
+})();
 /* ---------- narrator for the course videos ----------
    A calm, natural voice: the best neural/natural voice on the device (male or female, the student's choice),
    spoken sentence by sentence with short breaths between them, at an easy pace, in the chosen language. */
@@ -841,7 +876,7 @@ function strip(c, onSignOut, noLang, mainSel, onSignIn){
   const d = document.createElement("div"); d.id = "sdcStrip";
   d.setAttribute("style", "background:#0f1c33;color:#fff;font:600 13px/1.3 Arial,Helvetica,sans-serif;padding:6px 14px;display:flex;gap:8px 10px;align-items:center;flex-wrap:wrap;position:fixed;top:0;left:0;right:0;z-index:2147483000;box-shadow:0 1px 4px rgba(0,0,0,.25)");
   d.innerHTML = `<style>@media(max-width:560px){#sdcStrip .sdcHide{display:none}}</style><span style="background:#DC2B3E;border-radius:5px;padding:2px 7px;font-weight:900;letter-spacing:.04em">SISD</span><span class="sdcHide">Design and Computing</span><span class="sdcHide" style="opacity:.6">·</span><span>You are in: <b>${esc(C.name)}</b></span>
-    <span style="margin-left:auto;display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap">${noLang ? "" : langPicker(true)}</span><select id="sdcCourse" aria-label="Change course" title="Go to another of your courses" style="background:#0f1c33;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:999px;padding:3px 8px;font:inherit;cursor:pointer;max-width:200px"></select><button type="button" id="sdcLeave" style="background:#DC2B3E;border:1px solid #DC2B3E;color:#fff;border-radius:999px;padding:3px 12px;font:inherit;font-weight:800;cursor:pointer">Sign out</button>`;
+    <span style="margin-left:auto;display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap"><span id="sdcSave" role="status" aria-live="polite" style="display:none"></span>${noLang ? "" : langPicker(true)}</span><select id="sdcCourse" aria-label="Change course" title="Go to another of your courses" style="background:#0f1c33;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:999px;padding:3px 8px;font:inherit;cursor:pointer;max-width:200px"></select><button type="button" id="sdcLeave" style="background:#DC2B3E;border:1px solid #DC2B3E;color:#fff;border-radius:999px;padding:3px 12px;font:inherit;font-weight:800;cursor:pointer">Sign out</button>`;
   document.body.insertBefore(d, document.body.firstChild); bindPickers(); setTimeout(showFeedbackButton, 1500);
   const rp = document.getElementById("sdcReadPage");
   if (rp) rp.onclick = () => { const m = [...document.querySelectorAll(mainSel || "main, #app")].find(e => e.offsetParent !== null) || document.body; readEl(m, rp); };
@@ -868,5 +903,5 @@ function strip(c, onSignOut, noLang, mainSel, onSignIn){
 function signedOutNotice(msg, kind){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg, kind: kind || "bad" })); } catch(e){} }
 
 return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
-  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, slow, rank, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
+  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, slow, rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();
