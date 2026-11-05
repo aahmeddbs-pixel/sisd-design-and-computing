@@ -482,7 +482,7 @@ async function canSignUp(email, name, c){
 
 /* ---------- language: one choice for the portal, both courses and the admin pages ----------
    Uses Google's website translator. The choice is shared across all pages of the site (cookie on path /). */
-const LANGS = { en:"English", fr:"Français", ru:"Русский", es:"Español" };
+const LANGS = { en:"English", fr:"Français", ru:"Русский", es:"Español", de:"Deutsch" };
 function getLang(){
   let c = null; try { c = localStorage.getItem("sdc_lang"); } catch(e){}
   if (!LANGS[c]){ const m = document.cookie.match(/googtrans=\/en\/([a-z]+)/); c = m && LANGS[m[1]] ? m[1] : "en"; }
@@ -497,7 +497,7 @@ let gtLoaded = false;
 function loadTranslator(){
   if (gtLoaded || offline()) return; gtLoaded = true;
   let host = document.getElementById("gtHost"); if (!host){ host = document.createElement("div"); host.id = "gtHost"; document.body.appendChild(host); }
-  window.googleTranslateElementInit = () => { try { new google.translate.TranslateElement({ pageLanguage:"en", includedLanguages:"en,fr,ru,es", autoDisplay:false }, "gtHost"); } catch(e){} };
+  window.googleTranslateElementInit = () => { try { new google.translate.TranslateElement({ pageLanguage:"en", includedLanguages:"en,fr,ru,es,de", autoDisplay:false }, "gtHost"); } catch(e){} };
   const sc = document.createElement("script"); sc.src = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"; document.body.appendChild(sc);
 }
 function setLang(code, first){
@@ -506,7 +506,7 @@ function setLang(code, first){
   document.documentElement.lang = code; langCookie(code);
   document.querySelectorAll(".sdcLang select").forEach(x => { x.value = code; });
   if (code === "en"){ if (!first && gtLoaded) location.reload(); return; }
-  loadTranslator();
+  gloss(document.body); loadTranslator();
   let tries = 0; const t = setInterval(() => { const sel = document.querySelector(".goog-te-combo");
     if (sel){ if (sel.value !== code){ sel.value = code; sel.dispatchEvent(new Event("change")); } clearInterval(t); } else if (++tries > 40) clearInterval(t); }, 250);
 }
@@ -517,14 +517,81 @@ function langPicker(dark){
   const c = dark ? "#fff" : "inherit", bd = dark ? "rgba(255,255,255,.35)" : "var(--line,#D8DEEA)";
   return `<label class="sdcLang notranslate" translate="no" title="Language" style="display:inline-flex;align-items:center;gap:5px;border:1px solid ${bd};border-radius:999px;padding:3px 10px;font:700 13px Arial,Helvetica,sans-serif;color:${c};cursor:pointer"><span aria-hidden="true">🌐</span><select aria-label="Language" style="background:transparent;border:0;color:${c};font:inherit;cursor:pointer;outline:none;padding:0;margin:0;min-height:0;height:auto;width:auto;box-shadow:none;border-radius:0">${Object.keys(LANGS).map(k => `<option value="${k}" style="color:#16223A" ${k === getLang() ? "selected" : ""}>${LANGS[k]}</option>`).join("")}</select></label>`;
 }
+/* ---------- school glossary for the translations ----------
+   Google's page translator gets our subject words wrong ("strand" became "прядь" / "нить" / "hebra" / "Strang",
+   "rubric" became "Рубрика", "Practice: pass before the task" became a football pass). Before Google sees a piece of
+   text, our exact words are put in, marked "don't translate": whole labels from GL_PHRASE, and key terms inside
+   longer sentences from GL_TERM. Google then translates the rest of the sentence around them. */
+const GL_PHRASE = {
+  "pass before the task":        { ru:"Пройди перед заданием", fr:"À réussir avant la tâche", es:"Apruébala antes de la tarea", de:"Vor der Aufgabe bestehen" },
+  "practice":                    { ru:"Тренировка", fr:"Entraînement", es:"Práctica", de:"Übung" },
+  "how you're marked":           { ru:"Как тебя оценивают", fr:"Comment tu es évalué", es:"Cómo se te evalúa", de:"Wie du bewertet wirst" },
+  "method & starters":           { ru:"Метод и подсказки", fr:"Méthode et débuts de phrases", es:"Método e inicios de frase", de:"Methode und Satzanfänge" },
+  "how to solve it":             { ru:"Как это решить", fr:"Comment le résoudre", es:"Cómo resolverlo", de:"So löst du es" },
+  "a different problem":         { ru:"Другая задача", fr:"Un autre problème", es:"Un problema diferente", de:"Ein anderes Problem" },
+  "your task":                   { ru:"Твоё задание", fr:"Ta tâche", es:"Tu tarea", de:"Deine Aufgabe" },
+  "watch the video":             { ru:"Посмотри видео", fr:"Regarde la vidéo", es:"Mira el vídeo", de:"Sieh dir das Video an" },
+  "introduction":                { ru:"Введение", fr:"Introduction", es:"Introducción", de:"Einführung" },
+  "download & hand in":          { ru:"Скачать и сдать", fr:"Télécharger et rendre", es:"Descargar y entregar", de:"Herunterladen und abgeben" },
+  "pdf + teacher copy":          { ru:"PDF + копия для учителя", fr:"PDF + copie pour l'enseignant", es:"PDF + copia para el profesor", de:"PDF + Kopie für die Lehrkraft" },
+  "change course":               { ru:"Сменить курс", fr:"Changer de cours", es:"Cambiar de curso", de:"Kurs wechseln" },
+  "go to another of your courses": { ru:"Перейти в другой твой курс", fr:"Aller à un autre de tes cours", es:"Ir a otro de tus cursos", de:"Zu einem anderen deiner Kurse" },
+  "read to me":                  { ru:"Прочитать вслух", fr:"Lire à voix haute", es:"Leer en voz alta", de:"Vorlesen" },
+  "read this page to me":        { ru:"Прочитать эту страницу вслух", fr:"Lire cette page à voix haute", es:"Leer esta página en voz alta", de:"Diese Seite vorlesen" },
+  "learn":                       { ru:"Теория", fr:"Apprendre", es:"Aprender", de:"Lernen" },
+  "saving…":                     { ru:"Сохранение…", fr:"Enregistrement…", es:"Guardando…", de:"Wird gespeichert…" },
+  "saved":                       { ru:"Сохранено", fr:"Enregistré", es:"Guardado", de:"Gespeichert" },
+  "sketch here":                 { ru:"Нарисовать здесь", fr:"Dessiner ici", es:"Dibujar aquí", de:"Hier zeichnen" },
+  "check spelling and grammar":  { ru:"Проверить орфографию и грамматику", fr:"Vérifier l'orthographe et la grammaire", es:"Revisar ortografía y gramática", de:"Rechtschreibung und Grammatik prüfen" },
+  "skip the video task":         { ru:"Пропустить задание с видео", fr:"Passer la tâche vidéo", es:"Saltar la tarea del vídeo", de:"Die Videoaufgabe überspringen" }
+};
+const GL_TERM = [   // [English (regular expression), { language: our word }] — longest first
+  [/\bstrand briefs?\b/gi, { ru:"аудиоинструкция", fr:"consigne audio", es:"instrucciones en audio", de:"Audio-Anleitung" }],
+  [/\bstrands\b/gi, { ru:"части", fr:"volets", es:"aspectos", de:"Aspekte" }],
+  [/\bstrand\b/gi, { ru:"часть", fr:"volet", es:"aspecto", de:"Aspekt" }],
+  [/\brubrics?\b/gi, { ru:"критерии оценивания", fr:"grille d'évaluation", es:"rúbrica", de:"Bewertungsraster" }],
+  [/\bhouse points?\b/gi, { ru:"очки факультета", fr:"points de maison", es:"puntos de casa", de:"Hauspunkte" }],
+  [/\bworked examples?\b/gi, { ru:"разобранный пример", fr:"exemple corrigé", es:"ejemplo resuelto", de:"Lösungsbeispiel" }],
+  [/\bdesign briefs?\b/gi, { ru:"дизайн-бриф", fr:"cahier des charges", es:"brief de diseño", de:"Design-Briefing" }],
+  [/\bdesign specifications?\b/gi, { ru:"техническая спецификация", fr:"cahier des charges détaillé", es:"especificación de diseño", de:"Designspezifikation" }],
+  [/\blogical plan\b/gi, { ru:"логический план", fr:"plan logique", es:"plan lógico", de:"logischer Plan" }],
+  [/\bACCESS FM\b/g, { ru:"ACCESS FM", fr:"ACCESS FM", es:"ACCESS FM", de:"ACCESS FM" }],
+  [/\bMYP\b/g, { ru:"MYP", fr:"PEI", es:"PAI", de:"MYP" }],
+  [/\bSDGs?\b/g, { ru:"ЦУР", fr:"ODD", es:"ODS", de:"SDG" }]
+];
+const GL_SKIP = "script,style,textarea,input,select,code,pre,svg,canvas,.notranslate,[translate=no],[contenteditable],.editor,.console,#gtHost";
+const GL_CAP = (t, w) => /^[A-Z]/.test(t) ? w.charAt(0).toUpperCase() + w.slice(1) : w;
+function glossNode(tn, code){
+  const raw = tn.nodeValue; if (!raw || !/[A-Za-z]{3}/.test(raw)) return;
+  const el = tn.parentElement; if (!el || el.closest(GL_SKIP)) return;
+  const m = raw.match(/^([^A-Za-z]*)(.*?)([\s→←.:!?…]*)$/s), core = m ? m[2] : raw, ph = GL_PHRASE[core.trim().toLowerCase()];
+  const span = txt => { const sp = document.createElement("span"); sp.className = "notranslate sdcGl"; sp.setAttribute("translate", "no"); sp.textContent = txt; return sp; };
+  if (ph && ph[code]){ const frag = document.createDocumentFragment(); if (m[1]) frag.append(m[1]); frag.append(span(GL_CAP(core, ph[code]))); if (m[3]) frag.append(m[3]); tn.replaceWith(frag); return; }
+  const hits = []; GL_TERM.forEach(([re, tr]) => { if (!tr[code]) return; re.lastIndex = 0; let x; while ((x = re.exec(raw))){ if (!hits.some(h => x.index < h.e && x.index + x[0].length > h.s)) hits.push({ s:x.index, e:x.index + x[0].length, w:GL_CAP(x[0], tr[code]) }); } });
+  if (!hits.length) return;
+  hits.sort((a, b) => a.s - b.s); const frag = document.createDocumentFragment(); let at = 0;
+  hits.forEach(h => { if (h.s > at) frag.append(raw.slice(at, h.s)); frag.append(span(h.w)); at = h.e; }); if (at < raw.length) frag.append(raw.slice(at));
+  tn.replaceWith(frag);
+}
+function gloss(root){
+  const code = getLang(); if (code === "en" || !root) return;
+  if (root.nodeType === 3) return glossNode(root, code);
+  if (root.nodeType !== 1 || (root.closest && root.closest(GL_SKIP))) return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), list = []; let n; while ((n = w.nextNode())) list.push(n);
+  list.forEach(t => glossNode(t, code));
+  // dropdown options can't hold a span: swap whole labels and mark them
+  (root.querySelectorAll ? root.querySelectorAll("option") : []).forEach(o => { const ph = GL_PHRASE[String(o.textContent).trim().toLowerCase()]; if (ph && ph[code]){ o.textContent = ph[code]; o.classList.add("notranslate"); } });
+  if (root.title && GL_PHRASE[root.title.trim().toLowerCase()]) root.title = GL_PHRASE[root.title.trim().toLowerCase()][code] || root.title;
+}
 function bindPickers(){ document.querySelectorAll(".sdcLang select").forEach(x => { if (!x.dataset.b){ x.dataset.b = 1; x.onchange = () => { if (typeof window.SDC_onLang === "function") window.SDC_onLang(x.value); else setLang(x.value); }; } }); }
 (function initLang(){
   const css = document.createElement("style");
   css.textContent = "#gtHost,.goog-te-banner-frame,.skiptranslate>iframe,#goog-gt-tt,.goog-te-balloon-frame,.VIpgJd-ZVi9od-ORHb-OEVmcd,.VIpgJd-ZVi9od-aZ2wEe-wOHMyf{display:none!important}body{top:0!important}.goog-text-highlight{background:none!important;box-shadow:none!important}";
   document.head.appendChild(css);
   const start = () => {
-    protect(); bindPickers();
-    new MutationObserver(ms => { ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1 && !(n.classList && n.classList.contains("sdcTmp"))){ if (n.matches && n.matches(KEEP)) protect(n.parentNode || n); else protect(n); } })); bindPickers(); }).observe(document.body, { childList:true, subtree:true });
+    protect(); bindPickers(); gloss(document.body);
+    new MutationObserver(ms => { ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1 && !(n.classList && n.classList.contains("sdcTmp"))){ if (n.matches && n.matches(KEEP)) protect(n.parentNode || n); else protect(n); }
+      if (!(n.classList && n.classList.contains("sdcGl")) && !(n.parentElement && n.parentElement.classList.contains("sdcGl"))) gloss(n); })); bindPickers(); }).observe(document.body, { childList:true, subtree:true });
     if (!window.SDC_ownLang && getLang() !== "en") setLang(getLang(), true);
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
@@ -532,7 +599,7 @@ function bindPickers(){ document.querySelectorAll(".sdcLang select").forEach(x =
 
 /* ---------- read aloud: any text section, in the chosen language ----------
    Reads the text as it is on screen, so after translation it reads the translated words, with a voice for that language. */
-const VOICE = { en:"en-GB", fr:"fr-FR", ru:"ru-RU", es:"es-ES" };
+const VOICE = { en:"en-GB", fr:"fr-FR", ru:"ru-RU", es:"es-ES", de:"de-DE" };
 const canSpeak = () => { try { return "speechSynthesis" in window; } catch(e){ return false; } };
 let voices = {};
 try { speechSynthesis.onvoiceschanged = () => { voices = {}; }; speechSynthesis.getVoices(); } catch(e){}
@@ -904,5 +971,5 @@ function strip(c, onSignOut, noLang, mainSel, onSignIn){
 function signedOutNotice(msg, kind){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg, kind: kind || "bad" })); } catch(e){} }
 
 return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
-  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, listen, stopReading, speak, slow, rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
+  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, gloss, listen, stopReading, speak, slow, rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();
