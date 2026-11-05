@@ -543,30 +543,83 @@ const GL_PHRASE = {
   "saved":                       { ru:"Сохранено", fr:"Enregistré", es:"Guardado", de:"Gespeichert" },
   "sketch here":                 { ru:"Нарисовать здесь", fr:"Dessiner ici", es:"Dibujar aquí", de:"Hier zeichnen" },
   "check spelling and grammar":  { ru:"Проверить орфографию и грамматику", fr:"Vérifier l'orthographe et la grammaire", es:"Revisar ortografía y gramática", de:"Rechtschreibung und Grammatik prüfen" },
+  "rubric":                      { ru:"Шкала оценивания", fr:"Grille d'évaluation", es:"Rúbrica", de:"Bewertungsraster" },
+  "worked example":              { ru:"Разобранный пример", fr:"Exemple corrigé", es:"Ejemplo resuelto", de:"Lösungsbeispiel" },
+  "house points":                { ru:"Очки факультета", fr:"Points de maison", es:"Puntos de casa", de:"Hauspunkte" },
+  "strand brief":                { ru:"Аудиоинструкция", fr:"Consigne audio", es:"Instrucciones en audio", de:"Audio-Anleitung" },
+  "pause the strand brief":      { ru:"Пауза", fr:"Pause", es:"Pausa", de:"Pause" },
   "skip the video task":         { ru:"Пропустить задание с видео", fr:"Passer la tâche vidéo", es:"Saltar la tarea del vídeo", de:"Die Videoaufgabe überspringen" }
 };
-const GL_TERM = [   // [English (regular expression), { language: our word }] — longest first
-  [/\bstrand briefs?\b/gi, { ru:"аудиоинструкция", fr:"consigne audio", es:"instrucciones en audio", de:"Audio-Anleitung" }],
-  [/\bstrands\b/gi, { ru:"части", fr:"volets", es:"aspectos", de:"Aspekte" }],
-  [/\bstrand\b/gi, { ru:"часть", fr:"volet", es:"aspecto", de:"Aspekt" }],
-  [/\brubrics?\b/gi, { ru:"критерии оценивания", fr:"grille d'évaluation", es:"rúbrica", de:"Bewertungsraster" }],
-  [/\bhouse points?\b/gi, { ru:"очки факультета", fr:"points de maison", es:"puntos de casa", de:"Hauspunkte" }],
-  [/\bworked examples?\b/gi, { ru:"разобранный пример", fr:"exemple corrigé", es:"ejemplo resuelto", de:"Lösungsbeispiel" }],
-  [/\bdesign briefs?\b/gi, { ru:"дизайн-бриф", fr:"cahier des charges", es:"brief de diseño", de:"Design-Briefing" }],
-  [/\bdesign specifications?\b/gi, { ru:"техническая спецификация", fr:"cahier des charges détaillé", es:"especificación de diseño", de:"Designspezifikation" }],
-  [/\blogical plan\b/gi, { ru:"логический план", fr:"plan logique", es:"plan lógico", de:"logischer Plan" }],
-  [/\bACCESS FM\b/g, { ru:"ACCESS FM", fr:"ACCESS FM", es:"ACCESS FM", de:"ACCESS FM" }],
-  [/\bMYP\b/g, { ru:"MYP", fr:"PEI", es:"PAI", de:"MYP" }],
-  [/\bSDGs?\b/g, { ru:"ЦУР", fr:"ODD", es:"ODS", de:"SDG" }]
+const GL_RX = [   // whole labels with a strand number in them
+  [/^(←\s*)?Strand (i|ii|iii|iv)$/i, { ru:"$1Часть $2", fr:"$1Volet $2", es:"$1Aspecto $2", de:"$1Aspekt $2" }],
+  [/^Strands (i–iv|i-iv)$/i, { ru:"Части $1", fr:"Volets $1", es:"Aspectos $1", de:"Aspekte $1" }],
+  [/^Complete strand (i|ii|iii|iv) and continue$/i, { ru:"Завершить часть $1 и продолжить", fr:"Terminer le volet $1 et continuer", es:"Completar el aspecto $1 y continuar", de:"Aspekt $1 abschließen und weiter" }],
+  [/^Complete strand (i|ii|iii|iv)$/i, { ru:"Завершить часть $1", fr:"Terminer le volet $1", es:"Completar el aspecto $1", de:"Aspekt $1 abschließen" }],
+  [/^Save changes to strand (i|ii|iii|iv)$/i, { ru:"Сохранить изменения в части $1", fr:"Enregistrer les modifications du volet $1", es:"Guardar los cambios del aspecto $1", de:"Änderungen an Aspekt $1 speichern" }],
+  [/^Back to strand (i|ii|iii|iv)$/i, { ru:"Вернуться к части $1", fr:"Retour au volet $1", es:"Volver al aspecto $1", de:"Zurück zu Aspekt $1" }]
 ];
+const GL_TERM = [   // short names kept exactly as written (no grammar around them)
+  [/\bACCESS FM\b/g, { ru:"ACCESS FM", fr:"ACCESS FM", es:"ACCESS FM", de:"ACCESS FM" }],
+  [/\bMYP\b/g, { ru:"MYP", fr:"PEI", es:"PAI", de:"MYP" }]
+];
+/* after Google has translated a sentence: swap its wrong word for ours in the same grammatical form */
+const RU_3 = { "ь":"ь", "и":"и", "ью":"ью", "ей":"ей", "ям":"ям", "ями":"ями", "ях":"ях" };
+const RU_VETKA = { "а":"ь", "и":"и", "е":"и", "у":"ь", "ой":"ью", "ам":"ям", "ами":"ями", "ах":"ях" };
+const RU_STRAND = { "":"ь", "а":"и", "у":"и", "ом":"ью", "е":"и", "ы":"и", "ов":"ей", "ам":"ям", "ами":"ями", "ах":"ях" };
+const RU_ADJ = { "ый":"ый", "ий":"ый", "ого":"ого", "его":"ого", "ому":"ому", "ему":"ому", "ым":"ым", "им":"ым", "ом":"ом", "ем":"ом", "ые":"ые", "ие":"ые", "ых":"ых", "их":"ых", "ыми":"ыми", "ими":"ыми", "ую":"ый", "ая":"ый" };
+const L_ = "(?<![\\p{L}])", _L = "(?![\\p{L}])";
+const keepCase = (orig, w) => orig.charAt(0) === orig.charAt(0).toUpperCase() && orig.charAt(0) !== orig.charAt(0).toLowerCase() ? w.charAt(0).toUpperCase() + w.slice(1) : w;
+const GL_POST = {
+  ru: [
+    [new RegExp(L_ + "(пряд|нит)(ь|и|ью|ей|ям|ями|ях)" + _L, "giu"), (m, a, e) => keepCase(m, "част" + RU_3[e.toLowerCase()])],
+    [new RegExp(L_ + "ветк(а|и|е|у|ой|ам|ами|ах)" + _L, "giu"), (m, e) => keepCase(m, "част" + RU_VETKA[e.toLowerCase()])],
+    [new RegExp(L_ + "веток" + _L, "giu"), m => keepCase(m, "частей")],
+    [new RegExp(L_ + "стрэнд(а|у|ом|е|ы|ов|ам|ами|ах)?" + _L, "giu"), (m, e) => keepCase(m, "част" + RU_STRAND[(e || "").toLowerCase()])],
+    [new RegExp(L_ + "рубрик(а|и|е|у|ой|ам|ами|ах)?" + _L, "giu"), (m, e) => keepCase(m, "шкал" + (e || "") + " оценивания")],
+    [new RegExp(L_ + "(проработанн|рабоч|отработанн)(ый|ий|ого|его|ому|ему|ым|им|ом|ем|ые|ие|ых|их|ыми|ими)(\\s+пример)", "giu"), (m, a, e, t) => keepCase(m, "разобранн" + RU_ADJ[e.toLowerCase()]) + t],
+    [new RegExp("(очк(?:и|ов|ам|ами)|балл(?:а|ов)?)\\s+(?:дома|House Points)" + _L, "giu"), (m, a) => a + " факультета"],
+    [new RegExp(L_ + "House Points" + _L, "gu"), () => "очки факультета"]
+  ],
+  fr: [
+    [new RegExp(L_ + "brin(s?)" + _L, "giu"), (m, s) => keepCase(m, "volet" + s)],
+    [new RegExp(L_ + "rubrique(s?)" + _L, "giu"), (m, s) => keepCase(m, "grille" + s + " d'évaluation")],
+    [new RegExp(L_ + "exemple(s?) (?:concret|travaillé|pratique|résolu)s?" + _L, "giu"), (m, s) => keepCase(m, "exemple" + s + " corrigé" + s)],
+    [new RegExp(L_ + "(?:dossier|brief|cahier) de conception" + _L, "giu"), m => keepCase(m, "cahier des charges")],
+    [new RegExp(L_ + "Points de la maison" + _L, "giu"), m => keepCase(m, "points de maison")]
+  ],
+  es: [
+    [new RegExp(L_ + "(la|una|esta|esa|cada|otra|nueva|primera|última|siguiente) (hebra|hilera)" + _L, "giu"), (m, a) => keepCase(m, ({ la:"el", una:"un", esta:"este", esa:"ese", cada:"cada", otra:"otro", nueva:"nuevo", "primera":"primer", "última":"último", siguiente:"siguiente" })[a.toLowerCase()] + " aspecto")],
+    [new RegExp(L_ + "(las|unas|estas|esas|otras) (hebras|hileras)" + _L, "giu"), (m, a) => keepCase(m, ({ las:"los", unas:"unos", estas:"estos", esas:"esos", otras:"otros" })[a.toLowerCase()] + " aspectos")],
+    [new RegExp(L_ + "(?:hebra|hilo|hilera|capítulo|filamento)(s?)" + _L, "giu"), (m, s) => keepCase(m, "aspecto" + s)],
+    [new RegExp(L_ + "resumen de diseño" + _L, "giu"), m => keepCase(m, "brief de diseño")],
+    [new RegExp(L_ + "puntos de la casa" + _L, "giu"), m => keepCase(m, "puntos de casa")]
+  ],
+  de: [
+    [new RegExp(L_ + "(?:Strang|Faden)(es|s)?" + _L, "gu"), (m, e) => "Aspekt" + (e ? "s" : "")],
+    [new RegExp(L_ + "(?:Stränge|Fäden)" + _L, "gu"), () => "Aspekte"],
+    [new RegExp(L_ + "(?:Strängen|Fäden)" + _L, "gu"), () => "Aspekten"],
+    [new RegExp(L_ + "anhand der Rubrik" + _L, "gu"), () => "anhand des Bewertungsrasters"],
+    [new RegExp(L_ + "die Rubrik" + _L, "giu"), m => keepCase(m, "das Bewertungsraster")],
+    [new RegExp(L_ + "Rubrik(en)?" + _L, "gu"), () => "Bewertungsraster"],
+    [new RegExp(L_ + "ausgearbeitete(n|s)? Beispiel(e|en)?" + _L, "gu"), (m, a, b) => "Lösungsbeispiel" + (b || "")],
+    [new RegExp(L_ + "zu Ende stricken und weiterstricken" + _L, "gu"), () => "abschließen und weiter"]
+  ]
+};
+function glossPost(tn, code){
+  const rules = GL_POST[code]; if (!rules) return; const v = tn.nodeValue; if (!v || v.length < 3) return;
+  let out = v; rules.forEach(([re, f]) => { re.lastIndex = 0; out = out.replace(re, f); });
+  if (out !== v) tn.nodeValue = out;
+}
 const GL_SKIP = "script,style,textarea,input,select,code,pre,svg,canvas,.notranslate,[translate=no],[contenteditable],.editor,.console,#gtHost";
 const GL_CAP = (t, w) => /^[A-Z]/.test(t) ? w.charAt(0).toUpperCase() + w.slice(1) : w;
 function glossNode(tn, code){
-  const raw = tn.nodeValue; if (!raw || !/[A-Za-z]{3}/.test(raw)) return;
   const el = tn.parentElement; if (!el || el.closest(GL_SKIP)) return;
+  glossPost(tn, code);   // text Google has already translated
+  const raw = tn.nodeValue; if (!raw || !/[A-Za-z]{3}/.test(raw)) return;
   const m = raw.match(/^([^A-Za-z]*)(.*?)([\s→←.:!?…]*)$/s), core = m ? m[2] : raw, ph = GL_PHRASE[core.trim().toLowerCase()];
   const span = txt => { const sp = document.createElement("span"); sp.className = "notranslate sdcGl"; sp.setAttribute("translate", "no"); sp.textContent = txt; return sp; };
   if (ph && ph[code]){ const frag = document.createDocumentFragment(); if (m[1]) frag.append(m[1]); frag.append(span(GL_CAP(core, ph[code]))); if (m[3]) frag.append(m[3]); tn.replaceWith(frag); return; }
+  for (const [re, tr] of GL_RX){ const t = core.trim(); if (tr[code] && re.test(t)){ const frag = document.createDocumentFragment(); if (m[1]) frag.append(m[1]); frag.append(span(t.replace(re, tr[code]))); if (m[3]) frag.append(m[3]); tn.replaceWith(frag); return; } }
   const hits = []; GL_TERM.forEach(([re, tr]) => { if (!tr[code]) return; re.lastIndex = 0; let x; while ((x = re.exec(raw))){ if (!hits.some(h => x.index < h.e && x.index + x[0].length > h.s)) hits.push({ s:x.index, e:x.index + x[0].length, w:GL_CAP(x[0], tr[code]) }); } });
   if (!hits.length) return;
   hits.sort((a, b) => a.s - b.s); const frag = document.createDocumentFragment(); let at = 0;
@@ -590,8 +643,11 @@ function bindPickers(){ document.querySelectorAll(".sdcLang select").forEach(x =
   document.head.appendChild(css);
   const start = () => {
     protect(); bindPickers(); gloss(document.body);
-    new MutationObserver(ms => { ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1 && !(n.classList && n.classList.contains("sdcTmp"))){ if (n.matches && n.matches(KEEP)) protect(n.parentNode || n); else protect(n); }
-      if (!(n.classList && n.classList.contains("sdcGl")) && !(n.parentElement && n.parentElement.classList.contains("sdcGl"))) gloss(n); })); bindPickers(); }).observe(document.body, { childList:true, subtree:true });
+    new MutationObserver(ms => { ms.forEach(m => {
+      m.addedNodes.forEach(n => { if (n.nodeType === 1 && !(n.classList && n.classList.contains("sdcTmp"))){ if (n.matches && n.matches(KEEP)) protect(n.parentNode || n); else protect(n); }
+        if (!(n.classList && n.classList.contains("sdcGl")) && !(n.parentElement && n.parentElement.classList.contains("sdcGl"))) gloss(n); });
+      if (m.type === "characterData" && m.target.nodeType === 3){ const code = getLang(); if (code !== "en" && m.target.parentElement && !m.target.parentElement.closest(GL_SKIP)) glossPost(m.target, code); } });
+      bindPickers(); }).observe(document.body, { childList:true, subtree:true, characterData:true });
     if (!window.SDC_ownLang && getLang() !== "en") setLang(getLang(), true);
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
