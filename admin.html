@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261105i"></script>
+<script src="/python-pathways/pp-sync.js?v=20261105j"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261105i"></script>
+<script src="sdc.js?v=20261105j"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -144,6 +144,7 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
         <h2><span id="stTitle">Students</span> <span class="n" id="stCount">0</span></h2>
         <p class="muted small" style="margin-top:4px" id="stIntro">Open a student to see their progress and send them feedback. Press <b>✏️ Change course</b> to change a student's course, grade, level or teacher.</p>
         <div id="stWarn"></div>
+        <div id="resetBox"></div>
         <div id="slowBox"></div>
         <div id="vwait"></div>
         <div id="dreq"></div>
@@ -831,12 +832,13 @@ function renderStudents(){
       <td>${pill(s.course)}${s.also && s.also.length ? `<div class="em" title="Also takes ${esc(s.also.map(x => C[x] ? C[x].name : x).join(", "))}">also ${esc(s.also.map(x => C[x] ? C[x].short : x).join(", "))}</div>` : ""}</td><td>${s.grade ? "G" + esc(s.grade) : ""}</td><td>${esc(s.course === "cs" ? levelName("cs", s.level) : s.cls || "")}</td><td>${esc(s.teacher || "")}</td>
       <td class="small">${progressCell(s)}</td>
       <td class="small">${s.active || s.last ? esc(fmtDT(s.active || s.last)) : "<span class='muted'>—</span>"}</td>
-      <td><div class="acts">${isSuper() || TKEY ? `<button class="btn sm" data-ed="${i}" title="Change course, grade, level or teacher">✏️ Change course</button>` : ""}<button class="btn ghost sm" data-pr="${i}">Progress &amp; feedback</button><button class="btn ghost sm" data-fp="${i}" title="Download this student's feedback as a PDF">📄 Feedback PDF</button>${s.course === "cs" ? `<button class="btn ghost sm" data-vp="${i}" title="Show or hide this student's PIN">👁 PIN</button>${PIN_DONE[s.key] ? `<button class="btn ok sm" data-pin="${i}" style="background:#1E8A55;color:#fff" title="PIN reset done. Press to reset it again">✓ Done</button>` : `<button class="btn ghost sm" data-pin="${i}">🔑 Reset PIN</button>`}` : ""}${isSuper() ? delBtn(s, i) : ""}</div></td></tr>`).join("")
+      <td><div class="acts">${isSuper() || TKEY ? `<button class="btn sm" data-ed="${i}" title="Change course, grade, level or teacher">✏️ Change course</button>` : ""}<button class="btn ghost sm" data-pr="${i}">Progress &amp; feedback</button><button class="btn ghost sm" data-fp="${i}" title="Download this student's feedback as a PDF">📄 Feedback PDF</button>${s.course === "cs" ? `<button class="btn ghost sm" data-vp="${i}" title="Show or hide this student's PIN">👁 PIN</button>${PIN_DONE[s.key] ? `<button class="btn ok sm" data-pin="${i}" style="background:#1E8A55;color:#fff" title="PIN reset done. Press to reset it again">✓ Done</button>` : `<button class="btn ghost sm" data-pin="${i}">🔑 Reset PIN</button>`}` : RKEY ? (PIN_DONE[s.key + "#pw"] ? `<button class="btn ok sm" data-dpw="${i}" style="background:#1E8A55;color:#fff" title="Password reset done. Press to reset it again">✓ Done</button>` : `<button class="btn ghost sm" data-dpw="${i}">🔑 Reset password</button>`) : ""}${isSuper() ? delBtn(s, i) : ""}</div></td></tr>`).join("")
       : `<tr><td colspan="8" class="muted">${isSuper() ? "No students yet. They appear here after signing in through the platform." : "No students have chosen you as their teacher yet."}</td></tr>`);
   $("stTbl").querySelectorAll("[data-ed]").forEach(b => b.onclick = () => editStudent(list[+b.dataset.ed]));
   $("stTbl").querySelectorAll("[data-pr]").forEach(b => b.onclick = () => openProgress(list[+b.dataset.pr]));
   $("stTbl").querySelectorAll("[data-fp]").forEach(b => b.onclick = () => studentPdf(list[+b.dataset.fp], b));
   $("stTbl").querySelectorAll("[data-pin]").forEach(b => b.onclick = () => resetPin(list[+b.dataset.pin]));
+  $("stTbl").querySelectorAll("[data-dpw]").forEach(b => b.onclick = () => resetDesignPw(list[+b.dataset.dpw]));
   $("stTbl").querySelectorAll("[data-vp]").forEach(b => b.onclick = () => { const s = list[+b.dataset.vp];
     if (b.dataset.shown){ delete b.dataset.shown; b.textContent = "👁 PIN"; return; }
     b.dataset.shown = "1"; b.innerHTML = s.pin ? `PIN <b style="font-family:Consolas,Menlo,monospace;letter-spacing:.15em">${esc(s.pin)}</b>` : "No PIN on record"; b.title = s.pin ? "Click to hide" : "This student signed up before PINs were recorded. Use Reset PIN to give them a new one."; });
@@ -1151,10 +1153,70 @@ function resetPin(s){
         : `<div class="notice ok"><b>Done.</b> ${esc(s.name)} signs in with PIN <b style="font-size:1.15em">${p}</b> on <b>the computer they usually use</b> (their work isn't online yet). That first sign-in puts their work online; after that the PIN works on any computer.</div>`;
       if (ok){ const gb = q("#rpGo"); gb.textContent = "✓ Done"; gb.className = "btn ok"; gb.style.background = "#1E8A55"; gb.dataset.done = "1";
         SDC.log("pinreset", { name:s.name, email:s.email, course:"cs", grade:s.grade, teacher:s.teacher }, { by: ME.name, pin:p });
-        notePin(s.key, p, Date.now()); s.pin = p; PIN_DONE[s.key] = Date.now(); renderStudents(); }
+        notePin(s.key, p, Date.now()); s.pin = p; PIN_DONE[s.key] = Date.now(); ROWS.push({ sdc:1, type:"pinreset", when:Date.now(), acct:{ name:s.name, email:s.email || "", teacher:s.teacher, course:"cs" } }); renderStudents(); renderResets();
+        if (s.email){ const sent = await SDC.resetDone({ email:s.email, name:s.name, course:"cs", secret:p });
+          q("#rpMsg").insertAdjacentHTML("beforeend", sent ? `<div class="notice ok">📧 The new PIN has been emailed to ${esc(s.email)}.</div>` : `<div class="notice warn">The email to the student couldn't be sent. Please give them the PIN yourself.</div>`); } }
     } catch(e){ q("#rpMsg").innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; }
     if (!q("#rpGo").dataset.done) q("#rpGo").disabled = false;
   };
+}
+
+/* ---------------- Reset a Design / IT student's password (works on every device, work kept) ---------------- */
+function tempPassword(){ const w = ["Maple","River","Cloud","Tiger","Coral","Piano","Amber","Comet","Lemon","Cedar","Orbit","Pixel"], r = () => w[crypto.getRandomValues(new Uint32Array(1))[0] % w.length];
+  return r() + r() + (10 + crypto.getRandomValues(new Uint32Array(1))[0] % 90) + r(); }
+function resetDesignPw(s){
+  const bg = document.createElement("div"); bg.className = "modal-bg"; bg.style.zIndex = 70;
+  const pw = tempPassword(), em = String(s.email || "").toLowerCase();
+  bg.innerHTML = `<div class="modal" role="dialog" aria-label="Reset password"><h2>🔑 Reset password: ${esc(s.name)}</h2>
+    <p class="muted small" style="margin-top:4px">${esc(String(s.name).split(" ")[0])} signs in with ${esc(em || "their school email")} and the new password on any device. Their work is kept and the old password stops working. The new password is emailed to them.</p>
+    <label class="f">New password<input class="t" id="dpPw" maxlength="40" value="${pw}"></label>
+    ${RKEY ? "" : `<div class="notice warn">${isSuper() ? "The reset key isn't unlocked. Lock and sign in again as super admin." : "Password resets aren't set up for your account yet. Ask the super admin to sign in to this page once, then sign in again."}</div>`}
+    ${em ? "" : `<div class="notice bad">This student has no school email on record, so their password can't be reset here.</div>`}
+    <div id="dpMsg"></div><div class="row" style="margin-top:14px"><button class="btn red" id="dpGo" ${RKEY && em ? "" : "disabled"}>Reset password</button><button class="btn ghost" id="dpX">Close</button></div></div>`;
+  document.body.appendChild(bg);
+  const q = x => bg.querySelector(x);
+  q("#dpX").onclick = () => bg.remove(); bg.onclick = e => { if (e.target === bg) bg.remove(); };
+  q("#dpGo").onclick = async () => {
+    const p = q("#dpPw").value.trim(); if (!/^[A-Za-z0-9]{10,40}$/.test(p)) return q("#dpMsg").innerHTML = `<div class="notice bad">Use 10 to 40 letters and numbers (no spaces).</div>`;
+    if (!PPSync.design || !PPSync.design.enabled()) return q("#dpMsg").innerHTML = `<div class="notice bad">Design sync isn't connected.</div>`;
+    q("#dpGo").disabled = true; q("#dpMsg").innerHTML = `<div class="notice ok">Working… (up to a minute)</div>`;
+    try {
+      const ok = await PPSync.design.resetWithKey(em, p, RKEY);
+      if (!ok){ q("#dpMsg").innerHTML = `<div class="notice warn">No Design account was found online for <b>${esc(em)}</b>. They may never have signed in since saving went online. Ask them to sign up again with this email, or to sign in once on the device they used before.</div>`; q("#dpGo").disabled = false; return; }
+      try { await PPSync.design.escrowSecret(em, p); } catch(e){}
+      SDC.log("pwreset", { name:s.name, email:em, course:s.course || "design", grade:s.grade, teacher:s.teacher }, { by: isSuper() ? "(admin)" : (ME && ME.name) || "" });
+      ROWS.push({ sdc:1, type:"pwreset", when:Date.now(), acct:{ name:s.name, email:em, teacher:s.teacher, course:s.course || "design" } });
+      PIN_DONE[s.key + "#pw"] = Date.now();
+      const gb = q("#dpGo"); gb.textContent = "✓ Done"; gb.className = "btn ok"; gb.style.background = "#1E8A55";
+      const sent = await SDC.resetDone({ email:em, name:s.name, course:s.course || "design", secret:p });
+      q("#dpMsg").innerHTML = `<div class="notice ok"><b>Done.</b> New password for ${esc(s.name)}: <b style="font-size:1.15em;font-family:Consolas,monospace">${esc(p)}</b> (works on any device).</div>` +
+        (sent ? `<div class="notice ok">📧 Emailed to ${esc(em)}.</div>` : `<div class="notice warn">The email to the student couldn't be sent. Please give them the password yourself.</div>`);
+      renderStudents(); renderResets();
+    } catch(e){ q("#dpMsg").innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; q("#dpGo").disabled = false; }
+  };
+}
+/* ---------- students who pressed "Forgot your PIN / password?" ---------- */
+function renderResets(){
+  const box = $("resetBox"); if (!box) return;
+  const req = {}, done = {};
+  ROWS.forEach(r => { if (!r.acct || !r.acct.email) return; const cs = (r.acct.course || "") === "cs", k = SDC.keyOf(r.acct.email, "") + (cs ? "#cs" : "#ds");
+    if (r.type === "resetrequest" && Date.now() - r.when < 14 * 86400000 && (!req[k] || req[k].when < r.when)) req[k] = Object.assign({ k, cs }, r);
+    if (r.type === "pinreset" || r.type === "pwreset" || r.type === "resetdismiss") done[k] = Math.max(done[k] || 0, r.when); });
+  const all = students();
+  const list = Object.values(req).filter(r => !(done[r.k] >= r.when)).map(r => {
+    const em = String(r.acct.email).toLowerCase(), s = all.find(x => String(x.email || "").toLowerCase() === em && (r.cs ? x.course === "cs" : x.course !== "cs"));
+    return Object.assign(r, { s: s || { key:SDC.keyOf(em, r.acct.name), name:r.acct.name, email:em, course:r.cs ? "cs" : (r.acct.course || "design"), teacher:r.acct.teacher || "", grade:"" } });
+  }).filter(r => canSee(r.s.teacher || r.acct.teacher)).sort((a, b) => b.when - a.when);
+  if (!list.length){ box.innerHTML = ""; return; }
+  box.innerHTML = `<div class="card" style="margin:10px 0;border-left:6px solid #DC2B3E;padding:14px 16px"><h3 style="margin:0">🔑 Reset requests (${list.length})</h3>
+    <p class="small muted" style="margin:4px 0 8px">These students pressed <b>Forgot your PIN / password?</b>. Press <b>Reset now</b>: the new PIN or password works on any device, their work is kept, and it is emailed to them.</p>
+    <div class="scroll"><table class="tbl"><tr><th>Student</th><th>Course</th><th>Asked</th><th></th></tr>${list.map((r, i) => `<tr><td><b>${esc(r.s.name || r.acct.name)}</b><div class="em">${esc(r.acct.email)}${(r.s.teacher || r.acct.teacher) ? " · " + esc(r.s.teacher || r.acct.teacher) : ""}</div></td>
+      <td>${pill(r.cs ? "cs" : r.s.course)} ${r.cs ? "PIN" : "password"}</td><td class="small">${esc(fmtDT(r.when))}</td>
+      <td><div class="acts"><button class="btn sm" data-rq="${i}" ${RKEY ? "" : "disabled title=\"The reset key isn't unlocked on this computer\""}>🔑 Reset now</button><button class="btn ghost sm" data-rqx="${i}">Dismiss</button></div></td></tr>`).join("")}</table></div></div>`;
+  box.querySelectorAll("[data-rq]").forEach(b => b.onclick = () => { const r = list[+b.dataset.rq]; if (r.cs) resetPin(r.s); else resetDesignPw(r.s); });
+  box.querySelectorAll("[data-rqx]").forEach(b => b.onclick = () => { const r = list[+b.dataset.rqx], a = r.acct;
+    SDC.log("resetdismiss", { name:a.name, email:a.email, course:a.course, teacher:a.teacher }, { by: isSuper() ? "(admin)" : (ME && ME.name) || "" });
+    ROWS.push({ sdc:1, type:"resetdismiss", when:Date.now(), acct:a }); renderResets(); });
 }
 
 /* ---------------- teachers (super admin) ---------------- */
@@ -1331,7 +1393,7 @@ function renderLog(){
 }
 $("lgF").onchange = renderLog;
 
-function renderAll(){ renderHP(); renderSlow(); renderVerifyWaiting(); renderDesignRequests(); renderStudents(); renderLog(); }
+function renderAll(){ renderHP(); renderResets(); renderSlow(); renderVerifyWaiting(); renderDesignRequests(); renderStudents(); renderLog(); }
 /* ---------- students who signed up but can't get in because they haven't verified their email ---------- */
 /* ---------- students who've been stuck on one task for a long time (after two reminders on their screen) ---------- */
 function renderSlow(){

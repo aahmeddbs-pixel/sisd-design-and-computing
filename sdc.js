@@ -439,6 +439,53 @@ async function adminVerified(email){
     for (const r of await rows("V", id, 10)){ const o = await verify(r.text); if (o && o.k === id && o.verified){ try { localStorage.setItem(VKEY(email), "1"); } catch(e){} return true; } } } catch(e){}
   return false;
 }
+/* ---------- forgot PIN / password ----------
+   The student asks for a reset: their teacher and the super admin are emailed and see it on the staff dashboard
+   ("Reset requests"); the student gets an email saying what happens next. After the reset, resetDone() emails the
+   student their new PIN / password. */
+const BASE_TEACHERS = ["Mr. Ahmed", "Ms. Abdelaziz", "Mr. French", "Ms. Miyakawa"];
+async function forgot(r){
+  const email = normEmail(r.email), c = r.course === "cs" ? "cs" : r.course === "it" ? "it" : "design";
+  if (!/^[^\s@]+@sisd\.ae$/i.test(email)) return { ok:false, msg:"Type your full school email, ending in @sisd.ae." };
+  const name = String(r.name || "").trim().replace(/\s+/g, " ").slice(0, 80);
+  if (name.split(" ").length < 2) return { ok:false, msg:"Type your first and last name." };
+  log("resetrequest", { name, email, course:c, teacher:r.teacher || "" }, { reset:{ course:c } });
+  if (!VERIFY.url || offline()) return { ok:true, emailed:false };
+  let te = ""; try { te = r.teacher ? await teacherEmailFor(r.teacher) : ""; } catch(e){}
+  try { const x = await jsonp({ a:"notify", k:"reset-request", e:email, n:name, c, te }, 20000); return { ok:true, emailed: !!(x && x.ok) }; } catch(e){ return { ok:true, emailed:false }; }
+}
+async function resetDone(r){
+  if (!VERIFY.url || offline()) return false;
+  try { const x = await jsonp({ a:"notify", k:"reset-done", e:normEmail(r.email), n:String(r.name || "").slice(0, 80), c:r.course || "design", s:String(r.secret || "") }, 20000); return !!(x && x.ok); } catch(e){ return false; }
+}
+async function forgotDialog(o){
+  o = o || {}; const c = o.course === "cs" ? "cs" : o.course === "it" ? "it" : "design", what = c === "cs" ? "PIN" : "password";
+  const h = t => String(t == null ? "" : t).replace(/[&<>"]/g, x => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[x]));
+  let names = BASE_TEACHERS.slice(); try { (await teacherNames()).forEach(n => { if (!names.some(x => sameTeacher(x, n))) names.push(n); }); } catch(e){}
+  const bg = document.createElement("div");
+  bg.style.cssText = "position:fixed;inset:0;background:rgba(16,24,40,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px";
+  const fs = "width:100%;box-sizing:border-box;font:inherit;font-size:16px;padding:10px 12px;border:1.5px solid #C9D1E0;border-radius:10px;margin-top:4px";
+  bg.innerHTML = `<div role="dialog" aria-label="Forgot your ${what}" style="background:#fff;color:#16223A;border-radius:16px;max-width:440px;width:100%;padding:22px 22px 18px;box-shadow:0 20px 50px rgba(0,0,0,.3);font-family:inherit;max-height:92vh;overflow:auto">
+    <h2 style="margin:0 0 6px;font-size:22px">🔑 Forgot your ${what}?</h2>
+    <p style="margin:0 0 14px;color:#5B6782;font-size:14px">Fill this in and press <b>Ask for a reset</b>. Your teacher resets it, and your new ${what} is emailed to your school email. Your work is kept.</p>
+    <label style="display:block;font-weight:700;font-size:14px;margin-bottom:10px">Your full name<input id="fgName" autocomplete="name" style="${fs}" value="${h(o.name || "")}" placeholder="First and last name"></label>
+    <label style="display:block;font-weight:700;font-size:14px;margin-bottom:10px">School email<input id="fgEmail" type="email" autocomplete="email" style="${fs}" value="${h(o.email || "")}" placeholder="name@sisd.ae"></label>
+    <label style="display:block;font-weight:700;font-size:14px;margin-bottom:12px">Your teacher<select id="fgTeacher" style="${fs}"><option value="">Not sure</option>${names.map(n => `<option${o.teacher && sameTeacher(o.teacher, n) ? " selected" : ""}>${h(n)}</option>`).join("")}</select></label>
+    <div id="fgMsg" style="font-size:14px;margin-bottom:10px"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" id="fgGo" style="background:#DC2B3E;color:#fff;border:0;border-radius:10px;padding:11px 18px;font:inherit;font-weight:800;cursor:pointer">Ask for a reset</button><button type="button" id="fgX" style="background:#EEF1F7;color:#1B2D4E;border:0;border-radius:10px;padding:11px 18px;font:inherit;font-weight:700;cursor:pointer">Close</button></div></div>`;
+  document.body.appendChild(bg);
+  const q = x => bg.querySelector(x), close = () => bg.remove();
+  q("#fgX").onclick = close; bg.onclick = e => { if (e.target === bg) close(); };
+  setTimeout(() => (q(o.name ? "#fgEmail" : "#fgName") || {}).focus && q(o.name ? "#fgEmail" : "#fgName").focus(), 50);
+  const say = (t, ok) => { q("#fgMsg").innerHTML = `<div style="padding:10px 12px;border-radius:10px;background:${ok ? "#E7F6EE" : "#FDECEE"};color:${ok ? "#14633C" : "#9B1C2C"}">${t}</div>`; };
+  q("#fgGo").onclick = async () => {
+    q("#fgGo").disabled = true; say("Sending…", true);
+    const r = await forgot({ course:c, name:q("#fgName").value, email:q("#fgEmail").value, teacher:q("#fgTeacher").value });
+    if (!r.ok){ q("#fgGo").disabled = false; return say(h(r.msg)); }
+    say(`<b>Request sent.</b> ${r.emailed ? "Check your school email: we've sent you what happens next. " : ""}Your teacher will reset your ${what}, and your new ${what} will be emailed to you. You can also ask your teacher in your next lesson.`, true);
+    q("#fgGo").remove(); q("#fgX").textContent = "OK";
+  };
+}
 /* tell the super admin (email to their Gmail, from the school's script) that a new student is waiting; once a day at most */
 function notifyStudent(email, a){
   const k = "sdc_snote_" + normEmail(email); let last = 0; try { last = +localStorage.getItem(k) || 0; } catch(e){}
@@ -1038,5 +1085,5 @@ function strip(c, onSignOut, noLang, mainSel, onSignIn){
 function signedOutNotice(msg, kind){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg, kind: kind || "bad" })); } catch(e){} }
 
 return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
-  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, gloss, listen, stopReading, speak, slow, rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
+  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, forgot, forgotDialog, resetDone, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, gloss, listen, stopReading, speak, slow, rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();

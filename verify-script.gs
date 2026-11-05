@@ -124,6 +124,8 @@ function start_(email, kind){
 function notify_(p){
   const kind = String(p.k || "");
   if (kind === "slow-student") return slow_(p);
+  if (kind === "reset-request") return resetRequest_(p);
+  if (kind === "reset-done") return resetDone_(p);
   if (kind !== "teacher-request" && kind !== "student-request") return { ok: false, reason: "unknown" };
   const student = kind === "student-request";
   const email = String(p.e || "").trim().toLowerCase().slice(0, 120);
@@ -176,6 +178,63 @@ function slow_(p){
   if (te && DOMAIN.test(te) && te !== me){ try { MailApp.sendEmail({ to: te, name: "SISD Design and Computing", subject: subject, htmlBody: body }); teacherSent = true; } catch(err){} }
   MailApp.sendEmail({ to: me, name: "SISD Design and Computing", subject: subject + (te === me ? "" : te ? (teacherSent ? " (also sent to " + te + ")" : " (could not email " + te + ")") : " (teacher email unknown)"), htmlBody: body });
   return { ok: true, sent: true, teacher: teacherSent };
+}
+
+/* ---------- forgot PIN / password ----------
+   The student presses "Forgot…" on the sign-in page: they get an email explaining what happens next, and you (and their
+   teacher, when known) get an email with a link to the staff dashboard, where one click resets it. Then the student gets
+   a second email with the new PIN or password. Emails only ever go to @sisd.ae addresses, from fixed wording. */
+function mailBox_(title, bodyHtml){
+  return '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#16223A;max-width:540px">' +
+    '<div style="background:#1B2D4E;color:#fff;padding:14px 18px;border-bottom:4px solid #DC2B3E;font-weight:bold">SISD Design and Computing · ' + title + '</div>' + bodyHtml + '</div>';
+}
+const escH_ = s => String(s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const courseName_ = c => c === "cs" ? "Computer Science" : c === "it" ? "Information Technology" : "Design";
+function resetRequest_(p){
+  const email = String(p.e || "").trim().toLowerCase().slice(0, 120), te = String(p.te || "").trim().toLowerCase().slice(0, 120);
+  if (!DOMAIN.test(email)) return { ok: false, reason: "domain" };
+  const cache = CacheService.getScriptCache(), n = +(cache.get("reset-count") || 0);
+  if (n >= 40) return { ok: false, reason: "wait" };
+  if (cache.get("reset:" + email)) return { ok: true, already: true };     // one request per student per 30 minutes
+  cache.put("reset-count", String(n + 1), 3600); cache.put("reset:" + email, "1", 1800);
+  const c = String(p.c || "") === "cs" ? "cs" : String(p.c || "") === "it" ? "it" : "design", cs = c === "cs";
+  const name = String(p.n || "").slice(0, 80), first = name.split(" ")[0] || "there", what = cs ? "PIN" : "password";
+  const tips = cs
+    ? '<li>Your PIN is the 4 numbers you chose when you signed up.</li><li>Type your name exactly as you did when you signed up (first and last name).</li><li>If you signed up on another device (for example an iPad), try signing in there once: that puts your work online.</li>'
+    : '<li>Use your full school email (ending in @sisd.ae).</li><li>Passwords are case-sensitive: check Caps Lock.</li><li>If you also take Computer Science, you can sign in to Design with your school email and your Computer Science PIN.</li>';
+  try { MailApp.sendEmail({ to: email, name: "SISD Design and Computing", subject: "Your " + courseName_(c) + " " + what + " reset request",
+    htmlBody: mailBox_("Reset request", '<p>Hi ' + escH_(first) + ',</p><p>We have received your request to reset your <b>' + courseName_(c) + ' ' + what + '</b>.</p>' +
+      '<p><b>What happens next:</b> your teacher will reset it on the staff dashboard. As soon as they do, you will get another email with your new ' + what + '. Your saved work is kept.</p>' +
+      '<p><b>While you wait, check these:</b></p><ul>' + tips + '</ul>' +
+      '<p><a href="' + SITE + '" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Open SISD Design and Computing</a></p>' +
+      '<p style="color:#5B6782;font-size:13px">If you did not ask for this, you can ignore this email. Your ' + what + ' has not been changed.</p>') }); } catch(err){}
+  const staff = mailBox_("Reset request", '<p><b>' + escH_(name || email) + '</b> (' + escH_(email) + ') has asked for a new <b>' + courseName_(c) + ' ' + what + '</b>.</p>' +
+    '<p>Open the staff dashboard → Students &amp; progress. The request is in the <b>Reset requests</b> box: press <b>Reset now</b>. The new ' + what + ' is emailed to the student automatically.</p>' +
+    '<p><a href="' + SITE + 'admin.html" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Open the staff dashboard</a></p>');
+  const subject = "Reset request: " + (name || email) + " (" + courseName_(c) + ")";
+  if (te && DOMAIN.test(te) && te !== SLOW_TO){ try { MailApp.sendEmail({ to: te, name: "SISD Design and Computing", subject: subject, htmlBody: staff }); } catch(err){} }
+  MailApp.sendEmail({ to: SLOW_TO, name: "SISD Design and Computing", subject: subject, htmlBody: staff });
+  return { ok: true, sent: true };
+}
+function resetDone_(p){
+  const email = String(p.e || "").trim().toLowerCase().slice(0, 120), c = String(p.c || "") === "cs" ? "cs" : String(p.c || "") === "it" ? "it" : "design", cs = c === "cs";
+  const secret = String(p.s || "");
+  if (!DOMAIN.test(email)) return { ok: false, reason: "domain" };
+  if (cs ? !/^\d{4}$/.test(secret) : !/^[A-Za-z0-9]{8,40}$/.test(secret)) return { ok: false, reason: "bad" };
+  const cache = CacheService.getScriptCache(), n = +(cache.get("done-count") || 0), k = "done:" + email, m = +(cache.get(k) || 0);
+  if (n >= 60 || m >= 3) return { ok: false, reason: "wait" };
+  cache.put("done-count", String(n + 1), 3600); cache.put(k, String(m + 1), 3600);
+  const name = String(p.n || "").slice(0, 80), first = name.split(" ")[0] || "there", what = cs ? "PIN" : "password";
+  const how = cs
+    ? '<ol><li>Open SISD Design and Computing and choose <b>Computer Science</b>.</li><li>Type your name: <b>' + escH_(name) + '</b></li><li>Type your new PIN.</li></ol><p>You can then change it to a PIN of your own choice.</p>'
+    : '<ol><li>Open SISD Design and Computing and choose <b>' + courseName_(c) + '</b>.</li><li>Type your school email: <b>' + escH_(email) + '</b></li><li>Type your new password exactly as shown (capital letters matter).</li></ol>';
+  MailApp.sendEmail({ to: email, name: "SISD Design and Computing", subject: "Your new " + courseName_(c) + " " + what,
+    htmlBody: mailBox_("New " + what, '<p>Hi ' + escH_(first) + ',</p><p>Your teacher has reset your <b>' + courseName_(c) + ' ' + what + '</b>. Your new ' + what + ' is:</p>' +
+      '<p style="font-size:26px;font-weight:bold;letter-spacing:2px;background:#EEF1F7;border-radius:8px;padding:12px 16px;display:inline-block;font-family:Consolas,monospace">' + escH_(secret) + '</p>' +
+      '<p><b>How to sign in</b> (works on any device, and your work is kept):</p>' + how +
+      '<p><a href="' + SITE + '" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Sign in now</a></p>' +
+      '<p style="color:#5B6782;font-size:13px">Keep your ' + what + ' private. Don\'t share it with other students.</p>') });
+  return { ok: true, sent: true };
 }
 
 function verify_(email, token){
