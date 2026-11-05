@@ -560,7 +560,8 @@ const GL_RX = [   // whole labels with a strand number in them
 ];
 const GL_TERM = [   // short names kept exactly as written (no grammar around them)
   [/\bACCESS FM\b/g, { ru:"ACCESS FM", fr:"ACCESS FM", es:"ACCESS FM", de:"ACCESS FM" }],
-  [/\bMYP\b/g, { ru:"MYP", fr:"PEI", es:"PAI", de:"MYP" }]
+  [/\bIB MYP\b/g, { ru:"IB MYP", fr:"IB PEI", es:"IB PAI", de:"IB MYP" }],
+  [/\bMYP\b/g, { fr:"PEI", es:"PAI" }]
 ];
 /* after Google has translated a sentence: swap its wrong word for ours in the same grammatical form */
 const RU_3 = { "ь":"ь", "и":"и", "ью":"ью", "ей":"ей", "ям":"ям", "ями":"ями", "ях":"ях" };
@@ -617,13 +618,15 @@ function glossNode(tn, code){
   glossPost(tn, code);   // text Google has already translated
   const raw = tn.nodeValue; if (!raw || !/[A-Za-z]{3}/.test(raw)) return;
   const m = raw.match(/^([^A-Za-z]*)(.*?)([\s→←.:!?…]*)$/s), core = m ? m[2] : raw, ph = GL_PHRASE[core.trim().toLowerCase()];
-  const span = txt => { const sp = document.createElement("span"); sp.className = "notranslate sdcGl"; sp.setAttribute("translate", "no"); sp.textContent = txt; return sp; };
-  if (ph && ph[code]){ const frag = document.createDocumentFragment(); if (m[1]) frag.append(m[1]); frag.append(span(GL_CAP(core, ph[code]))); if (m[3]) frag.append(m[3]); tn.replaceWith(frag); return; }
-  for (const [re, tr] of GL_RX){ const t = core.trim(); if (tr[code] && re.test(t)){ const frag = document.createDocumentFragment(); if (m[1]) frag.append(m[1]); frag.append(span(t.replace(re, tr[code]))); if (m[3]) frag.append(m[3]); tn.replaceWith(frag); return; } }
+  // Google drops the spaces next to a "don't translate" word inside a sentence: keep them inside our word
+  const inSentence = (() => { const pe = el, gp = pe.parentElement; if (!gp || getComputedStyle(pe).display !== "inline") return false; return String(gp.textContent || "").trim().length > String(pe.textContent || "").trim().length + 2; })();
+  const span = (txt, pad) => { const sp = document.createElement("span"); sp.className = "notranslate sdcGl"; sp.setAttribute("translate", "no"); sp.textContent = pad ? "\u00a0" + txt + "\u00a0" : txt; return sp; };
+  if (ph && ph[code]){ const frag = document.createDocumentFragment(); if (m[1]) frag.append(m[1]); frag.append(span(GL_CAP(core, ph[code]), inSentence)); if (m[3]) frag.append(m[3]); tn.replaceWith(frag); return; }
+  for (const [re, tr] of GL_RX){ const t = core.trim(); if (tr[code] && re.test(t)){ const frag = document.createDocumentFragment(); if (m[1]) frag.append(m[1]); frag.append(span(t.replace(re, tr[code]), inSentence)); if (m[3]) frag.append(m[3]); tn.replaceWith(frag); return; } }
   const hits = []; GL_TERM.forEach(([re, tr]) => { if (!tr[code]) return; re.lastIndex = 0; let x; while ((x = re.exec(raw))){ if (!hits.some(h => x.index < h.e && x.index + x[0].length > h.s)) hits.push({ s:x.index, e:x.index + x[0].length, w:GL_CAP(x[0], tr[code]) }); } });
   if (!hits.length) return;
   hits.sort((a, b) => a.s - b.s); const frag = document.createDocumentFragment(); let at = 0;
-  hits.forEach(h => { if (h.s > at) frag.append(raw.slice(at, h.s)); frag.append(span(h.w)); at = h.e; }); if (at < raw.length) frag.append(raw.slice(at));
+  hits.forEach(h => { if (h.s > at) frag.append(raw.slice(at, h.s)); frag.append(span(h.w, true)); at = h.e; }); if (at < raw.length) frag.append(raw.slice(at));
   tn.replaceWith(frag);
 }
 function gloss(root){
