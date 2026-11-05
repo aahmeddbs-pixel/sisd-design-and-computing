@@ -377,7 +377,7 @@ async function confirm(a, signup){
   const both = !!(A && A.also && (A.also === c || A.c === c));   // set up for both courses (Computer Science + Design)
   if (A && A.c !== c && (A.also === c || bothOk(A.c, c, a.grade, A.g, g && g.grade))) A = null;   // approved for both: this change was for the other course   // also taking the other course: fine, the change was for that one
   if (A && A.c !== c){ log("wrongcourse", Object.assign({}, a, { course:c }), { registered:A.c, byAdmin:true }); return { ok:false, msg:MSG.other(A.c, true), registered:A.c }; }
-  const csToo = c === "cs" && !signup && L.reg && L.reg.c === "design" && ["6","7","8"].indexOf(String(L.reg.g || a.grade || "")) >= 0;   // Grades 6–8 take both: their own Computer Science account still opens
+  const csToo = c === "cs" && L.reg && L.reg.c === "design" && ["6","7","8"].indexOf(String(L.reg.g || a.grade || "")) >= 0;   // Grades 6–8 take both: their own Computer Science account still opens
   if (!A && L.reg && L.reg.c !== c && (both || csToo || bothOk(L.reg.c, c, a.grade, L.reg.g, g && g.grade))){ /* Grade 6–8: registered for both is allowed */ }
   else if (!A && L.reg && L.reg.c !== c){ log("wrongcourse", Object.assign({}, a, { course:c }), { registered:L.reg.c }); return { ok:false, msg:MSG.other(L.reg.c, false), registered:L.reg.c }; }
   if (!L.reg) register(a.email, a.name, c, (A && A.g) || a.grade);
@@ -476,6 +476,7 @@ async function canSignUp(email, name, c){
   if (L.assign && L.assign.c !== c && bothOk(L.assign.c, c, gg, L.assign.g)) return { ok:true, assign:null };
   if (L.assign && L.assign.c !== c){ log("wrongcourse", { email, name, course:c }, { registered:L.assign.c, byAdmin:true, signup:true }); return { ok:false, msg:MSG.other(L.assign.c, true) }; }
   if (!L.assign && L.reg && L.reg.c !== c && bothOk(L.reg.c, c, gg, L.reg.g)) return { ok:true, assign:null };
+  if (!L.assign && L.reg && L.reg.c === "design" && c === "cs" && ["6","7","8"].indexOf(String(L.reg.g || gg || "")) >= 0) return { ok:true, assign:null };   // Grades 6–8 take both: they may make their Computer Science account
   if (!L.assign && L.reg && L.reg.c !== c){ log("wrongcourse", { email, name, course:c }, { registered:L.reg.c, signup:true }); return { ok:false, msg:MSG.other(L.reg.c, false) }; }
   return { ok:true, assign:L.assign };
 }
