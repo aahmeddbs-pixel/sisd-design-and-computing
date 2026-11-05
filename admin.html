@@ -831,7 +831,7 @@ function renderStudents(){
       <td>${pill(s.course)}${s.also && s.also.length ? `<div class="em" title="Also takes ${esc(s.also.map(x => C[x] ? C[x].name : x).join(", "))}">also ${esc(s.also.map(x => C[x] ? C[x].short : x).join(", "))}</div>` : ""}</td><td>${s.grade ? "G" + esc(s.grade) : ""}</td><td>${esc(s.course === "cs" ? levelName("cs", s.level) : s.cls || "")}</td><td>${esc(s.teacher || "")}</td>
       <td class="small">${progressCell(s)}</td>
       <td class="small">${s.active || s.last ? esc(fmtDT(s.active || s.last)) : "<span class='muted'>—</span>"}</td>
-      <td><div class="acts">${isSuper() || TKEY ? `<button class="btn sm" data-ed="${i}" title="Change course, grade, level or teacher">✏️ Change course</button>` : ""}<button class="btn ghost sm" data-pr="${i}">Progress &amp; feedback</button><button class="btn ghost sm" data-fp="${i}" title="Download this student's feedback as a PDF">📄 Feedback PDF</button>${s.course === "cs" ? `<button class="btn ghost sm" data-vp="${i}" title="Show or hide this student's PIN">👁 PIN</button><button class="btn ghost sm" data-pin="${i}">🔑 Reset PIN</button>` : ""}${isSuper() ? delBtn(s, i) : ""}</div></td></tr>`).join("")
+      <td><div class="acts">${isSuper() || TKEY ? `<button class="btn sm" data-ed="${i}" title="Change course, grade, level or teacher">✏️ Change course</button>` : ""}<button class="btn ghost sm" data-pr="${i}">Progress &amp; feedback</button><button class="btn ghost sm" data-fp="${i}" title="Download this student's feedback as a PDF">📄 Feedback PDF</button>${s.course === "cs" ? `<button class="btn ghost sm" data-vp="${i}" title="Show or hide this student's PIN">👁 PIN</button>${PIN_DONE[s.key] ? `<button class="btn ok sm" data-pin="${i}" style="background:#1E8A55;color:#fff" title="PIN reset done. Press to reset it again">✓ Done</button>` : `<button class="btn ghost sm" data-pin="${i}">🔑 Reset PIN</button>`}` : ""}${isSuper() ? delBtn(s, i) : ""}</div></td></tr>`).join("")
       : `<tr><td colspan="8" class="muted">${isSuper() ? "No students yet. They appear here after signing in through the platform." : "No students have chosen you as their teacher yet."}</td></tr>`);
   $("stTbl").querySelectorAll("[data-ed]").forEach(b => b.onclick = () => editStudent(list[+b.dataset.ed]));
   $("stTbl").querySelectorAll("[data-pr]").forEach(b => b.onclick = () => openProgress(list[+b.dataset.pr]));
@@ -1094,6 +1094,7 @@ async function openProgress(s){
 /* ---------------- Reset a Computer Science student's PIN (works on every computer, progress kept) ---------------- */
 /* the same PIN fingerprint the Computer Science course uses */
 function csPinHash(name, pin){ let h = 5381; const t = String(name).trim().toLowerCase().replace(/\s+/g, " ") + "|" + pin + "|sisd-python"; for (const ch of t) h = ((h * 33) ^ ch.charCodeAt(0)) >>> 0; return h.toString(36); }
+const PIN_DONE = {};   // PINs reset in this session: the row's button shows "✓ Done" in green
 function resetPin(s){
   const bg = document.createElement("div"); bg.className = "modal-bg"; bg.style.zIndex = 70;
   const pin = String(1000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 9000));
@@ -1105,21 +1106,22 @@ function resetPin(s){
   document.body.appendChild(bg);
   const q = x => bg.querySelector(x);
   q("#rpX").onclick = () => bg.remove(); bg.onclick = e => { if (e.target === bg) bg.remove(); };
-  q("#rpPin").oninput = e => { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4); };
+  q("#rpPin").oninput = e => { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4); const gb = q("#rpGo"); if (gb.dataset.done){ delete gb.dataset.done; gb.textContent = "Reset PIN"; gb.className = "btn red"; gb.style.background = ""; gb.disabled = false; } };
   q("#rpGo").onclick = async () => {
     const p = q("#rpPin").value; if (!/^\d{4}$/.test(p)) return q("#rpMsg").innerHTML = `<div class="notice bad">The PIN must be 4 numbers.</div>`;
     if (!window.PPSync || !PPSync.enabled()) return q("#rpMsg").innerHTML = `<div class="notice bad">Computer Science sync isn't connected.</div>`;
     q("#rpGo").disabled = true; q("#rpMsg").innerHTML = `<div class="notice ok">Working… (a few seconds)</div>`;
-    try { let ok = await PPSync.resetWithKey(String(s.name).trim().toLowerCase().replace(/\s+/g, " "), p, RKEY), local = false;
-      if (!ok){   // nothing online yet: a signed note lets the student's own computer accept the new PIN
-        const id = await SDC.idOf(s.email || "", s.name), at = Date.now();
-        SDC.sendRow("P", id, await signAssign({ k:id, ph: csPinHash(s.name, p), at })); SDC.flush(); ok = local = true; }
+    try { let ok = await PPSync.resetWithKey(String(s.name).trim().toLowerCase().replace(/\s+/g, " "), p, RKEY), local = !ok;
+      // always: a signed note that lets the student's own computer accept the new PIN (matched by email and by name)
+      { const at = Date.now(), ids = [...new Set([await SDC.idOf(s.email || "", s.name), await SDC.idOf("", s.name)])];
+        for (const id of ids) SDC.sendRow("P", id, await signAssign({ k:id, ph: csPinHash(s.name, p), at })); SDC.flush(); ok = true; }
       q("#rpMsg").innerHTML = !local ? `<div class="notice ok"><b>Done.</b> ${esc(s.name)} can now sign in with PIN <b style="font-size:1.15em">${p}</b> on any computer.</div>`
         : `<div class="notice ok"><b>Done.</b> ${esc(s.name)} signs in with PIN <b style="font-size:1.15em">${p}</b> on <b>the computer they usually use</b> (their work isn't online yet). That first sign-in puts their work online; after that the PIN works on any computer.</div>`;
-      if (ok){ SDC.log("pinreset", { name:s.name, email:s.email, course:"cs", grade:s.grade, teacher:s.teacher }, { by: ME.name, pin:p });
-        notePin(s.key, p, Date.now()); s.pin = p; renderStudents(); }
+      if (ok){ const gb = q("#rpGo"); gb.textContent = "✓ Done"; gb.className = "btn ok"; gb.style.background = "#1E8A55"; gb.dataset.done = "1";
+        SDC.log("pinreset", { name:s.name, email:s.email, course:"cs", grade:s.grade, teacher:s.teacher }, { by: ME.name, pin:p });
+        notePin(s.key, p, Date.now()); s.pin = p; PIN_DONE[s.key] = Date.now(); renderStudents(); }
     } catch(e){ q("#rpMsg").innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; }
-    q("#rpGo").disabled = false;
+    if (!q("#rpGo").dataset.done) q("#rpGo").disabled = false;
   };
 }
 
