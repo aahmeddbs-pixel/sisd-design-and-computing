@@ -62,13 +62,14 @@ video{width:100%;border-radius:12px;background:#000;display:block}
       <ul class="small" style="margin-top:6px"><li>Use a quiet room. A headset or earphones with a microphone sounds best.</li>
       <li>Speak like you're talking to one student: warm, calm and a little slower than normal.</li>
       <li><b>Computer Science videos:</b> the video plays silently while you record. Read each line when it lights up; it stops by itself at the end.</li>
+      <li><b>Strand explanations (Design, Grades 6–8):</b> write your own script for each strand (a starter script is filled in for you to change), press <b>Record</b>, read it paragraph by paragraph and press <b>Stop</b>. Students hear it on that strand's task page.</li>
       <li><b>Design and IT videos:</b> read the paragraphs in order at a steady pace, with a short pause between them. Press <b>Next line</b> (or the space bar) to move the highlight, then <b>Stop</b> when you finish.</li>
       <li>Need a break? Press <b>❚❚ Pause</b>, then <b>▶ Continue</b> when you are ready: the video waits for you, so your voice stays in step.</li>
       <li>Made a mistake? Press <b>Record again</b>. Only the last take is kept.</li></ul></details>
   </div>
   <div class="grid">
     <div class="card" style="padding:8px">
-      <div class="filters row" style="padding:6px"><button data-f="all" aria-pressed="true">All</button><button data-f="Computer Science" aria-pressed="false">Computer Science</button><button data-f="Design" aria-pressed="false">Design</button><button data-f="IT" aria-pressed="false">IT</button><button data-f="todo" aria-pressed="false">Not recorded</button></div>
+      <div class="filters row" style="padding:6px"><button data-f="all" aria-pressed="true">All</button><button data-f="Computer Science" aria-pressed="false">Computer Science</button><button data-f="Design" aria-pressed="false">Design</button><button data-f="Design strands" aria-pressed="false">Strand explanations (G6–8)</button><button data-f="IT" aria-pressed="false">IT</button><button data-f="todo" aria-pressed="false">Not recorded</button></div>
       <div class="list" id="list"></div>
     </div>
     <div class="card" id="main"><p class="muted">Choose a script on the left.</p></div>
@@ -149,7 +150,10 @@ function stopAll(){
 }
 function open(x){
   stopAll(); cur = x; renderList();
-  const isVid = !!x.video, lines = isVid ? x.lines : x.paras.map((p, i) => [i, p]);
+  const isVid = !!x.video, own = !!x.own;
+  const myScript = () => { try { return localStorage.getItem("vs_script_" + x.file) || x.draft || ""; } catch(e){ return x.draft || ""; } };
+  const parasOf = t => String(t).split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+  let lines = isVid ? x.lines : own ? parasOf(myScript()).map((p, i) => [i, p]) : x.paras.map((p, i) => [i, p]);
   $("main").innerHTML = `<div class="row" style="justify-content:space-between"><div><div class="small muted" style="font-weight:800">${esc(x.course)} · ${esc(x.group)}</div><h2 style="font-size:1.3rem;margin-top:2px">${esc(x.label)}</h2></div>
       <div class="row"><span id="have"></span><span class="pill" id="live">Checking the site…</span></div></div>
     ${isVid ? `<video id="v" playsinline muted preload="metadata" src="${esc(x.video)}" poster="${esc(x.poster || "")}" style="margin-top:12px"></video>` : `<p class="small muted" style="margin-top:10px">This is the introduction video for this criterion. Read all ${lines.length} paragraphs in order.</p>`}
@@ -159,9 +163,17 @@ function open(x){
       <button class="btn ghost hidden" id="play">▶ Play back</button><button class="btn ghost hidden" id="dl">⬇ Save this file</button><button class="btn ghost hidden" id="del">🗑 Delete</button>
       <button class="btn ghost" id="nxt" style="margin-left:auto">Next script →</button></div>
     <div id="msg" class="small" style="margin-top:8px;font-weight:700"></div>
-    <div class="small" style="font-weight:800;margin-top:12px">Script${isVid ? ": read each line when it lights up" : ": read the highlighted paragraph"}</div>
+    ${own ? `<div class="tips" style="margin-top:12px"><b>What students do in this strand</b><div class="small" style="margin-top:4px"><i>${esc(x.sub || "")}</i></div><ul class="small" style="margin-top:6px">${(x.tasks || []).map(t => `<li>${esc(t)}</li>`).join("")}</ul></div>
+      <div class="small" style="font-weight:800;margin-top:12px">Your script <span class="muted" style="font-weight:400">(write it in your own words: a blank line starts a new paragraph. It's saved on this computer as you type.)</span></div>
+      <textarea id="own" spellcheck="true" lang="en-GB" style="width:100%;min-height:220px;margin-top:6px;padding:10px 12px;border:2px solid var(--line);border-radius:10px;font:15px/1.55 Arial,Helvetica,sans-serif;background:var(--card);color:var(--ink)">${esc(myScript())}</textarea>
+      <div class="row" style="margin-top:6px"><button class="btn ghost sm" id="draft">↺ Start again from the starter script</button><span class="small muted" id="ownMsg"></span></div>` : ""}
+    <div class="small" style="font-weight:800;margin-top:12px">${own ? "While you record: read the highlighted paragraph" : "Script" + (isVid ? ": read each line when it lights up" : ": read the highlighted paragraph")}</div>
     <ol class="script" id="script">${lines.map((l, i) => `<li data-i="${i}">${isVid ? `<span class="tm">${fmt(l[0])}</span>` : `<span class="tm">${i + 1}</span>`}${esc(l[1])}</li>`).join("")}</ol>`;
   const v = $("v"), msg = t => $("msg").innerHTML = t;
+  if (own){ const ta = $("own"), redraw = () => { lines = parasOf(ta.value).map((p, i) => [i, p]); $("script").innerHTML = lines.map((l, i) => `<li data-i="${i}"><span class="tm">${i + 1}</span>${esc(l[1])}</li>`).join(""); };
+    ta.oninput = () => { try { localStorage.setItem("vs_script_" + x.file, ta.value); $("ownMsg").textContent = "Script saved on this computer."; } catch(e){} redraw(); };
+    $("draft").onclick = () => { if (!confirm("Replace your script with the starter script?")) return; ta.value = x.draft || ""; ta.oninput(); };
+    ta.addEventListener("focus", () => { if (state.recording) ta.blur(); }); }
   const mark = k => { state.line = k; $("script").querySelectorAll("li").forEach((li, i) => { const on = i === k; if (on && !li.classList.contains("on")){ const box = li.parentNode; box.scrollTop = Math.max(0, li.offsetTop - box.offsetTop - 60); } li.classList.toggle("on", on); }); };
   if (v) v.addEventListener("timeupdate", () => { let k = 0; lines.forEach((l, i) => { if (v.currentTime >= l[0]) k = i; }); mark(k); });
   mark(0);
@@ -200,6 +212,7 @@ function open(x){
     rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
     rec.onstop = async () => {
       state.stream.getTracks().forEach(t => t.stop());
+      if (own && $("own")) $("own").readOnly = false;
       const type = rec.mimeType || mime || "audio/webm", blob = new Blob(chunks, { type }), secs = state.secs || elapsed();
       if (secs < 2){ msg("That was too short to keep. Press Record and read the script."); return; }
       const val = { blob, ext: extOf(type), at: Date.now(), secs };
@@ -207,6 +220,8 @@ function open(x){
       if (cur === x){ paint(); $("rec").disabled = false; if (!$("msg").textContent) msg("✅ Saved. Press <b>Play back</b> to check it, or <b>Next script</b> to carry on."); }
       renderList();
     };
+    if (own && !lines.length){ msg("Write your script first, then press Record."); return; }
+    if (own) $("own").readOnly = true;
     $("rec").disabled = true; ["play", "dl", "del"].forEach(id => $(id).classList.add("hidden"));
     if (v){ v.muted = true; v.pause(); v.currentTime = 0; } mark(0);
     for (const n of ["3", "2", "1"]){ $("cnt").textContent = n; await new Promise(r => setTimeout(r, 800)); if (cur !== x) return; }
@@ -231,13 +246,14 @@ function open(x){
 }
 $("zipAll").onclick = async () => {
   const files = ITEMS.filter(x => REC[x.file]).map(x => ({ name: x.file + "." + REC[x.file].ext, blob: REC[x.file].blob }));
+  ITEMS.filter(x => x.own && REC[x.file]).forEach(x => { let t = ""; try { t = localStorage.getItem("vs_script_" + x.file) || x.draft || ""; } catch(e){} files.push({ name: x.file + ".txt", blob: new Blob([t], { type:"text/plain" }) }); });
   if (!files.length) return;
   $("zipAll").disabled = true; $("zipAll").textContent = "Preparing…";
   try { const z = await makeZip(files), u = URL.createObjectURL(z), a = document.createElement("a");
     a.href = u; a.download = "sisd-voice-recordings-" + new Date().toISOString().slice(0, 10) + ".zip"; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(u); a.remove(); }, 2000); }
   finally { $("zipAll").textContent = "⬇ Save all my recordings (one zip file)"; $("zipAll").disabled = false; }
 };
-Promise.all([fetch("voice-scripts.json?v=20261104b", { cache:"no-store" }).then(r => r.json()), dbAll().catch(() => ({}))]).then(([items, rec]) => {
+Promise.all([fetch("voice-scripts.json?v=20261105a", { cache:"no-store" }).then(r => r.json()), dbAll().catch(() => ({}))]).then(([items, rec]) => {
   ITEMS = items; REC = rec; renderList(); open(ITEMS.find(x => !REC[x.file]) || ITEMS[0]);
 }).catch(() => { $("progTxt").textContent = "The scripts couldn't be loaded. Check the internet connection and refresh."; });
 window.addEventListener("beforeunload", () => stopAll());
