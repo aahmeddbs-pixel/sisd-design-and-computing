@@ -253,7 +253,7 @@ $("zipAll").onclick = async () => {
     a.href = u; a.download = "sisd-voice-recordings-" + new Date().toISOString().slice(0, 10) + ".zip"; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(u); a.remove(); }, 2000); }
   finally { $("zipAll").textContent = "⬇ Save all my recordings (one zip file)"; $("zipAll").disabled = false; }
 };
-Promise.all([fetch("voice-scripts.json?v=20261105l", { cache:"no-store" }).then(r => r.json()), dbAll().catch(() => ({}))]).then(([items, rec]) => {
+Promise.all([fetch("voice-scripts.json?v=20261105m", { cache:"no-store" }).then(r => r.json()), dbAll().catch(() => ({}))]).then(([items, rec]) => {
   ITEMS = items; REC = rec; renderList(); open(ITEMS.find(x => !REC[x.file]) || ITEMS[0]);
 }).catch(() => { $("progTxt").textContent = "The scripts couldn't be loaded. Check the internet connection and refresh."; });
 window.addEventListener("beforeunload", () => stopAll());
