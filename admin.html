@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261105a"></script>
+<script src="/python-pathways/pp-sync.js?v=20261105b"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261105a"></script>
+<script src="sdc.js?v=20261105b"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -904,6 +904,8 @@ function pyDetail(s){
       <div class="scroll"><table class="tbl"><tr><th>Lesson</th><th>Exercises</th><th>Practice</th><th>Hints</th><th>Time</th><th>Submitted</th></tr>${rows || `<tr><td colspan="6" class="muted">No lessons started.</td></tr>`}</table></div>`; }).join("");
 }
 function fieldVal(f){
+  if (f.value === "SKIPPED" || /^SKIPPED/.test(String(f.value || ""))) return "<span class='pill bad'>Skipped by the student (video task)</span>";
+  if (f.t === "video"){ const m = String(f.value || "").match(/https:\/\/\S+/); return m ? `<a href="${esc(m[0])}" target="_blank" rel="noopener">🎬 Watch the student's video</a>` : "<span class='muted'>no video uploaded</span>"; }
   if (f.t === "sketch") return f.value ? "<i>sketch or image added</i>" : "<span class='muted'>no image</span>";
   if (f.t === "table" && Array.isArray(f.value)) return `<div class="scroll"><table class="tbl">${f.cols ? `<tr>${f.cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr>` : ""}${f.value.filter(r => Array.isArray(r) && r.some(x => String(x || "").trim())).map(r => `<tr>${r.map(x => `<td>${esc(x)}</td>`).join("")}</tr>`).join("")}</table></div>`;
   if (Array.isArray(f.value)) return esc(f.value.join(", "));
@@ -926,6 +928,8 @@ function dsDetail(s){
 const wordsIn = v => { const t = Array.isArray(v) ? v.flat(2).join(" ") : v && typeof v === "object" ? Object.values(v).join(" ") : String(v || ""); return (t.match(/[A-Za-z0-9\u00C0-\u024F]+/g) || []).length; };
 const shortLabel = l => String(l || "").replace(/\s+/g, " ").replace(/[:.]+$/, "").slice(0, 70);
 function fieldState(f){
+  if (f.t === "video") return /^Video: /.test(String(f.value || "")) ? "ok" : "empty";
+  if (/^SKIPPED/.test(String(f.value || ""))) return "empty";
   if (f.t === "sketch") return f.value ? "ok" : "empty";
   if (f.t === "table"){ const rows = (Array.isArray(f.value) ? f.value : []).filter(r => Array.isArray(r) && r.some(x => String(x || "").trim()));
     if (!rows.length) return "empty"; const cells = rows.flat().filter(x => String(x || "").trim()).length, total = rows.length * ((rows[0] || []).length || 1);
@@ -969,7 +973,9 @@ const yKey = m => +m >= 5 ? 5 : Math.max(1, +m || 1);
 function fieldScore(f, N){
   const lab = String(f.label || "").toLowerCase();
   const target = /test/.test(lab) ? N.tests : /spec/.test(lab) ? N.spec : /step|plan/.test(lab) ? N.steps : /question/.test(lab) ? N.q : /source|reference/.test(lab) ? N.src : /skill/.test(lab) ? N.skills : 0;
-  if (f.t === "sketch") return f.value ? 1 : 0;
+  if (f.t === "sketch") return f.value && f.value !== "SKIPPED" ? 1 : 0;
+  if (f.t === "video") return /^Video: /.test(String(f.value || "")) ? 1 : 0;
+  if (f.value === "SKIPPED") return 0;
   if (f.t === "table"){ const rows = (Array.isArray(f.value) ? f.value : []).filter(r => Array.isArray(r) && r.some(x => String(x || "").trim()));
     if (!rows.length) return 0; const width = Math.max(...rows.map(r => r.length), 1), cells = rows.flat().filter(x => String(x || "").trim()).length;
     const need = Math.max(target || +f.min || 3, 2), fill = cells / (rows.length * width);
@@ -1086,6 +1092,8 @@ async function openProgress(s){
 }
 
 /* ---------------- Reset a Computer Science student's PIN (works on every computer, progress kept) ---------------- */
+/* the same PIN fingerprint the Computer Science course uses */
+function csPinHash(name, pin){ let h = 5381; const t = String(name).trim().toLowerCase().replace(/\s+/g, " ") + "|" + pin + "|sisd-python"; for (const ch of t) h = ((h * 33) ^ ch.charCodeAt(0)) >>> 0; return h.toString(36); }
 function resetPin(s){
   const bg = document.createElement("div"); bg.className = "modal-bg"; bg.style.zIndex = 70;
   const pin = String(1000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 9000));
@@ -1102,9 +1110,12 @@ function resetPin(s){
     const p = q("#rpPin").value; if (!/^\d{4}$/.test(p)) return q("#rpMsg").innerHTML = `<div class="notice bad">The PIN must be 4 numbers.</div>`;
     if (!window.PPSync || !PPSync.enabled()) return q("#rpMsg").innerHTML = `<div class="notice bad">Computer Science sync isn't connected.</div>`;
     q("#rpGo").disabled = true; q("#rpMsg").innerHTML = `<div class="notice ok">Working… (a few seconds)</div>`;
-    try { const ok = await PPSync.resetWithKey(String(s.name).trim().toLowerCase().replace(/\s+/g, " "), p, RKEY);
-      q("#rpMsg").innerHTML = ok ? `<div class="notice ok"><b>Done.</b> ${esc(s.name)} can now sign in with PIN <b style="font-size:1.15em">${p}</b> on any computer.</div>`
-        : `<div class="notice warn">No saved progress was found for ${esc(s.name)} yet. Ask them to sign in once on their usual computer, then try again.</div>`;
+    try { let ok = await PPSync.resetWithKey(String(s.name).trim().toLowerCase().replace(/\s+/g, " "), p, RKEY), local = false;
+      if (!ok){   // nothing online yet: a signed note lets the student's own computer accept the new PIN
+        const id = await SDC.idOf(s.email || "", s.name), at = Date.now();
+        SDC.sendRow("P", id, await signAssign({ k:id, ph: csPinHash(s.name, p), at })); SDC.flush(); ok = local = true; }
+      q("#rpMsg").innerHTML = !local ? `<div class="notice ok"><b>Done.</b> ${esc(s.name)} can now sign in with PIN <b style="font-size:1.15em">${p}</b> on any computer.</div>`
+        : `<div class="notice ok"><b>Done.</b> ${esc(s.name)} signs in with PIN <b style="font-size:1.15em">${p}</b> on <b>the computer they usually use</b> (their work isn't online yet). That first sign-in puts their work online; after that the PIN works on any computer.</div>`;
       if (ok){ SDC.log("pinreset", { name:s.name, email:s.email, course:"cs", grade:s.grade, teacher:s.teacher }, { by: ME.name, pin:p });
         notePin(s.key, p, Date.now()); s.pin = p; renderStudents(); }
     } catch(e){ q("#rpMsg").innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; }

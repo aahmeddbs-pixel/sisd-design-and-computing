@@ -40,11 +40,60 @@ function doGet(e){
     return out_(e, m);
   }
   if (a === "notify") return out_(e, notify_(p));
+  if (a === "vstatus") return out_(e, vstatus_(String(p.id || "")));
   if (a === "start"){
     const lock = LockService.getScriptLock(); lock.waitLock(20000);
     try { return out_(e, start_(email, String(p.k || "student").slice(0, 20))); } finally { lock.releaseLock(); }
   }
   return out_(e, { ok: false, reason: "unknown" });
+}
+
+/* ---------- students' finished videos (Design Grade 7, Criterion C strand ii) ----------
+   The course sends the video in 4 MB pieces; each piece goes straight into a Google Drive upload, so nothing big is held
+   in memory. Videos land in the Drive folder "SISD student videos" (one sub-folder per class) and anyone with the link can view. */
+const VIDEO_FOLDER = "SISD student videos";
+const VIDEO_MAX = 300 * 1024 * 1024;
+function doPost(e){
+  let p = null; try { p = JSON.parse(e.postData.contents); } catch(err){ return out_(null, { ok: false, reason: "bad" }); }
+  if (p && p.a === "vchunk") return out_(null, vchunk_(p));
+  return out_(null, { ok: false, reason: "unknown" });
+}
+const vid_ = id => String(id || "").replace(/[^\w-]/g, "").slice(0, 48);
+function vstatus_(id){ id = vid_(id); const st = id && JSON.parse(CacheService.getScriptCache().get("vu:" + id) || "null"); return st ? { ok: true, next: st.next, done: !!st.done, url: st.url || "", err: st.err || "" } : { ok: true, next: 0 }; }
+function videoFolder_(cls){
+  const it = DriveApp.getFoldersByName(VIDEO_FOLDER), top = it.hasNext() ? it.next() : DriveApp.createFolder(VIDEO_FOLDER);
+  const name = String(cls || "Other").replace(/[\\/:*?"<>|]/g, " ").slice(0, 60) || "Other", sub = top.getFoldersByName(name);
+  return sub.hasNext() ? sub.next() : top.createFolder(name);
+}
+function vchunk_(p){
+  const id = vid_(p.id), i = +p.i, total = +p.size, type = String(p.type || "");
+  if (!id || !(total > 0 && total <= VIDEO_MAX) || !/^video\//.test(type)) return { ok: false, reason: "type" };
+  const cache = CacheService.getScriptCache(), key = "vu:" + id;
+  let st = JSON.parse(cache.get(key) || "null");
+  if (!st){
+    if (i !== 0) return { ok: false, reason: "start" };
+    const ext = (String(p.name || "").match(/\.(\w{2,4})$/) || [, "mp4"])[1];
+    const name = [String(p.who || "Student").slice(0, 60), String(p.w || "").slice(0, 60), Utilities.formatDate(new Date(), "Asia/Dubai", "yyyy-MM-dd HH.mm")].filter(Boolean).join(" - ") + "." + ext;
+    const meta = { name: name, mimeType: type, parents: [videoFolder_(p.cls).getId()] };
+    const r = UrlFetchApp.fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id", { method: "post", contentType: "application/json; charset=UTF-8", payload: JSON.stringify(meta),
+      headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken(), "X-Upload-Content-Type": type, "X-Upload-Content-Length": String(total) }, muteHttpExceptions: true });
+    const h = r.getHeaders(), loc = h.Location || h.location;
+    if (!loc){ cache.put(key, JSON.stringify({ next: 0, err: "drive " + r.getResponseCode() }), 3600); return { ok: false, reason: "drive" }; }
+    st = { loc: loc, got: 0, next: 0 };
+  }
+  if (st.done || i !== st.next) return { ok: i < st.next, next: st.next, done: !!st.done, url: st.url || "" };   // a piece sent twice is fine
+  const bytes = Utilities.base64Decode(String(p.data || "")), start = st.got, end = start + bytes.length - 1;
+  const r = UrlFetchApp.fetch(st.loc, { method: "put", payload: bytes, contentType: type, headers: { "Content-Range": "bytes " + start + "-" + end + "/" + total }, muteHttpExceptions: true });
+  const code = r.getResponseCode();
+  if (code === 308 || code === 200 || code === 201){ st.got = end + 1; st.next = i + 1; st.err = ""; }
+  else { st.err = "upload " + code; cache.put(key, JSON.stringify(st), 21600); return { ok: false, reason: "put" }; }
+  if (code === 200 || code === 201){
+    const f = DriveApp.getFileById(JSON.parse(r.getContentText()).id);
+    try { f.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch(err){}
+    st.url = f.getUrl(); st.done = true; delete st.loc;
+  }
+  cache.put(key, JSON.stringify(st), 21600);
+  return { ok: true, next: st.next, done: !!st.done, url: st.url || "" };
 }
 
 function start_(email, kind){
