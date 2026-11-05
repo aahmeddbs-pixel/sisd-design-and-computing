@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261105g"></script>
+<script src="/python-pathways/pp-sync.js?v=20261105h"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261105g"></script>
+<script src="sdc.js?v=20261105h"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -1094,6 +1094,37 @@ async function openProgress(s){
 /* ---------------- Reset a Computer Science student's PIN (works on every computer, progress kept) ---------------- */
 /* the same PIN fingerprint the Computer Science course uses */
 function csPinHash(name, pin){ let h = 5381; const t = String(name).trim().toLowerCase().replace(/\s+/g, " ") + "|" + pin + "|sisd-python"; for (const ch of t) h = ((h * 33) ^ ch.charCodeAt(0)) >>> 0; return h.toString(36); }
+/* the dashboard's copy of a Computer Science student's progress, turned back into the course's own save format */
+function snapToProg(paths){
+  const out = {};
+  Object.keys(paths || {}).forEach(p => { const P = paths[p]; if (!P || !P.lessons) return;
+    const pr = { lessons:{}, spent: +P.spent || 0 };
+    Object.keys(P.lessons).forEach(n => { const L = P.lessons[n] || {};
+      const s = { code:{}, solved:{}, hints:{}, tries:{}, errs:{}, ms:{}, solvedAt:{}, ranExample:false, watched:false, days:{}, submissions:[], prac:{ count:0, cur:null, done:[], skipped: +L.skipped || 0 } };
+      (L.core || []).forEach((o, i) => { const q = o.q || i + 1; if (o.ok) s.solved[q] = true; if (o.h) s.hints[q] = o.h; if (o.c) s.tries[q] = o.c; if (o.ms) s.ms[q] = o.ms; if (o.at) s.solvedAt[q] = o.at; if (o.code && !o.ok) s.code[q] = o.code; });
+      (L.prac || []).forEach((x, i) => { const id = "p" + (i + 1); s.solved[id] = true; s.prac.done.push({ id, title:x.t || "Practice question", ok:true, hints:x.h || 0, checks:x.c || 0, ms:x.ms || 0, at:x.at || 0 }); });
+      s.prac.count = s.prac.done.length;
+      Object.keys(L.days || {}).forEach(d => { s.days[d] = { activeMs: +L.days[d] || 0, start: Date.parse(d + "T08:00:00") || 0 }; });
+      for (let i = 0; i < (+L.subs || 0); i++) s.submissions.push({ date:"", at:0, kind:"restored", complete:true, sent:"sent" });
+      if (Object.keys(s.tries).length || Object.keys(s.solved).length){ s.ranExample = true; s.watched = true; }
+      pr.lessons[n] = s; });
+    const led = Array.isArray(P.hpLedger) ? P.hpLedger : [], solved = Object.values(pr.lessons).reduce((a, s) => a + Object.keys(s.solved).length, 0);
+    pr.hp = { base: solved, legacy: Math.max(0, (+P.house || 0) - led.length), ledger: led };
+    if (Object.keys(pr.lessons).length) out[p] = pr; });
+  return out;
+}
+/* no online save yet (it only lived on the student's own device): rebuild it from the dashboard's copy, with the new PIN */
+async function rebuildCS(s, pin){
+  const snap = s.py; if (!snap || !snap.paths) return false;
+  const progress = snapToProg(snap.paths); if (!Object.keys(progress).length) return false;
+  const a = snap.acct || {}, nm = String(a.name || s.name).trim(), sl = nm.toLowerCase().replace(/\s+/g, " ");
+  const acct = { name:nm, email:a.email || s.email || "", grade:String(a.grade || s.grade || ""), cls:a.cls || s.cls || "", teacher:a.teacher || s.teacher || "", path:a.path || s.level || "beginner", created:a.created || Date.now() };
+  const dk = PPSync.newKey(), at = Date.now();
+  await PPSync.publishWrap(sl, pin, dk); await PPSync.push(dk, at, { acct, progress }); await PPSync.flush();
+  for (let i = 0; i < 10; i++){ await new Promise(r => setTimeout(r, i ? 4000 : 1500));
+    try { if (await PPSync.findKey(sl, pin) === dk && await PPSync.pull(dk)) return true; } catch(e){} }
+  throw new Error("The rebuilt save was sent but hasn't reached the Sync sheet yet. Wait a minute and press Reset PIN again.");
+}
 const PIN_DONE = {};   // PINs reset in this session: the row's button shows "✓ Done" in green
 function resetPin(s){
   const bg = document.createElement("div"); bg.className = "modal-bg"; bg.style.zIndex = 70;
@@ -1112,6 +1143,7 @@ function resetPin(s){
     if (!window.PPSync || !PPSync.enabled()) return q("#rpMsg").innerHTML = `<div class="notice bad">Computer Science sync isn't connected.</div>`;
     q("#rpGo").disabled = true; q("#rpMsg").innerHTML = `<div class="notice ok">Working… (a few seconds)</div>`;
     try { let ok = await PPSync.resetWithKey(String(s.name).trim().toLowerCase().replace(/\s+/g, " "), p, RKEY), local = !ok;
+      if (local){ q("#rpMsg").innerHTML = `<div class="notice ok">Their work isn't online yet: putting the dashboard's copy of it online… (up to a minute)</div>`; if (await rebuildCS(s, p)) local = false; }
       // always: a signed note that lets the student's own computer accept the new PIN (matched by email and by name)
       { const at = Date.now(), ids = [...new Set([await SDC.idOf(s.email || "", s.name), await SDC.idOf("", s.name)])];
         for (const id of ids) SDC.sendRow("P", id, await signAssign({ k:id, ph: csPinHash(s.name, p), at })); SDC.flush(); ok = true; }
