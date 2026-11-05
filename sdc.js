@@ -543,6 +543,11 @@ const GL_PHRASE = {
   "saved":                       { ru:"Сохранено", fr:"Enregistré", es:"Guardado", de:"Gespeichert" },
   "sketch here":                 { ru:"Нарисовать здесь", fr:"Dessiner ici", es:"Dibujar aquí", de:"Hier zeichnen" },
   "check spelling and grammar":  { ru:"Проверить орфографию и грамматику", fr:"Vérifier l'orthographe et la grammaire", es:"Revisar ortografía y gramática", de:"Rechtschreibung und Grammatik prüfen" },
+  "inquiring & analysing":       { ru:"Исследование и анализ", fr:"Recherche et analyse", es:"Indagación y análisis", de:"Recherchieren und Analysieren" },
+  "inquiring and analysing":     { ru:"Исследование и анализ", fr:"Recherche et analyse", es:"Indagación y análisis", de:"Recherchieren und Analysieren" },
+  "developing ideas":            { ru:"Разработка идей", fr:"Développement des idées", es:"Desarrollo de ideas", de:"Ideen entwickeln" },
+  "creating the solution":       { ru:"Создание решения", fr:"Création de la solution", es:"Creación de la solución", de:"Die Lösung erstellen" },
+  "evaluating":                  { ru:"Оценивание", fr:"Évaluation", es:"Evaluación", de:"Bewerten" },
   "rubric":                      { ru:"Шкала оценивания", fr:"Grille d'évaluation", es:"Rúbrica", de:"Bewertungsraster" },
   "worked example":              { ru:"Разобранный пример", fr:"Exemple corrigé", es:"Ejemplo resuelto", de:"Lösungsbeispiel" },
   "house points":                { ru:"Очки факультета", fr:"Points de maison", es:"Puntos de casa", de:"Hauspunkte" },
@@ -616,7 +621,9 @@ const GL_CAP = (t, w) => /^[A-Z]/.test(t) ? w.charAt(0).toUpperCase() + w.slice(
 function glossNode(tn, code){
   const el = tn.parentElement; if (!el || el.closest(GL_SKIP)) return;
   glossPost(tn, code);   // text Google has already translated
-  const raw = tn.nodeValue; if (!raw || !/[A-Za-z]{3}/.test(raw)) return;
+  const raw = tn.nodeValue;
+  if (/^\s*[A-D]\s*$/.test(raw || "") && !el.classList.contains("notranslate")){ el.classList.add("notranslate"); el.setAttribute("translate", "no"); return; }   // a criterion letter on its own
+  if (!raw || !/[A-Za-z]{3}/.test(raw)) return;
   const m = raw.match(/^([^A-Za-z]*)(.*?)([\s→←.:!?…]*)$/s), core = m ? m[2] : raw, ph = GL_PHRASE[core.trim().toLowerCase()];
   // Google drops the spaces next to a "don't translate" word inside a sentence: keep them inside our word
   const inSentence = (() => { const pe = el, gp = pe.parentElement; if (!gp || getComputedStyle(pe).display !== "inline") return false; return String(gp.textContent || "").trim().length > String(pe.textContent || "").trim().length + 2; })();
