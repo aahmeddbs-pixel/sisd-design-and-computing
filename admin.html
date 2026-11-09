@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261109a"></script>
+<script src="/python-pathways/pp-sync.js?v=20261109b"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261109a"></script>
+<script src="sdc.js?v=20261109b"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -1166,12 +1166,19 @@ function tempPassword(){ const w = ["Maple","River","Cloud","Tiger","Coral","Pia
   return r() + r() + (10 + crypto.getRandomValues(new Uint32Array(1))[0] % 90) + r(); }
 /* a temporary password the student must replace when they next sign in: TEMP-7K4P-9QX2 (no 0/O/1/I to misread) */
 function tempCode(){ const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789", r = () => Array.from(crypto.getRandomValues(new Uint32Array(4)), x => A[x % A.length]).join(""); return "TEMP-" + r() + "-" + r(); }
+/* a signed note that this password was set by a teacher: the course asks the student to replace it at next sign-in */
+async function markTemp(key, pw){
+  const h = async t => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)))].map(b => b.toString(16).padStart(2, "0")).join("");
+  const id = (await h("sdc-temp|" + key)).slice(0, 32);
+  SDC.sendRow("X", id, await signAssign({ k:id, th: await h("sdc-tmp|" + key + "|" + pw), at: Date.now() })); SDC.flush();
+}
 function resetDesignPw(s){
   const bg = document.createElement("div"); bg.className = "modal-bg"; bg.style.zIndex = 70;
   const pw = tempCode(), em = String(s.email || "").toLowerCase(), isUser = !!em && !em.includes("@");   // Grade 10: a username, no email kept
   bg.innerHTML = `<div class="modal" role="dialog" aria-label="Reset password"><h2>🔑 Reset password: ${esc(s.name)}</h2>
     <p class="muted small" style="margin-top:4px">${esc(String(s.name).split(" ")[0])} signs in with ${isUser ? `the username <b>${esc(s.uname || em)}</b>` : esc(em || "their school email")} and this <b>temporary password</b>, on any device. They then create their own new password. Their work is kept and the old password stops working.${isUser ? " This student has no email on record, so give them the temporary password yourself." : " The temporary password is also emailed to them."}</p>
-    <label class="f">Temporary password<input class="t" id="dpPw" maxlength="14" value="${pw}" readonly style="font-family:Consolas,monospace;font-size:1.2em;letter-spacing:1px"></label>
+    <label class="f">Temporary password <span class="muted small">(type your own, or keep this one)</span><input class="t" id="dpPw" maxlength="40" value="${pw}" autocomplete="off" spellcheck="false" style="font-family:Consolas,monospace;font-size:1.2em;letter-spacing:1px"></label>
+    <p class="muted small" style="margin-top:-4px">8 to 40 letters and numbers, no spaces. The student must change it the first time they sign in with it.</p>
     ${RKEY ? "" : `<div class="notice warn">${isSuper() ? "The reset key isn't unlocked. Lock and sign in again as super admin." : "Password resets aren't set up for your account yet. Ask the super admin to sign in to this page once, then sign in again."}</div>`}
     ${em ? "" : `<div class="notice bad">This student has no school email on record, so their password can't be reset here.</div>`}
     <div id="dpMsg"></div><div class="row" style="margin-top:14px"><button class="btn red" id="dpGo" ${RKEY && em ? "" : "disabled"}>Reset password</button><button class="btn ghost" id="dpX">Close</button></div></div>`;
@@ -1179,13 +1186,14 @@ function resetDesignPw(s){
   const q = x => bg.querySelector(x);
   q("#dpX").onclick = () => bg.remove(); bg.onclick = e => { if (e.target === bg) bg.remove(); };
   q("#dpGo").onclick = async () => {
-    const p = q("#dpPw").value.trim(); if (!/^TEMP-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(p)) return q("#dpMsg").innerHTML = `<div class="notice bad">Close this box and press Reset password again.</div>`;
+    const p = q("#dpPw").value.trim(); if (!/^(TEMP-[A-Z0-9]{4}-[A-Z0-9]{4}|[A-Za-z0-9]{8,40})$/.test(p)) return q("#dpMsg").innerHTML = `<div class="notice bad">Use 8 to 40 letters and numbers, with no spaces or symbols.</div>`;
     if (!PPSync.design || !PPSync.design.enabled()) return q("#dpMsg").innerHTML = `<div class="notice bad">Design sync isn't connected.</div>`;
     q("#dpGo").disabled = true; q("#dpMsg").innerHTML = `<div class="notice ok">Working… (up to a minute)</div>`;
     try {
       const ok = await PPSync.design.resetWithKey(em, p, RKEY);
       if (!ok){ q("#dpMsg").innerHTML = `<div class="notice warn">No Design account was found online for <b>${esc(em)}</b>. They may never have signed in since saving went online. Ask them to sign up again with this email, or to sign in once on the device they used before.</div>`; q("#dpGo").disabled = false; return; }
       try { await PPSync.design.escrowSecret(em, p); } catch(e){}
+      try { await markTemp(em, p); } catch(e){}   // so the student is asked to choose their own password, whatever was typed
       SDC.log("pwreset", { name:s.name, email:em, course:s.course || "design", grade:s.grade, teacher:s.teacher }, { by: isSuper() ? "(admin)" : (ME && ME.name) || "" });
       ROWS.push({ sdc:1, type:"pwreset", when:Date.now(), acct:{ name:s.name, email:em, teacher:s.teacher, course:s.course || "design" } });
       PIN_DONE[s.key + "#pw"] = Date.now();
