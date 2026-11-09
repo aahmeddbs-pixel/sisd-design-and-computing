@@ -883,20 +883,34 @@ async function healDeletes(){
       const e = normE(d.student.email); if (seenE.has(e)) continue; seenE.add(e);
       const live = list.filter(x => normE(x.email) === e); if (!live.length) continue;   // really deleted: nothing still listed
       const s = live.find(x => x.course === "design") || live[0];
-      let L = null; try { L = await SDC.lookup(s.email, s.name); } catch(err){ continue; }
-      if (!L || !L.assign || !L.assign.del) continue;   // not blocked (or already fixed)
-      const courses = new Set(live.map(x => x.course)); if (d.student.course) courses.add(d.student.course);
       const id = await SDC.idOf(s.email, s.name), at = Date.now(), g = String(s.grade || "");
-      const dEnt = live.find(x => x.course === "design"), dg = String(dEnt ? dEnt.grade || "" : d.student.course === "design" && d.acct && d.acct.grade || g);   // keep their Design grade
-      const o = courses.has("cs") && courses.has("design") ? { k:id, c:"design", also:"cs", g:dg, t:(dEnt || s).teacher || "", cls:dEnt ? dEnt.cls || "" : "", at }
-        : { k:id, c:s.course, g, t:s.teacher || "", l: s.course === "cs" ? s.level || "" : "", cls: s.course === "design" ? s.cls || "" : "", at };
+      // the signed course settings for this student, newest first
+      let objs = []; try { for (const r of await SDC.rows("S", id, 20)){ const o = await SDC.verify(r.text); if (o && o.k === id) objs.push(o); } } catch(err){ continue; }
+      if (!objs.length) continue;
+      const fixedAt = ROWS.filter(r => r.type === "adminrestore" && r.student && normE(r.student.email) === e).map(r => r.when);
+      const healed = objs[0].rs || (!objs[0].del && objs[1] && objs[1].del && fixedAt.some(w => Math.abs(w - objs[0].at) < 120000));   // restored by this dashboard
+      const di = healed ? 1 : 0; if (!objs[di] || !objs[di].del) continue;   // not blocked, or set again by a teacher since
+      const before = objs.slice(di + 1).find(o => !o.del && o.c);   // their settings before the mistaken delete
+      let o;
+      if (before){ o = Object.assign({}, before, { at, rs:1 }); delete o.del; }
+      else {
+        const courses = new Set(live.map(x => x.course)); if (d.student.course) courses.add(d.student.course);
+        const dEnt = live.find(x => x.course === "design"), dg = String(dEnt ? dEnt.grade || "" : d.student.course === "design" && d.acct && d.acct.grade || g);
+        o = courses.has("cs") && courses.has("design") ? { k:id, c:"design", also:"cs", g:dg, t:(dEnt || s).teacher || "", cls:dEnt ? dEnt.cls || "" : "", at, rs:1 }
+          : { k:id, c:s.course, g, t:s.teacher || "", l: s.course === "cs" ? s.level || "" : "", cls: s.course === "design" ? s.cls || "" : "", at, rs:1 };
+      }
+      if (healed && ["c", "also", "g", "cls", "l", "t"].every(f => String(objs[0][f] || "") === String(o[f] || ""))) continue;   // already right
       SDC.sendRow("S", id, await signAssign(o));
       SDC.log("adminrestore", { name:"(admin)", course:s.course || "", grade:g, teacher:s.teacher || "" }, { student:{ name:s.name, email:s.email, key:s.key, course:s.course || "" } });
+      ROWS.push({ sdc:1, type:"adminrestore", when:at, acct:{ name:"(admin)" }, student:{ name:s.name, email:s.email, key:s.key } });
       done.push(s.name);
     }
   } catch(err){ console.warn("heal", err); }
   healing = false;
-  if (done.length){ try { SDC.flush(); } catch(e){} toast("Fixed: " + done.join(", ") + " can sign in again (a duplicate entry had been deleted). Their PIN and work are unchanged."); }
+  if (done.length){ try { SDC.flush(); } catch(e){}
+    const n = document.createElement("div"); n.className = "notice ok"; n.style.cssText = "position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:9999;max-width:560px;box-shadow:0 8px 30px rgba(0,0,0,.25);padding:14px 16px";
+    n.innerHTML = `<b>✅ Fixed:</b> ${done.map(esc).join(", ")} can sign in again, with the same course, grade and class as before. Their PIN and work are unchanged. <button class="btn sm" style="margin-left:8px">OK</button>`;
+    n.querySelector("button").onclick = () => n.remove(); document.body.appendChild(n); }
 }
 function deleteStudent(s){
   if (!isSuper()) return;
