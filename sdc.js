@@ -49,7 +49,7 @@ const PORTAL = "/sisd-design-and-computing/";
 const COURSES = {
   cs:     { id:"cs",     name:"Computer Science", short:"CS",     icon:"</>", app:"/python-pathways/",                 grades:["6","7","8","11","12"], blurb:"Python coding: lessons, exercises and practice" },
   design: { id:"design", name:"Design",           short:"Design", icon:"✎",   app:"/myp-design-curriculum-pathways/", grades:["6","7","8","10"],      blurb:"IB MYP Design: Criteria A to D design projects" },
-  it:     { id:"it",     name:"IT",               short:"IT",     icon:"⇄",   app:"/myp-design-curriculum-pathways/", grades:["10"],                  blurb:"Grade 10 IT: Networks and network security" }
+  it:     { id:"it",     name:"IT",               short:"IT",     icon:"⇄",   app:"/myp-design-curriculum-pathways/", grades:["10"],                  blurb:"Grade 10 IT: Game Development, and Networks and network security" }
 };
 // Teacher's private log (the same Google Form as the Python Pathways Log): type, student, email, teacher, data
 const LOG = { url:"https://docs.google.com/forms/d/e/1FAIpQLSfFnVZORF6176gPE9a2zGNpivDuklLFF5cHzdQz1YxfAxThRA/formResponse",
