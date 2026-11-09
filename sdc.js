@@ -11,17 +11,29 @@ if (!window.gfSend) window.gfSend = (function(){
     if (!p.has("partialResponse")) p.append("partialResponse", JSON.stringify([null, null, z]));
     return p;
   }
+  /* Keep the student where they are: a reply loading in the hidden frame can make the browser jump the page.
+     For a moment after each reply, a jump that the student didn't make (no scroll wheel, key or touch) is put back. */
+  let lastY = 0, lastX = 0, userAt = 0, guardTo = 0;
+  try {
+    const mark = () => { userAt = Date.now(); };
+    ["wheel", "touchstart", "touchmove", "keydown", "mousedown"].forEach(ev => window.addEventListener(ev, mark, { passive:true, capture:true }));
+    window.addEventListener("scroll", () => {
+      if (Date.now() < guardTo && Date.now() - userAt > 2000 && Math.abs(window.scrollY - lastY) > 40){ window.scrollTo(lastX, lastY); return; }
+      lastY = window.scrollY; lastX = window.scrollX;
+    }, { passive:true });
+  } catch(e){}
+  function keepPlace(){ guardTo = Date.now() + 1500; }
   function viaFrame(action, p){
     return new Promise(res => {
       try {
         if (!document.body) return res(false);
         const name = "gfsink" + (++n), fr = document.createElement("iframe");
         fr.name = name; fr.title = "sync"; fr.setAttribute("aria-hidden", "true"); fr.tabIndex = -1;
-        fr.style.cssText = "position:absolute;width:1px;height:1px;left:-9999px;top:-9999px;border:0;opacity:0";
+        fr.style.cssText = "position:fixed;width:1px;height:1px;left:0;top:0;border:0;opacity:0;pointer-events:none";   // fixed: if the reply page grabs focus, the student's page must not jump to the top
         const f = document.createElement("form"); f.method = "POST"; f.action = action; f.target = name; f.acceptCharset = "UTF-8"; f.style.display = "none";
         p.forEach((v, k) => { const i = document.createElement("textarea"); i.name = k; i.value = v; f.appendChild(i); });
         let done = false; const end = ok => { if (done) return; done = true; setTimeout(() => { try { fr.remove(); f.remove(); } catch(e){} }, 1500); res(ok); };
-        fr.onload = () => end(true); setTimeout(() => end(true), 6000);
+        fr.onload = () => { keepPlace(); end(true); }; setTimeout(() => end(true), 6000);
         document.body.appendChild(fr); document.body.appendChild(f); f.submit();
       } catch(e){ res(false); }
     });
