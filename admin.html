@@ -867,6 +867,37 @@ function delBtn(s, i){   // super admin only: always available (a recently activ
   const d = idleDays(s), tip = s.seen ? (d < 1 ? "Online today" : "Last online " + d + " day" + (d === 1 ? "" : "s") + " ago") + ": delete this account" : "Never seen online: delete this account";
   return ` <button class="btn red sm" data-del="${i}" title="${esc(tip)}">🗑 Delete</button>`;
 }
+/* another entry on the dashboard for the same student (same school email, the other course) */
+const normE = e => String(e || "").trim().toLowerCase();
+function sameAccount(s){ const e = normE(s.email); if (!e) return null; return students().find(x => x !== s && normE(x.email) === e && x.course !== s.course) || null; }
+/* Fix accounts blocked by mistake: before 9 Nov 2026, deleting a duplicate entry (e.g. a student's Design entry when
+   the same student also has a Computer Science entry) blocked their one login for both. Super admin only, runs on its own. */
+let healing = false;
+async function healDeletes(){
+  if (!isSuper() || healing || !window.SDC || !SDC.lookup) return; healing = true;
+  const done = [];
+  try {
+    const list = students(), dels = ROWS.filter(r => r.type === "admindelete" && r.student && normE(r.student.email));
+    const seenE = new Set();
+    for (const d of dels){
+      const e = normE(d.student.email); if (seenE.has(e)) continue; seenE.add(e);
+      const live = list.filter(x => normE(x.email) === e); if (!live.length) continue;   // really deleted: nothing still listed
+      const s = live.find(x => x.course === "design") || live[0];
+      let L = null; try { L = await SDC.lookup(s.email, s.name); } catch(err){ continue; }
+      if (!L || !L.assign || !L.assign.del) continue;   // not blocked (or already fixed)
+      const courses = new Set(live.map(x => x.course)); if (d.student.course) courses.add(d.student.course);
+      const id = await SDC.idOf(s.email, s.name), at = Date.now(), g = String(s.grade || "");
+      const dEnt = live.find(x => x.course === "design"), dg = String(dEnt ? dEnt.grade || "" : d.student.course === "design" && d.acct && d.acct.grade || g);   // keep their Design grade
+      const o = courses.has("cs") && courses.has("design") ? { k:id, c:"design", also:"cs", g:dg, t:(dEnt || s).teacher || "", cls:dEnt ? dEnt.cls || "" : "", at }
+        : { k:id, c:s.course, g, t:s.teacher || "", l: s.course === "cs" ? s.level || "" : "", cls: s.course === "design" ? s.cls || "" : "", at };
+      SDC.sendRow("S", id, await signAssign(o));
+      SDC.log("adminrestore", { name:"(admin)", course:s.course || "", grade:g, teacher:s.teacher || "" }, { student:{ name:s.name, email:s.email, key:s.key, course:s.course || "" } });
+      done.push(s.name);
+    }
+  } catch(err){ console.warn("heal", err); }
+  healing = false;
+  if (done.length){ try { SDC.flush(); } catch(e){} toast("Fixed: " + done.join(", ") + " can sign in again (a duplicate entry had been deleted). Their PIN and work are unchanged."); }
+}
 function deleteStudent(s){
   if (!isSuper()) return;
   const bg = document.createElement("div"); bg.className = "modal-bg";
@@ -885,8 +916,10 @@ function deleteStudent(s){
   q("#dGo").onclick = async () => {
     q("#dGo").disabled = true;
     try {
-      const id = await SDC.idOf(s.email || "", s.name), at = Date.now();
-      SDC.sendRow("S", id, await signAssign({ k:id, del:true, at }));
+      const id = await SDC.idOf(s.email || "", s.name), at = Date.now(), keep = sameAccount(s);
+      // the same student is still listed for the other course (one login for both): only take this course away,
+      // never delete the login they still use
+      SDC.sendRow("S", id, await signAssign(keep ? { k:id, c:keep.course, g:String(keep.grade || ""), t:keep.teacher || "", l: keep.course === "cs" ? keep.level || "" : "", cls: keep.course === "design" ? keep.cls || "" : "", at } : { k:id, del:true, at }));
       SDC.log("admindelete", { name:"(admin)", course:s.course || "", grade:s.grade || "", teacher:s.teacher || "" }, { student:{ name:s.name, email:s.email || "", key:s.key, course:s.course || "" } });
       ROWS.push({ sdc:1, type:"admindelete", when:at, acct:{ name:"(admin)" }, student:{ name:s.name, email:s.email || "", key:s.key } });
     } catch(e){ q("#dMsg").innerHTML = `<div class="notice bad">Could not delete: ${esc(e.message)}</div>`; q("#dGo").disabled = false; return; }
@@ -1403,7 +1436,7 @@ function renderLog(){
 }
 $("lgF").onchange = renderLog;
 
-function renderAll(){ renderHP(); renderResets(); renderSlow(); renderVerifyWaiting(); renderDesignRequests(); renderStudents(); renderLog(); }
+function renderAll(){ renderHP(); renderResets(); renderSlow(); renderVerifyWaiting(); renderDesignRequests(); renderStudents(); renderLog(); setTimeout(healDeletes, 1500); }
 /* ---------- students who signed up but can't get in because they haven't verified their email ---------- */
 /* ---------- students who've been stuck on one task for a long time (after two reminders on their screen) ---------- */
 function renderSlow(){
