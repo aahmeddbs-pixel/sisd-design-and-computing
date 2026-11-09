@@ -360,7 +360,7 @@ async function confirm(a, signup){
   let L = null;
   try { L = await lookup(a.email, a.name); } catch(e){ L = null; }
   if (!L){ // sheet unreachable: let them in, it is checked again next time (new sign-ups must still verify)
-    const made0 = createdMs(a), vm = c === "cs" || a.viaCS ? null : await verifyGate(a.email, "student", !!signup || (made0 ? made0 >= sinceMs() : false), a);   // new accounts must verify even when the online register can't be read if (vm){ log("unverified", Object.assign({}, a, { course:c }), { signup:!!signup }); return { ok:false, verify:true, msg:vm }; }
+    const made0 = createdMs(a), vm = c === "cs" || a.viaCS || a.viaCode ? null : await verifyGate(a.email, "student", !!signup || (made0 ? made0 >= sinceMs() : false), a);   // new accounts must verify even when the online register can't be read if (vm){ log("unverified", Object.assign({}, a, { course:c }), { signup:!!signup }); return { ok:false, verify:true, msg:vm }; }
     patchGate({ who:{ email:normEmail(a.email), name:a.name } });
     if (!(g && g.logged)) { log("signin", Object.assign({}, a, { course:c }), { gate:g && g.mode, unchecked:true }); patchGate({ logged:true }); }
     return { ok:true, assign:null };
@@ -384,7 +384,7 @@ async function confirm(a, signup){
   // only accounts made after verification was switched on must verify (judged by when the account was made,
   // not by when it first reached the online register). Computer Science students never need to verify.
   const made = createdMs(a), isNew = !!signup || (made ? made >= sinceMs() : (!!L.reg && L.reg.ver >= sinceMs()));
-  const vm = c === "cs" || a.viaCS ? null : await verifyGate(a.email, "student", isNew, a);
+  const vm = c === "cs" || a.viaCS || a.viaCode ? null : await verifyGate(a.email, "student", isNew, a);
   if (vm){ log("unverified", Object.assign({}, a, { course:c }), { signup:!!signup }); return { ok:false, verify:true, msg:vm }; }
   patchGate({ who:{ email:normEmail(a.email), name:a.name }, acct: acctOf(Object.assign({}, a, { course: c })) }); work(); setTimeout(showFeedbackButton, 800);
   if (!(g && g.logged)){ log(signup ? "signup" : "signin", Object.assign({}, a, { course:c }), { gate:g && g.mode }); patchGate({ logged:true }); }
@@ -439,6 +439,29 @@ async function adminVerified(email){
     for (const r of await rows("V", id, 10)){ const o = await verify(r.text); if (o && o.k === id && o.verified){ try { localStorage.setItem(VKEY(email), "1"); } catch(e){} return true; } } } catch(e){}
   return false;
 }
+/* ---------- Grade 10 sign-up: confirm the SISD email with a 6-digit code, then forget the email ----------
+   The address and code go in the body of a hidden POST (never in a web address); the result is read back by a random id.
+   Returns { ok } or { ok:false, reason }; reason "old" = the email script hasn't been updated yet. */
+async function codePost(body){
+  if (!VERIFY.url || offline()) return { ok:false, reason:"offline" };
+  const rid = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  try { await fetch(VERIFY.url, { method:"POST", mode:"no-cors", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body: JSON.stringify(Object.assign({ rid }, body)) }); }
+  catch(e){ return { ok:false, reason:"reach" }; }
+  for (let i = 0; i < 14; i++){
+    await new Promise(r => setTimeout(r, i ? 1500 : 900));
+    try { const x = await jsonp({ a:"cstatus", id: rid }, 12000); if (x && x.reason === "unknown") return { ok:false, reason:"old" }; if (x && !x.pending) return x; } catch(e){}
+  }
+  return { ok:false, reason:"reach" };
+}
+const emailCode = (email, first) => codePost({ a:"code", e: normEmail(email), n: String(first || "").slice(0, 40) });
+const checkCode = (email, code) => codePost({ a:"check", e: normEmail(email), c: String(code || "").replace(/\D/g, "").slice(0, 6) });
+/* a username made from the student's first and last name, letters and numbers only: "Mikaeel Ahmed" → "MikaeelAhmed" */
+function usernameOf(name){
+  return String(name || "").normalize("NFD").replace(/[̀-ͯ]/g, "").split(/\s+/).filter(Boolean)
+    .map(w => w.replace(/[^A-Za-z0-9]/g, "")).filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join("").slice(0, 40);
+}
+const isUsername = v => /^[a-z][a-z0-9]{2,40}$/i.test(String(v || "").trim());
+
 /* ---------- forgot PIN / password ----------
    The student asks for a reset: their teacher and the super admin are emailed and see it on the staff dashboard
    ("Reset requests"); the student gets an email saying what happens next. After the reset, resetDone() emails the
@@ -446,7 +469,8 @@ async function adminVerified(email){
 const BASE_TEACHERS = ["Mr. Ahmed", "Ms. Abdelaziz", "Mr. French", "Ms. Miyakawa"];
 async function forgot(r){
   const email = normEmail(r.email), c = r.course === "cs" ? "cs" : r.course === "it" ? "it" : "design";
-  if (!/^[^\s@]+@sisd\.ae$/i.test(email)) return { ok:false, msg:"Type your full school email, ending in @sisd.ae." };
+  const uname = !email.includes("@") && isUsername(email);
+  if (!/^[^\s@]+@sisd\.ae$/i.test(email) && !uname) return { ok:false, msg:"Type your full school email (ending in @sisd.ae), or your username if you have one." };
   const name = String(r.name || "").trim().replace(/\s+/g, " ").slice(0, 80);
   if (name.split(" ").length < 2) return { ok:false, msg:"Type your first and last name." };
   log("resetrequest", { name, email, course:c, teacher:r.teacher || "" }, { reset:{ course:c } });
@@ -469,7 +493,7 @@ async function forgotDialog(o){
     <h2 style="margin:0 0 6px;font-size:22px">🔑 Forgot your ${what}?</h2>
     <p style="margin:0 0 14px;color:#5B6782;font-size:14px">Fill this in and press <b>Ask for a reset</b>. Your teacher resets it, and your new ${what} is emailed to your school email. Your work is kept.</p>
     <label style="display:block;font-weight:700;font-size:14px;margin-bottom:10px">Your full name<input id="fgName" autocomplete="name" style="${fs}" value="${h(o.name || "")}" placeholder="First and last name"></label>
-    <label style="display:block;font-weight:700;font-size:14px;margin-bottom:10px">School email<input id="fgEmail" type="email" autocomplete="email" style="${fs}" value="${h(o.email || "")}" placeholder="name@sisd.ae"></label>
+    <label style="display:block;font-weight:700;font-size:14px;margin-bottom:10px">${c === "cs" ? "School email" : "School email, or your username"}<input id="fgEmail" type="text" autocomplete="username" style="${fs}" value="${h(o.email || "")}" placeholder="name@sisd.ae"></label>
     <label style="display:block;font-weight:700;font-size:14px;margin-bottom:12px">Your teacher<select id="fgTeacher" style="${fs}"><option value="">Not sure</option>${names.map(n => `<option${o.teacher && sameTeacher(o.teacher, n) ? " selected" : ""}>${h(n)}</option>`).join("")}</select></label>
     <div id="fgMsg" style="font-size:14px;margin-bottom:10px"></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" id="fgGo" style="background:#DC2B3E;color:#fff;border:0;border-radius:10px;padding:11px 18px;font:inherit;font-weight:800;cursor:pointer">Ask for a reset</button><button type="button" id="fgX" style="background:#EEF1F7;color:#1B2D4E;border:0;border-radius:10px;padding:11px 18px;font:inherit;font-weight:700;cursor:pointer">Close</button></div></div>`;
@@ -482,6 +506,8 @@ async function forgotDialog(o){
     q("#fgGo").disabled = true; say("Sending…", true);
     const r = await forgot({ course:c, name:q("#fgName").value, email:q("#fgEmail").value, teacher:q("#fgTeacher").value });
     if (!r.ok){ q("#fgGo").disabled = false; return say(h(r.msg)); }
+    const un = !q("#fgEmail").value.includes("@");
+    if (un){ say(`<b>Request sent.</b> Your teacher will give you a <b>temporary password</b>. Sign in with your username and it, then create your own new password.`, true); q("#fgGo").remove(); q("#fgX").textContent = "OK"; return; }
     say(`<b>Request sent.</b> ${r.emailed ? "Check your school email: we've sent you what happens next. " : ""}Your teacher will reset your ${what}, and your new ${what} will be emailed to you. You can also ask your teacher in your next lesson.`, true);
     q("#fgGo").remove(); q("#fgX").textContent = "OK";
   };
@@ -1085,5 +1111,5 @@ function strip(c, onSignOut, noLang, mainSel, onSignIn){
 function signedOutNotice(msg, kind){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg, kind: kind || "bad" })); } catch(e){} }
 
 return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
-  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, forgot, forgotDialog, resetDone, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, gloss, listen, stopReading, speak, slow, rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
+  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, forgot, forgotDialog, resetDone, emailCode, checkCode, usernameOf, isUsername, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, gloss, listen, stopReading, speak, slow, rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();

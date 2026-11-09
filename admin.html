@@ -7,9 +7,9 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261105o"></script>
+<script src="/python-pathways/pp-sync.js?v=20261109a"></script>
 <script src="/python-pathways/answers-view.js?v=20261102d"></script>
-<script src="sdc.js?v=20261105o"></script>
+<script src="sdc.js?v=20261109a"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -1164,12 +1164,14 @@ function resetPin(s){
 /* ---------------- Reset a Design / IT student's password (works on every device, work kept) ---------------- */
 function tempPassword(){ const w = ["Maple","River","Cloud","Tiger","Coral","Piano","Amber","Comet","Lemon","Cedar","Orbit","Pixel"], r = () => w[crypto.getRandomValues(new Uint32Array(1))[0] % w.length];
   return r() + r() + (10 + crypto.getRandomValues(new Uint32Array(1))[0] % 90) + r(); }
+/* a temporary password the student must replace when they next sign in: TEMP-7K4P-9QX2 (no 0/O/1/I to misread) */
+function tempCode(){ const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789", r = () => Array.from(crypto.getRandomValues(new Uint32Array(4)), x => A[x % A.length]).join(""); return "TEMP-" + r() + "-" + r(); }
 function resetDesignPw(s){
   const bg = document.createElement("div"); bg.className = "modal-bg"; bg.style.zIndex = 70;
-  const pw = tempPassword(), em = String(s.email || "").toLowerCase();
+  const pw = tempCode(), em = String(s.email || "").toLowerCase(), isUser = !!em && !em.includes("@");   // Grade 10: a username, no email kept
   bg.innerHTML = `<div class="modal" role="dialog" aria-label="Reset password"><h2>🔑 Reset password: ${esc(s.name)}</h2>
-    <p class="muted small" style="margin-top:4px">${esc(String(s.name).split(" ")[0])} signs in with ${esc(em || "their school email")} and the new password on any device. Their work is kept and the old password stops working. The new password is emailed to them.</p>
-    <label class="f">New password<input class="t" id="dpPw" maxlength="40" value="${pw}"></label>
+    <p class="muted small" style="margin-top:4px">${esc(String(s.name).split(" ")[0])} signs in with ${isUser ? `the username <b>${esc(s.uname || em)}</b>` : esc(em || "their school email")} and this <b>temporary password</b>, on any device. They then create their own new password. Their work is kept and the old password stops working.${isUser ? " This student has no email on record, so give them the temporary password yourself." : " The temporary password is also emailed to them."}</p>
+    <label class="f">Temporary password<input class="t" id="dpPw" maxlength="14" value="${pw}" readonly style="font-family:Consolas,monospace;font-size:1.2em;letter-spacing:1px"></label>
     ${RKEY ? "" : `<div class="notice warn">${isSuper() ? "The reset key isn't unlocked. Lock and sign in again as super admin." : "Password resets aren't set up for your account yet. Ask the super admin to sign in to this page once, then sign in again."}</div>`}
     ${em ? "" : `<div class="notice bad">This student has no school email on record, so their password can't be reset here.</div>`}
     <div id="dpMsg"></div><div class="row" style="margin-top:14px"><button class="btn red" id="dpGo" ${RKEY && em ? "" : "disabled"}>Reset password</button><button class="btn ghost" id="dpX">Close</button></div></div>`;
@@ -1177,7 +1179,7 @@ function resetDesignPw(s){
   const q = x => bg.querySelector(x);
   q("#dpX").onclick = () => bg.remove(); bg.onclick = e => { if (e.target === bg) bg.remove(); };
   q("#dpGo").onclick = async () => {
-    const p = q("#dpPw").value.trim(); if (!/^[A-Za-z0-9]{10,40}$/.test(p)) return q("#dpMsg").innerHTML = `<div class="notice bad">Use 10 to 40 letters and numbers (no spaces).</div>`;
+    const p = q("#dpPw").value.trim(); if (!/^TEMP-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(p)) return q("#dpMsg").innerHTML = `<div class="notice bad">Close this box and press Reset password again.</div>`;
     if (!PPSync.design || !PPSync.design.enabled()) return q("#dpMsg").innerHTML = `<div class="notice bad">Design sync isn't connected.</div>`;
     q("#dpGo").disabled = true; q("#dpMsg").innerHTML = `<div class="notice ok">Working… (up to a minute)</div>`;
     try {
@@ -1188,9 +1190,9 @@ function resetDesignPw(s){
       ROWS.push({ sdc:1, type:"pwreset", when:Date.now(), acct:{ name:s.name, email:em, teacher:s.teacher, course:s.course || "design" } });
       PIN_DONE[s.key + "#pw"] = Date.now();
       const gb = q("#dpGo"); gb.textContent = "✓ Done"; gb.className = "btn ok"; gb.style.background = "#1E8A55";
-      const sent = await SDC.resetDone({ email:em, name:s.name, course:s.course || "design", secret:p });
-      q("#dpMsg").innerHTML = `<div class="notice ok"><b>Done.</b> New password for ${esc(s.name)}: <b style="font-size:1.15em;font-family:Consolas,monospace">${esc(p)}</b> (works on any device).</div>` +
-        (sent ? `<div class="notice ok">📧 Emailed to ${esc(em)}.</div>` : `<div class="notice warn">The email to the student couldn't be sent. Please give them the password yourself.</div>`);
+      const sent = isUser ? false : await SDC.resetDone({ email:em, name:s.name, course:s.course || "design", secret:p });
+      q("#dpMsg").innerHTML = `<div class="notice ok"><b>Done.</b> Temporary password for ${esc(s.name)}: <b style="font-size:1.15em;font-family:Consolas,monospace">${esc(p)}</b>. ${isUser ? `They sign in with the username <b>${esc(s.uname || em)}</b> and this, then create their own password.` : "They sign in with it, then create their own password."}</div>` +
+        (isUser ? `<div class="notice warn">Give the temporary password to the student yourself (no email is kept for username accounts).</div>` : sent ? `<div class="notice ok">📧 Emailed to ${esc(em)}.</div>` : `<div class="notice warn">The email to the student couldn't be sent. Please give them the password yourself.</div>`);
       renderStudents(); renderResets();
     } catch(e){ q("#dpMsg").innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; q("#dpGo").disabled = false; }
   };
