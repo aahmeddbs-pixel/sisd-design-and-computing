@@ -439,6 +439,19 @@ async function adminVerified(email){
     for (const r of await rows("V", id, 10)){ const o = await verify(r.text); if (o && o.k === id && o.verified){ try { localStorage.setItem(VKEY(email), "1"); } catch(e){} return true; } } } catch(e){}
   return false;
 }
+/* ---------- home learning switches ----------
+   Which strands' home learning is live, per unit: { "7": { "A1": true, ... }, ... }. Set by the super admin or an approved
+   teacher on the staff dashboard; signed, so only they can switch it on. The newest signed copy wins. */
+const HL_ID = "homelearn";
+let HL = null, HL_AT = 0;
+async function homeLearning(fresh){
+  if (!fresh && HL && Date.now() - HL_AT < 180000) return HL;
+  let best = null;
+  try { for (const r of await rows("H", HL_ID, 25)){ const o = await verify(r.text); if (o && o.k === HL_ID && o.map && (!best || o.at > best.at)) best = o; } }
+  catch(e){ if (HL) return HL; throw e; }
+  HL = best || { k:HL_ID, map:{}, at:0 }; HL_AT = Date.now(); return HL;
+}
+const hlLive = (map, unit, key) => !!(map && map[String(unit)] && map[String(unit)][key]);
 /* ---------- forgot PIN / password ----------
    The student asks for a reset: their teacher and the super admin are emailed and see it on the staff dashboard
    ("Reset requests"); the student gets an email saying what happens next. After the reset, resetDone() emails the
@@ -1085,5 +1098,5 @@ function strip(c, onSignOut, noLang, mainSel, onSignIn){
 function signedOutNotice(msg, kind){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg, kind: kind || "bad" })); } catch(e){} }
 
 return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
-  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, forgot, forgotDialog, resetDone, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, gloss, listen, stopReading, speak, slow, rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
+  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, forgot, forgotDialog, resetDone, homeLearning, hlLive, HL_ID, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, gloss, listen, stopReading, speak, slow, rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();

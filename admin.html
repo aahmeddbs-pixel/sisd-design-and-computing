@@ -125,7 +125,7 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
   <div id="app" class="hidden">
     <div class="row" style="justify-content:space-between;margin-bottom:4px"><div><h1 id="whoTitle">Admin</h1><div class="muted small" id="whoSub"></div></div><div class="row"><span class="muted small" id="loadState"></span><button class="btn ghost sm" id="refresh">↻ Refresh</button></div></div>
     <div class="tabs" role="tablist">
-      <button data-t="students" aria-selected="true">👥 Students &amp; progress</button><button data-t="hp">🏠 House Points</button><button data-t="log">📋 Sign-in log</button><button data-t="teachers" data-super>🧑‍🏫 Teachers</button><button data-t="switches" data-super>🔀 Criteria switches</button><button data-t="setup" data-super>⚙️ Setup</button>
+      <button data-t="students" aria-selected="true">👥 Students &amp; progress</button><button data-t="hp">🏠 House Points</button><button data-t="log">📋 Sign-in log</button><button data-t="hl">📚 Home learning</button><button data-t="teachers" data-super>🧑‍🏫 Teachers</button><button data-t="switches" data-super>🔀 Criteria switches</button><button data-t="setup" data-super>⚙️ Setup</button>
     </div>
 
     <section id="t-hp" class="hidden">
@@ -181,6 +181,14 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
       </div>
     </section>
 
+    <section id="t-hl" class="hidden">
+      <div class="card">
+        <h2>📚 Home learning</h2>
+        <p class="muted small" style="margin-top:4px">Each Design strand has a home learning activity that reinforces what students learnt: keyword matching, completing sentences, three "apply it" questions and a short reflection. Students complete it on the website, download it as a PDF and hand it in on ManageBac. Switch a strand <b>on</b> to make its home learning live for every student in that unit. It's off until you switch it on. Changes reach students within about 3 minutes.</p>
+        <div id="hlMsg" style="margin-top:8px"></div>
+        <div class="scroll" style="margin-top:10px"><table class="tbl" id="hlTbl"></table></div>
+      </div>
+    </section>
     <section id="t-switches" class="hidden">
       <div class="card">
         <h2>Criteria switches (Design and IT)</h2>
@@ -486,13 +494,14 @@ function enter(){
 $("outBtn").onclick = () => location.reload();
 
 /* ---------------- tabs ---------------- */
-const TABS = ["hp","students","log","teachers","switches","setup"];
+const TABS = ["hp","students","log","hl","teachers","switches","setup"];
 document.querySelectorAll("#app .tabs button").forEach(b => b.onclick = () => {
   if (b.hasAttribute("data-super") && !isSuper()) return;
   document.querySelectorAll("#app .tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
   TABS.forEach(t => $("t-" + t).classList.toggle("hidden", t !== b.dataset.t));
   if (b.dataset.t === "teachers") renderTeachers();
   if (b.dataset.t === "switches") renderSwitches();
+  if (b.dataset.t === "hl") renderHomeLearning();
 });
 
 /* ---------------- setup ---------------- */
@@ -1275,6 +1284,35 @@ $("swGo").onclick = async () => { $("swGo").disabled = true;
   const ok = await publishCourseState(Object.assign({}, STATE, { unlocks: SW }));
   $("swMsg").innerHTML = `<div class="notice ${ok ? "ok" : "bad"}">${ok ? "Applied. Students see the change within about 5 minutes." : "Google Forms couldn't be reached. Try again."}</div>`; $("swGo").disabled = false; };
 
+/* ---------------- home learning: on/off per unit and strand (super admin and approved teachers) ---------------- */
+const HL_STRANDS = ["A","B","C","D"].flatMap(c => [1,2,3,4].map(n => c + n)), HL_ROMAN = ["i","ii","iii","iv"];
+let HLMAP = null;
+async function renderHomeLearning(){
+  const t = $("hlTbl"), m = $("hlMsg"); t.innerHTML = `<tr><td class="muted">Loading…</td></tr>`;
+  const canSign = isSuper() || !!TKEY;
+  m.innerHTML = canSign ? "" : `<div class="notice warn">Switching home learning on isn't set up for your account yet. Ask the super admin to sign in to this page once, then sign in again.</div>`;
+  try { HLMAP = JSON.parse(JSON.stringify((await SDC.homeLearning(true)).map || {})); } catch(e){ t.innerHTML = `<tr><td><div class="notice bad">The switches couldn't be read. Check the connection and press ↻ Refresh.</div></td></tr>`; return; }
+  t.innerHTML = `<tr><th rowspan="2">Unit</th>${["A","B","C","D"].map(c => `<th colspan="4" style="text-align:center;border-left:2px solid var(--line)">Criterion ${c}</th>`).join("")}</tr>
+    <tr>${HL_STRANDS.map((k, i) => `<th style="text-align:center;${i % 4 === 0 ? "border-left:2px solid var(--line)" : ""}">${HL_ROMAN[i % 4]}</th>`).join("")}</tr>` +
+    UNITS.map(([g, l]) => `<tr><td><b>${esc(l)}</b><div class="em">${HL_STRANDS.filter(k => SDC.hlLive(HLMAP, g, k)).length} live</div></td>${HL_STRANDS.map((k, i) =>
+      `<td style="text-align:center;${i % 4 === 0 ? "border-left:2px solid var(--line)" : ""}"><button class="sw" role="switch" data-g="${g}" data-k="${k}" aria-checked="${SDC.hlLive(HLMAP, g, k)}" aria-label="${esc(l)} Criterion ${k[0]} strand ${HL_ROMAN[+k[1] - 1]}" ${canSign ? "" : "disabled"}></button></td>`).join("")}</tr>`).join("");
+  t.querySelectorAll(".sw").forEach(b => b.onclick = () => toggleHL(b));
+}
+async function toggleHL(b){
+  const g = b.dataset.g, k = b.dataset.k, on = b.getAttribute("aria-checked") !== "true", m = $("hlMsg");
+  const name = (UNITS.find(u => u[0] === g) || [g, g])[1] + ", Criterion " + k[0] + " strand " + HL_ROMAN[+k[1] - 1];
+  b.disabled = true; m.innerHTML = `<div class="notice">Saving…</div>`;
+  try {
+    let map = HLMAP || {}; try { map = JSON.parse(JSON.stringify((await SDC.homeLearning(true)).map || {})); } catch(e){}   // someone else may have changed it
+    map[g] = map[g] || {}; if (on) map[g][k] = true; else delete map[g][k];
+    const o = { k:SDC.HL_ID, map, at: Date.now(), by: isSuper() ? "(admin)" : (ME && ME.name) || "" };
+    SDC.sendRow("H", SDC.HL_ID, await signAssign(o)); SDC.flush();
+    HLMAP = map; b.setAttribute("aria-checked", on);
+    const cnt = b.closest("tr").querySelector(".em"); if (cnt) cnt.textContent = HL_STRANDS.filter(x => SDC.hlLive(map, g, x)).length + " live";
+    m.innerHTML = `<div class="notice ok">${on ? "✓ <b>Live:</b>" : "Switched off:"} home learning for ${esc(name)}. Students see the change within about 3 minutes.</div>`;
+  } catch(e){ m.innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; }
+  b.disabled = false;
+}
 $("stQ").oninput = renderStudents; $("stC").onchange = renderStudents; $("stK").onchange = renderStudents; $("stCr").onchange = renderStudents;
 /* one student's feedback: Computer Science on one page, Design / IT one page per criterion they have work in */
 async function studentPdf(s0, b){
