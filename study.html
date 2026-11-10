@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SISD Study Plus</title>
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
+<script src="sdc.js?v=20261110a"></script>
+<script src="study/maths.js?v=20261110a"></script>
+<script src="study/english.js?v=20261110a"></script>
+<script src="study/science.js?v=20261110a"></script>
+<script src="study/ins.js?v=20261110a"></script>
+<script src="study/islamic.js?v=20261110a"></script>
+<script src="study/french.js?v=20261110a"></script>
+<script src="study/arabic.js?v=20261110a"></script>
+<style>
+:root{
+  --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
+  --ok:#1E8A55; --okbg:#E3F4EA; --warn:#8A4B00; --warnbg:#FFF2DC; --bad:#A3172A; --badbg:#FBE5E8; --r:14px;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0E1626; --card:#16213A; --ink:#E7ECF6; --muted:#9AA7C2; --line:#2A3858; --soft:#1D2A47; --okbg:#143326; --ok:#47C487; --warnbg:#3A2C10; --warn:#F0B44C; --badbg:#3E1820; --bad:#FF8A98; color-scheme:dark}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 Arial,Helvetica,sans-serif;min-height:100vh}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+:focus-visible{outline:3px solid var(--red);outline-offset:2px}
+/* top bar */
+.top{background:var(--navy);color:#fff;border-bottom:4px solid var(--red);position:sticky;top:0;z-index:20}
+.top .in{max-width:1080px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.logo{background:var(--red);border-radius:7px;padding:3px 9px;font-weight:900;letter-spacing:.06em;font-size:.88rem}
+.brand{font-weight:900;font-size:1.1rem}
+.brand small{display:block;font-weight:400;font-size:.72rem;opacity:.75;letter-spacing:.06em;text-transform:uppercase}
+.top .sp{flex:1}
+.top select{background:var(--navy-d);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:999px;padding:6px 12px;font-weight:700;font-size:.9rem;max-width:100%}
+.top .ghost{background:none;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:6px 12px;color:#fff;font-weight:700;font-size:.9rem}
+.clock{font-family:Menlo,Consolas,monospace;font-size:.85rem;background:rgba(255,255,255,.12);border-radius:999px;padding:4px 10px;font-variant-numeric:tabular-nums}
+main{max-width:1080px;margin:0 auto;padding:22px 16px 60px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;box-shadow:0 2px 10px rgba(11,33,73,.06)}
+h1{font-size:clamp(1.5rem,3.6vw,2.1rem);font-weight:900;line-height:1.15}
+h2{font-size:1.25rem;font-weight:900}
+.muted{color:var(--muted)}
+.small{font-size:.88rem}
+.eyebrow{font-size:.75rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--red)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.stack{display:flex;flex-direction:column;gap:14px}
+.btn{border:none;border-radius:10px;padding:11px 18px;background:var(--navy);color:#fff;font-weight:800;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{filter:brightness(1.1)}
+.btn.red{background:var(--red)}
+.btn.ok{background:var(--ok)}
+.btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.btn.sm{padding:7px 12px;font-size:.88rem}
+.btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
+.back{background:none;border:none;color:var(--muted);font-weight:800;padding:0;margin-bottom:12px}
+/* hero + home */
+.hero{background:linear-gradient(135deg,var(--navy) 60%,var(--red));color:#fff;border-radius:var(--r);padding:24px;display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center}
+@media(max-width:700px){.hero{grid-template-columns:1fr}}
+.hero p{opacity:.92;margin-top:8px;max-width:60ch}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;min-width:280px}
+@media(max-width:700px){.stats{min-width:0}}
+.stat{background:rgba(0,0,0,.2);border-radius:10px;padding:10px;text-align:center}
+.stat b{display:block;font-size:1.35rem;font-variant-numeric:tabular-nums}
+.stat span{font-size:.72rem;opacity:.85;text-transform:uppercase;letter-spacing:.06em}
+.pick{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:18px}
+@media(max-width:820px){.pick{grid-template-columns:1fr}}
+.choice{text-align:left;border:2px solid var(--line);background:var(--card);border-radius:var(--r);padding:16px;display:flex;gap:12px;align-items:center}
+.choice:hover{border-color:var(--navy)}
+.choice.here{border-color:var(--red)}
+.choice .ic{width:48px;height:48px;border-radius:12px;display:grid;place-items:center;font-weight:900;color:#fff;background:var(--navy);flex:none;font-size:1.2rem}
+.choice.here .ic{background:var(--red)}
+.choice b{display:block;font-size:1.05rem}
+.subjects{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-top:14px}
+.subj{text-align:left;border:1px solid var(--line);background:var(--card);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:10px;border-top:5px solid var(--c,var(--navy));transition:transform .12s,box-shadow .12s}
+.subj:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(11,33,73,.12)}
+.subj .top2{display:flex;gap:10px;align-items:center}
+.subj .ic{width:42px;height:42px;border-radius:10px;display:grid;place-items:center;color:#fff;font-weight:900;background:var(--c,var(--navy));flex:none}
+.subj b{font-size:1.05rem}
+.bar{height:7px;background:var(--soft);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ok);width:0;transition:width .4s}
+/* topics */
+.topics{display:grid;gap:10px;margin-top:14px}
+.topic{display:flex;gap:12px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:14px}
+.topic:hover{border-color:var(--navy)}
+.topic .n{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:900;background:var(--soft);flex:none}
+.topic.done .n{background:var(--ok);color:#fff}
+.topic .meta{margin-left:auto;text-align:right;font-size:.85rem;color:var(--muted);white-space:nowrap}
+.pill{display:inline-block;border-radius:999px;padding:2px 9px;font-size:.78rem;font-weight:800;background:var(--soft)}
+.pill.ok{background:var(--okbg);color:var(--ok)} .pill.warn{background:var(--warnbg);color:var(--warn)} .pill.bad{background:var(--badbg);color:var(--bad)}
+select.big{border:2px solid var(--line);background:var(--card);border-radius:10px;padding:10px 12px;width:100%;max-width:520px;font-weight:700}
+/* task */
+.qhead{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}
+.dots{display:flex;gap:5px;flex-wrap:wrap}
+.dots i{width:22px;height:8px;border-radius:9px;background:var(--soft);border:1px solid var(--line)}
+.dots i.cur{border-color:var(--navy);background:var(--line)}
+.dots i.r{background:var(--ok);border-color:var(--ok)} .dots i.w{background:var(--red);border-color:var(--red)}
+.q{font-size:1.2rem;font-weight:800;line-height:1.4;white-space:pre-line}
+.opts{display:grid;gap:8px}
+.opt{text-align:left;border:2px solid var(--line);background:var(--card);border-radius:10px;padding:12px 14px;font-size:1.05rem}
+.opt:hover:not(:disabled){border-color:var(--navy)}
+.opt[aria-pressed=true]{border-color:var(--navy);background:var(--soft)}
+.opt.right{border-color:var(--ok);background:var(--okbg)} .opt.wrong{border-color:var(--bad);background:var(--badbg)}
+.opt:disabled{cursor:default}
+.ans{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ans .pre{font-weight:800;font-size:1.1rem}
+.ans input{border:2px solid var(--line);background:var(--card);border-radius:10px;padding:11px 12px;font-size:1.1rem;width:min(320px,100%)}
+.ans input.right{border-color:var(--ok)} .ans input.wrong{border-color:var(--bad)}
+.verdict{border-radius:12px;padding:12px 14px;font-weight:700}
+.verdict.ok{background:var(--okbg);color:var(--ok)} .verdict.bad{background:var(--badbg);color:var(--bad)}
+.rate{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media(max-width:520px){.rate{grid-template-columns:1fr}}
+.rate button{border:2px solid var(--line);background:var(--card);border-radius:10px;padding:10px;font-weight:800}
+.rate button[aria-pressed=true]{border-color:var(--navy);background:var(--navy);color:#fff}
+.rtl{direction:rtl;unicode-bidi:plaintext}
+[dir=auto]{unicode-bidi:plaintext}
+/* knowledge + modal */
+.ideas{margin:10px 0 0 20px;display:grid;gap:6px}
+.example{background:var(--soft);border-left:4px solid var(--red);border-radius:0 10px 10px 0;padding:12px 14px;white-space:pre-line;font-family:inherit;margin-top:12px}
+.modal-bg{position:fixed;inset:0;background:rgba(8,15,30,.6);display:grid;place-items:center;padding:16px;z-index:60}
+.modal{background:var(--card);border-radius:var(--r);max-width:620px;width:100%;max-height:88vh;overflow:auto;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,.35)}
+.modal h3{font-size:1.2rem;font-weight:900}
+.agree{display:flex;gap:10px;align-items:flex-start;font-weight:700;cursor:pointer;margin-top:14px}
+.agree input{width:20px;height:20px;accent-color:var(--red);flex:none;margin-top:2px}
+/* summary */
+.sumgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media(max-width:700px){.sumgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.sum{background:var(--soft);border-radius:12px;padding:12px;text-align:center}
+.sum b{display:block;font-size:1.6rem;font-variant-numeric:tabular-nums}
+.sum span{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:700px){.two{grid-template-columns:1fr}}
+.list{margin:8px 0 0 18px;display:grid;gap:6px}
+.fix{border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:6px}
+.fix .q{font-size:1rem}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;z-index:70;font-weight:700;max-width:calc(100% - 32px)}
+.foot{text-align:center;color:var(--muted);font-size:.82rem;margin-top:30px}
+</style>
+</head>
+<body>
+<header class="top"><div class="in">
+  <span class="logo">SISD</span><span class="brand">Study Plus<small id="whoLine"></small></span>
+  <span class="sp"></span>
+  <span class="clock hidden" id="clock" title="Active work time on this topic">⏱ 00:00</span>
+  <select id="switcher" aria-label="Switch course"></select>
+  <button class="ghost" id="outBtn">Sign out</button>
+</div></header>
+<main id="app"></main>
+<p class="foot">Swiss International Scientific School Dubai · Study Plus</p>
+<div id="modalRoot"></div>
+
+<script>
+(function(){
+"use strict";
+const $ = id => document.getElementById(id), esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const S = window.STUDY || {}, ORDER = ["maths","english","science","ins","islamic","french","arabic"].filter(k => S[k]);
+const IDLE_MS = 60000, FOCUS_SEC_PER_TASK = 40;
+
+/* ---------- who is signed in: only the chosen student (and the test account) may stay ---------- */
+const G = window.SDC ? SDC.gate() : null;
+const WHO = G && (G.acct || G.who);
+if (!window.SDC || !WHO || !SDC.studyPlusOK(WHO)){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg:"Choose your course to sign in.", kind:"warn" })); } catch(e){} location.replace(window.SDC ? SDC.PORTAL : "./"); return; }
+const ACCT = Object.assign({ course:"study" }, G.acct || {}, { name: WHO.name || "", email: WHO.email || "" });
+const FIRST = String(ACCT.name || "").split(/\s+/)[0] || "there";
+$("whoLine").textContent = ACCT.name || ACCT.email;
+
+/* ---------- saved progress (on this device) ---------- */
+const KEY = "sdc_study_" + (SDC.keyOf ? SDC.keyOf(ACCT.email, ACCT.name) : (ACCT.email || ACCT.name)).replace(/[^\w:@.-]/g, "_");
+let DB = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e){ return {}; } })();
+DB.topics = DB.topics || {}; DB.reports = DB.reports || [];
+function save(){ try { DB.updatedAt = Date.now(); localStorage.setItem(KEY, JSON.stringify(DB)); } catch(e){} }
+const tkey = (s, t) => s + "/" + t;
+function tstate(s, t){ const k = tkey(s, t); return DB.topics[k] = DB.topics[k] || { i:0, ans:{}, ms:0, read:false, done:false, runs:0 }; }
+function topicOf(s, t){ return (S[s].topics || []).find(x => x.id === t); }
+
+/* ---------- active work timer: counts only while the page is open, visible and being used ---------- */
+let lastAct = Date.now(), working = null;
+["keydown","pointerdown","input","change","wheel","touchstart"].forEach(ev => window.addEventListener(ev, () => lastAct = Date.now(), { capture:true, passive:true }));
+const fmt = ms => { const s = Math.floor(ms / 1000), m = Math.floor(s / 60); return (m >= 60 ? Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0") : String(m).padStart(2, "0")) + ":" + String(s % 60).padStart(2, "0"); };
+const mins = ms => Math.round(ms / 60000);
+setInterval(() => {
+  if (!working || document.hidden || Date.now() - lastAct > IDLE_MS) return;
+  const st = tstate(working.s, working.t); st.ms += 1000; $("clock").textContent = "⏱ " + fmt(st.ms);
+  if (st.ms % 5000 === 0) save();
+}, 1000);
+document.addEventListener("visibilitychange", save); window.addEventListener("pagehide", save);
+
+/* ---------- switcher: Computer Science, Design, Other subjects ---------- */
+function paintSwitcher(){
+  const C = SDC.COURSES;
+  $("switcher").innerHTML = `<option value="">Switch ▾</option><option value="cs">${esc(C.cs.name)}</option><option value="design">${esc(C.design.name)}</option><option value="home">Other subjects</option>`;
+  $("switcher").value = "";
+}
+$("switcher").onchange = e => {
+  const to = e.target.value; e.target.value = ""; if (!to) return;
+  if (to === "home") return go({ v:"home" });
+  save(); stopWork();
+  const g = SDC.gate() || {};
+  SDC.setGate({ mode: g.link ? "link" : "signin", course: to, link: g.link || null, studyFrom: true });
+  location.href = SDC.COURSES[to].app;
+};
+$("outBtn").onclick = () => { save(); stopWork(); SDC.leave("out"); };
+
+/* ---------- marking ---------- */
+const strip = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "");
+const clean = s => String(s || "").toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, " ").trim().replace(/[.!]$/, "");
+function toNum(v){ const t = String(v || "").trim().replace(/[−–—]/g, "-").replace(/\s/g, "").replace(/,(\d{1,2})$/, ".$1").replace(/,/g, "").replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[a-z%°²³]+$/i, ""); if (!/^-?\d*\.?\d+$/.test(t)) return NaN; return parseFloat(t); }
+function mark(task, given){
+  if (task.k === "mcq") return { ok: given === task.a };
+  if (task.k === "tf") return { ok: given === task.a };
+  if (task.k === "num"){ const n = toNum(given); return { ok: !isNaN(n) && Math.abs(n - task.a) <= (task.tol || 1e-9), blank: String(given || "").trim() === "", bad: isNaN(n) }; }
+  if (task.k === "text"){
+    let g = clean(given); const pre = clean(task.prefix || ""); if (pre && g.startsWith(pre)) g = g.slice(pre.length).trim();
+    g = g.replace(/\s*\/\s*/g, "/");
+    const acc = task.a.map(clean);
+    if (acc.indexOf(g) >= 0) return { ok:true };
+    if (acc.map(strip).indexOf(strip(g)) >= 0) return { ok:true, accent:true };
+    return { ok:false, blank: g === "" };
+  }
+  return { ok:false };
+}
+function rightText(task){
+  if (task.k === "mcq") return task.o[task.a];
+  if (task.k === "tf") return task.a ? "True" : "False";
+  if (task.k === "num") return String(task.a);
+  if (task.k === "text") return (task.prefix || "") + (task.best || task.a[0]);
+  return "";
+}
+function givenText(task, g){
+  if (task.k === "mcq") return g == null ? "" : task.o[g];
+  if (task.k === "tf") return g == null ? "" : g ? "True" : "False";
+  return String(g == null ? "" : g);
+}
+
+/* ---------- scores ---------- */
+function topicScore(s, t){
+  const T = topicOf(s, t), st = tstate(s, t), n = T.tasks.length;
+  let right = 0, answered = 0, need = 0, unsure = 0, got = 0;
+  T.tasks.forEach((_, i) => { const a = st.ans[i]; if (!a) return; answered++; if (a.ok) right++; if (a.rate === 3) need++; if (a.rate === 2) unsure++; if (a.rate === 1) got++; });
+  const score = n ? Math.round(right / n * 100) : 0, completion = n ? answered / n : 0;
+  const focus = Math.min(1, (st.ms / 1000) / (Math.max(1, answered) * FOCUS_SEC_PER_TASK));
+  const effort = Math.round(100 * (0.6 * (score / 100) + 0.2 * completion + 0.2 * focus));
+  return { n, right, answered, score, effort, focus: Math.round(focus * 100), need, unsure, got, ms: st.ms };
+}
+function subjectProgress(s){ const T = S[s].topics; const done = T.filter(t => tstate(s, t.id).done).length; return { done, total: T.length, pct: Math.round(done / T.length * 100) }; }
+function totals(){
+  let ms = 0, done = 0, sc = 0, n = 0;
+  Object.keys(DB.topics).forEach(k => { const [s, t] = k.split("/"); if (!S[s] || !topicOf(s, t)) return; const st = DB.topics[k]; ms += st.ms || 0; if (st.done){ done++; sc += topicScore(s, t).score; n++; } });
+  return { ms, done, avg: n ? Math.round(sc / n) : 0 };
+}
+
+/* ---------- views ---------- */
+let VIEW = { v:"home" };
+function go(v){ VIEW = v; stopWork(); render(); window.scrollTo(0, 0); }
+function stopWork(){ working = null; $("clock").classList.add("hidden"); }
+function startWork(s, t){ working = { s, t }; lastAct = Date.now(); $("clock").classList.remove("hidden"); $("clock").textContent = "⏱ " + fmt(tstate(s, t).ms); }
+function render(){
+  if (VIEW.v === "home") return renderHome();
+  if (VIEW.v === "subject") return renderSubject();
+  if (VIEW.v === "topic") return renderTopic();
+  if (VIEW.v === "summary") return renderSummary();
+}
+
+function renderHome(){
+  const T = totals();
+  $("app").innerHTML = `
+  <section class="hero">
+    <div><div class="eyebrow" style="color:#FFB3BC">Your personal space</div><h1>Hi ${esc(FIRST)}, what will you work on?</h1>
+      <p>Choose Computer Science or Design to carry on with your courses, or pick <b>Other subjects</b> to practise MYP 2 Maths, English, Science, Individuals and Societies, Islamic Education, French and Arabic.</p></div>
+    <div class="stats"><div class="stat"><b>${fmt(T.ms)}</b><span>Work time</span></div><div class="stat"><b>${T.done}</b><span>Topics done</span></div><div class="stat"><b>${T.avg}%</b><span>Avg score</span></div></div>
+  </section>
+  <div class="pick">
+    <button class="choice" data-go="cs"><span class="ic">&lt;/&gt;</span><span><b>Computer Science</b><span class="muted small">Python Pathways</span></span></button>
+    <button class="choice" data-go="design"><span class="ic">✎</span><span><b>Design</b><span class="muted small">MYP Design, Criteria A to D</span></span></button>
+    <button class="choice here" data-go="other"><span class="ic">✦</span><span><b>Other subjects</b><span class="muted small">7 MYP 2 subjects below</span></span></button>
+  </div>
+  <div class="card" style="margin-top:18px" id="otherCard">
+    <h2>Other subjects</h2>
+    <p class="muted small" style="margin-top:4px">Pick a subject, then a topic. Each topic starts with the key knowledge, then tasks you answer, check and rate yourself on.</p>
+    <div class="subjects">${ORDER.map(s => { const P = subjectProgress(s); return `<button class="subj" data-s="${s}" style="--c:${S[s].colour}">
+      <span class="top2"><span class="ic">${esc(S[s].icon)}</span><span><b>${esc(S[s].name)}</b><br><span class="muted small">${P.done} of ${P.total} topics done</span></span></span>
+      <span class="muted small">${esc(S[s].blurb)}</span><span class="bar"><i style="width:${P.pct}%"></i></span></button>`; }).join("")}</div>
+  </div>`;
+  $("app").querySelectorAll("[data-go]").forEach(b => b.onclick = () => { const g = b.dataset.go; if (g === "other") return $("otherCard").scrollIntoView({ behavior:"smooth" }); $("switcher").value = g; $("switcher").onchange({ target: $("switcher") }); });
+  $("app").querySelectorAll("[data-s]").forEach(b => b.onclick = () => go({ v:"subject", s:b.dataset.s }));
+}
+
+function renderSubject(){
+  const s = VIEW.s, SUB = S[s];
+  $("app").innerHTML = `<button class="back" id="bk">← All subjects</button>
+  <div class="card stack" style="border-top:6px solid ${SUB.colour}">
+    <div><div class="eyebrow">MYP 2 · Grade 7</div><h1>${esc(SUB.name)}</h1><p class="muted">${esc(SUB.blurb)}</p></div>
+    <label class="small" style="font-weight:800">Jump to a topic
+      <select class="big" id="topicSel" style="margin-top:6px"><option value="">Choose a topic…</option>${SUB.topics.map((t, i) => `<option value="${t.id}">${i + 1}. ${esc(t.title)}${tstate(s, t.id).done ? " ✓" : ""}</option>`).join("")}</select></label>
+    <div class="topics">${SUB.topics.map((t, i) => { const st = tstate(s, t.id), sc = topicScore(s, t.id);
+      const meta = st.done ? `<span class="pill ${sc.score >= 70 ? "ok" : sc.score >= 50 ? "warn" : "bad"}">${sc.score}%</span><br>${fmt(st.ms)}` : sc.answered ? `<span class="pill warn">In progress</span><br>${sc.answered}/${sc.n}` : `${t.tasks.length} tasks`;
+      return `<button class="topic ${st.done ? "done" : ""}" data-t="${t.id}"><span class="n">${st.done ? "✓" : i + 1}</span><span><b>${esc(t.title)}</b><br><span class="muted small">${esc(t.strand)}</span></span><span class="meta">${meta}</span></button>`; }).join("")}</div>
+  </div>`;
+  $("bk").onclick = () => go({ v:"home" });
+  $("topicSel").onchange = e => { if (e.target.value) openTopic(s, e.target.value); };
+  $("app").querySelectorAll("[data-t]").forEach(b => b.onclick = () => openTopic(s, b.dataset.t));
+}
+function openTopic(s, t){
+  const st = tstate(s, t);
+  if (st.done) return go({ v:"summary", s, t });
+  go({ v:"topic", s, t });
+  if (!st.read) showKnowledge(s, t, true);
+}
+
+/* ---------- key knowledge pop-up (must be read before the tasks unlock) ---------- */
+function showKnowledge(s, t, gate){
+  const T = topicOf(s, t), rtl = S[s].rtl;
+  modal(`<div class="eyebrow">${esc(S[s].name)} · Key knowledge</div><h3 style="margin-top:4px">${esc(T.title)}</h3>
+    <ul class="ideas">${T.learn.ideas.map(x => `<li dir="auto">${esc(x)}</li>`).join("")}</ul>
+    <div class="example" dir="auto"><b>Worked example</b>\n${esc(T.learn.example)}</div>
+    ${gate ? `<label class="agree"><input type="checkbox" id="kRead"> I have read the key knowledge and the worked example.</label>` : ""}
+    <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn sm ghost" id="kSay">🔊 Read aloud</button><button class="btn" id="kGo" ${gate ? "disabled" : ""}>${gate ? "Start the tasks →" : "Close"}</button></div>`);
+  if (gate) $("kRead").onchange = e => $("kGo").disabled = !e.target.checked;
+  $("kSay").onclick = () => say(T.title + ". " + T.learn.ideas.join(" ") + " Worked example. " + T.learn.example, rtl);
+  $("kGo").onclick = () => { hush(); closeModal(); if (gate){ tstate(s, t).read = true; save(); render(); } };
+}
+function say(text, rtl){ try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(String(text).replace(/[→←✓]/g, " ")); u.lang = rtl ? "en-GB" : "en-GB"; u.rate = .95; speechSynthesis.speak(u); } catch(e){} }
+function hush(){ try { speechSynthesis.cancel(); } catch(e){} }
+
+/* ---------- one task at a time ---------- */
+let pick = null;
+function renderTopic(){
+  const s = VIEW.s, t = VIEW.t, SUB = S[s], T = topicOf(s, t), st = tstate(s, t);
+  if (!st.read){ $("app").innerHTML = `<button class="back" id="bk">← ${esc(SUB.name)}</button><div class="card"><h2>${esc(T.title)}</h2><p class="muted" style="margin-top:6px">Read the key knowledge first to unlock the tasks.</p><button class="btn" id="kOpen" style="margin-top:12px">Open key knowledge</button></div>`;
+    $("bk").onclick = () => go({ v:"subject", s }); $("kOpen").onclick = () => showKnowledge(s, t, true); return; }
+  const retry = VIEW.retry || null, list = retry || T.tasks.map((_, i) => i);
+  let pos = VIEW.pos != null ? VIEW.pos : retry ? 0 : Math.min(st.i, T.tasks.length - 1);
+  if (!retry){ const firstOpen = T.tasks.findIndex((_, i) => !st.ans[i] || !st.ans[i].rate); if (firstOpen < 0){ return finishTopic(s, t); } if (VIEW.pos == null) pos = firstOpen; }
+  VIEW.pos = pos;
+  const i = list[pos], task = T.tasks[i], prev = retry ? (st.retry || {})[i] : st.ans[i];
+  startWork(s, t); pick = prev ? prev.g : null;
+  const dots = T.tasks.map((_, j) => { const a = st.ans[j]; return `<i class="${j === i ? "cur" : ""} ${a ? (a.ok ? "r" : "w") : ""}"></i>`; }).join("");
+  $("app").innerHTML = `<button class="back" id="bk">← ${esc(SUB.name)}</button>
+  <div class="card stack" style="border-top:6px solid ${SUB.colour}">
+    <div class="qhead"><div><div class="eyebrow">${esc(SUB.name)} · ${esc(T.title)}${retry ? " · Fix my mistakes" : ""}</div><div class="muted small">Task ${pos + 1} of ${list.length}</div></div>
+      <div class="row"><button class="btn sm ghost" id="kAgain">📘 Key knowledge</button></div></div>
+    <div class="dots" aria-hidden="true">${dots}</div>
+    <div class="q" dir="auto">${esc(task.q)}</div>
+    <div id="answerBox">${answerUI(task, SUB.rtl)}</div>
+    <div id="after"></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn red" id="checkBtn">Check my answer</button></div>
+  </div>`;
+  $("bk").onclick = () => { save(); go({ v:"subject", s }); };
+  $("kAgain").onclick = () => showKnowledge(s, t, false);
+  wireAnswer(task);
+  if (prev && prev.checked !== false) showAfter(s, t, i, task, prev, !!retry, list, pos);
+  else $("checkBtn").onclick = () => check(s, t, i, task, !!retry, list, pos);
+}
+function answerUI(task, rtl){
+  if (task.k === "mcq") return `<div class="opts">${task.o.map((o, j) => `<button class="opt" data-o="${j}" aria-pressed="false" dir="auto">${esc(o)}</button>`).join("")}</div>`;
+  if (task.k === "tf") return `<div class="opts" style="grid-template-columns:1fr 1fr"><button class="opt" data-o="t" aria-pressed="false">True</button><button class="opt" data-o="f" aria-pressed="false">False</button></div>`;
+  const ph = task.k === "num" ? "Type a number" : "Type your answer";
+  return `<div class="ans">${task.prefix ? `<span class="pre">${esc(task.prefix)}</span>` : ""}<input id="inp" ${task.k === "num" ? 'inputmode="decimal"' : 'autocapitalize="off"'} autocomplete="off" spellcheck="false" placeholder="${ph}" dir="auto"></div>`;
+}
+function wireAnswer(task){
+  const opts = $("answerBox").querySelectorAll(".opt");
+  opts.forEach(b => b.onclick = () => { pick = task.k === "tf" ? b.dataset.o === "t" : +b.dataset.o; opts.forEach(x => x.setAttribute("aria-pressed", x === b)); });
+  const inp = $("inp"); if (inp){ inp.oninput = () => pick = inp.value; inp.onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); $("checkBtn").click(); } }; setTimeout(() => { try { inp.focus(); } catch(e){} }, 50); }
+  if (pick != null){ if (inp) inp.value = pick; else opts.forEach(b => { const v = task.k === "tf" ? b.dataset.o === "t" : +b.dataset.o; b.setAttribute("aria-pressed", v === pick); }); }
+}
+function check(s, t, i, task, isRetry, list, pos){
+  if (pick == null || (typeof pick === "string" && !pick.trim())) return toast("Answer the task first.");
+  const m = mark(task, pick);
+  if (task.k === "num" && m.bad) return toast("Type a number only, for example 12 or -3.5");
+  const st = tstate(s, t), rec = { g: pick, ok: m.ok, accent: !!m.accent, at: Date.now() };
+  if (isRetry){ st.retry = st.retry || {}; st.retry[i] = rec; } else { st.ans[i] = rec; st.i = i; }
+  save(); showAfter(s, t, i, task, rec, isRetry, list, pos); explain(task, rec, S[s].rtl);
+}
+function showAfter(s, t, i, task, rec, isRetry, list, pos){
+  // lock the answer
+  $("answerBox").querySelectorAll(".opt").forEach(b => { b.disabled = true; const v = task.k === "tf" ? b.dataset.o === "t" : +b.dataset.o; if (v === task.a) b.classList.add("right"); else if (v === rec.g) b.classList.add("wrong"); });
+  const inp = $("inp"); if (inp){ inp.value = rec.g; inp.disabled = true; inp.classList.add(rec.ok ? "right" : "wrong"); }
+  const rate = rec.rate || 0;
+  $("after").innerHTML = `<div class="verdict ${rec.ok ? "ok" : "bad"}">${rec.ok ? "✓ Correct!" + (rec.accent ? " Watch the accent: " + esc(rightText(task)) : "") : "✗ Not quite. The answer is: <span dir='auto'>" + esc(rightText(task)) + "</span>"} <button class="btn sm ghost" id="whyBtn" style="margin-left:8px">💡 Why?</button></div>
+    <div style="margin-top:12px"><b>Rate your answer</b> <span class="muted small">How well do you understand this now?</span>
+      <div class="rate" style="margin-top:8px"><button data-r="1" aria-pressed="${rate === 1}">😀 I've got it</button><button data-r="2" aria-pressed="${rate === 2}">🤔 Partly</button><button data-r="3" aria-pressed="${rate === 3}">😟 I need help</button></div></div>`;
+  $("whyBtn").onclick = () => explain(task, rec, S[s].rtl);
+  const last = pos >= list.length - 1;
+  $("checkBtn").textContent = last ? (isRetry ? "Finish fixing →" : "Finish topic →") : "Next task →";
+  $("checkBtn").disabled = !rate;
+  $("after").querySelectorAll("[data-r]").forEach(b => b.onclick = () => {
+    rec.rate = +b.dataset.r; save();
+    $("after").querySelectorAll("[data-r]").forEach(x => x.setAttribute("aria-pressed", x === b)); $("checkBtn").disabled = false;
+  });
+  $("checkBtn").onclick = () => {
+    if (!rec.rate) return toast("Rate your answer first.");
+    if (last){ if (isRetry) return finishRetry(s, t); return finishTopic(s, t); }
+    VIEW.pos = pos + 1; render(); window.scrollTo(0, 0);
+  };
+}
+/* explanation pop-up: shown after every check, right or wrong, to reinforce the knowledge */
+function explain(task, rec, rtl){
+  modal(`<div class="eyebrow">${rec.ok ? "Well done — here's why it's right" : "Let's fix this"}</div>
+    <h3 style="margin-top:4px" dir="auto">${esc(task.q)}</h3>
+    ${rec.ok ? "" : `<p style="margin-top:8px"><span class="pill bad">Your answer</span> <span dir="auto">${esc(givenText(task, rec.g)) || "—"}</span></p>`}
+    <p style="margin-top:8px"><span class="pill ok">Correct answer</span> <span dir="auto">${esc(rightText(task))}</span></p>
+    <div class="example" dir="auto"><b>💡 Explanation and example</b>\n${esc(task.x)}</div>
+    <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn sm ghost" id="xSay">🔊 Read aloud</button><button class="btn" id="xOk">Got it</button></div>`);
+  $("xSay").onclick = () => say(task.x, rtl);
+  $("xOk").onclick = () => { hush(); closeModal(); };
+}
+
+/* ---------- finishing: summary, log for the super admin, email to the teacher ---------- */
+function finishTopic(s, t){
+  const st = tstate(s, t), first = !st.done; st.done = true; st.runs = (st.runs || 0) + 1; st.finishedAt = Date.now(); save();
+  if (first) report(s, t, false);
+  go({ v:"summary", s, t });
+}
+function finishRetry(s, t){ const st = tstate(s, t); st.retriedAt = Date.now(); save(); report(s, t, true); go({ v:"summary", s, t }); }
+function analysis(s, t){
+  const T = topicOf(s, t), st = tstate(s, t), well = [], improve = [], gaps = [];
+  T.tasks.forEach((task, i) => { const a = st.ans[i]; if (!a) return; const fixed = st.retry && st.retry[i] && st.retry[i].ok;
+    if (a.ok && a.rate === 1) well.push(task.q);
+    else if (!a.ok){ improve.push({ q: task.q, right: rightText(task), given: givenText(task, a.g), fixed }); gaps.push(i); }
+    else if (a.rate >= 2){ improve.push({ q: task.q, right: rightText(task), given: givenText(task, a.g), unsure: true }); gaps.push(i); } });
+  return { well, improve, gaps };
+}
+function report(s, t, isRetry){
+  const T = topicOf(s, t), sc = topicScore(s, t), A = analysis(s, t), st = tstate(s, t);
+  const fixedNow = isRetry ? Object.values(st.retry || {}).filter(r => r.ok).length : 0;
+  const data = { subject: S[s].name, sid: s, topic: T.title, tid: t, strand: T.strand, score: sc.score, right: sc.right, n: sc.n, effort: sc.effort, focus: sc.focus,
+    mins: Math.max(1, mins(sc.ms)), secs: Math.round(sc.ms / 1000), got: sc.got, unsure: sc.unsure, need: sc.need, retry: !!isRetry, fixed: fixedNow,
+    well: A.well.slice(0, 6).map(q => q.slice(0, 120)), improve: A.improve.slice(0, 8).map(x => ({ q: x.q.slice(0, 120), right: String(x.right).slice(0, 80), given: String(x.given).slice(0, 80), unsure: !!x.unsure, fixed: !!x.fixed })),
+    totalMs: totals().ms };
+  DB.reports.push(Object.assign({ at: Date.now() }, data)); if (DB.reports.length > 300) DB.reports.shift(); save();
+  try { SDC.log("studyplus", ACCT, { study: data }); } catch(e){}
+  try { SDC.studyReport(ACCT, data); } catch(e){}
+}
+function renderSummary(){
+  const s = VIEW.s, t = VIEW.t, SUB = S[s], T = topicOf(s, t), st = tstate(s, t), sc = topicScore(s, t), A = analysis(s, t);
+  const msg = sc.score >= 85 ? "Excellent work: you really know this topic." : sc.score >= 65 ? "Good work. Fix the few gaps below to master it." : sc.score >= 40 ? "A solid start. Use the corrections below, then try the mistakes again." : "This topic needs more practice. Re-read the key knowledge, then fix your mistakes.";
+  const gapsLeft = A.gaps.filter(i => !(st.retry && st.retry[i] && st.retry[i].ok));
+  $("app").innerHTML = `<button class="back" id="bk">← ${esc(SUB.name)}</button>
+  <div class="card stack" style="border-top:6px solid ${SUB.colour}">
+    <div><div class="eyebrow">${esc(SUB.name)} · Topic complete</div><h1>${esc(T.title)}</h1><p class="muted" style="margin-top:4px">${msg}</p></div>
+    <div class="sumgrid"><div class="sum"><b>${sc.score}%</b><span>Score</span></div><div class="sum"><b>${sc.right}/${sc.n}</b><span>Right first time</span></div><div class="sum"><b>${fmt(sc.ms)}</b><span>Active work time</span></div><div class="sum"><b>${sc.effort}%</b><span>Effort</span></div></div>
+    <div class="two">
+      <div class="card" style="box-shadow:none"><h2>⭐ What you did well</h2>${A.well.length ? `<ul class="list">${A.well.map(q => `<li dir="auto">${esc(q)}</li>`).join("")}</ul>` : `<p class="muted small" style="margin-top:6px">Answer confidently and correctly to see your strengths here.</p>`}</div>
+      <div class="card" style="box-shadow:none"><h2>🎯 What to improve</h2>${A.improve.length ? `<ul class="list">${A.improve.map(x => `<li dir="auto">${esc(x.q)}${x.fixed ? ` <span class="pill ok">fixed</span>` : x.unsure ? ` <span class="pill warn">not sure yet</span>` : ""}</li>`).join("")}</ul>` : `<p class="muted small" style="margin-top:6px">No gaps found in this topic. 🎉</p>`}</div>
+    </div>
+    ${A.improve.length ? `<div><h2>📝 Corrections</h2><p class="muted small" style="margin-top:2px">Read each correction carefully; these are your knowledge gaps.</p><div class="stack" style="margin-top:10px">${A.gaps.map(i => { const task = T.tasks[i], a = st.ans[i];
+      return `<div class="fix"><div class="q" dir="auto">${esc(task.q)}</div>${a.ok ? "" : `<div><span class="pill bad">You said</span> <span dir="auto">${esc(givenText(task, a.g))}</span></div>`}<div><span class="pill ok">Answer</span> <span dir="auto">${esc(rightText(task))}</span></div><div class="example" dir="auto" style="margin-top:4px">${esc(task.x)}</div></div>`; }).join("")}</div></div>` : ""}
+    <div class="row" style="justify-content:flex-end">
+      <button class="btn ghost" id="kAgain">📘 Key knowledge</button>
+      ${gapsLeft.length ? `<button class="btn red" id="fixBtn">Fix my mistakes (${gapsLeft.length})</button>` : ""}
+      <button class="btn ghost" id="redo">Start this topic again</button>
+      <button class="btn" id="nextT">${nextTopic(s, t) ? "Next topic →" : "Back to " + esc(SUB.name)}</button>
+    </div>
+    <p class="muted small">Effort combines your score (60%), how many tasks you finished (20%) and how much real work time you spent on them (20%).</p>
+  </div>`;
+  $("bk").onclick = () => go({ v:"subject", s });
+  $("kAgain").onclick = () => showKnowledge(s, t, false);
+  if ($("fixBtn")) $("fixBtn").onclick = () => { const st2 = tstate(s, t); st2.retry = {}; save(); go({ v:"topic", s, t, retry: gapsLeft, pos: 0 }); };
+  $("redo").onclick = () => { if (!confirm("Start this topic again? Your previous result has already been sent to your teacher.")) return; const st2 = tstate(s, t); st2.ans = {}; st2.retry = {}; st2.i = 0; st2.done = false; save(); go({ v:"topic", s, t }); };
+  $("nextT").onclick = () => { const n = nextTopic(s, t); if (n) openTopic(s, n); else go({ v:"subject", s }); };
+}
+function nextTopic(s, t){ const L = S[s].topics, i = L.findIndex(x => x.id === t); for (let j = i + 1; j < L.length; j++) if (!tstate(s, L[j].id).done) return L[j].id; return null; }
+
+/* ---------- small UI helpers ---------- */
+function modal(html){ $("modalRoot").innerHTML = `<div class="modal-bg" role="dialog" aria-modal="true"><div class="modal">${html}</div></div>`; }
+function closeModal(){ $("modalRoot").innerHTML = ""; }
+function toast(m){ const d = document.createElement("div"); d.className = "toast"; d.textContent = m; document.body.appendChild(d); setTimeout(() => d.remove(), 2600); }
+
+paintSwitcher();
+try { SDC.log("studyopen", ACCT, {}); } catch(e){}
+render();
+window.__study = { mark, topicScore, DB: () => DB };   // used by the self-test
+})();
+</script>
+</body>
+</html>

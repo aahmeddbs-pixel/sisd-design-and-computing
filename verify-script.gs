@@ -57,6 +57,7 @@ const VIDEO_MAX = 300 * 1024 * 1024;
 function doPost(e){
   let p = null; try { p = JSON.parse(e.postData.contents); } catch(err){ return out_(null, { ok: false, reason: "bad" }); }
   if (p && p.a === "vchunk") return out_(null, vchunk_(p));
+  if (p && p.a === "study") return out_(null, study_(p));
   if (p && (p.a === "code" || p.a === "check")){
     const rid = String(p.rid || "").replace(/[^\w-]/g, "").slice(0, 40); if (!rid) return out_(null, { ok: false, reason: "bad" });
     const lock = LockService.getScriptLock(); lock.waitLock(20000);
@@ -303,4 +304,37 @@ function verify_(email, token){
     '<h2 style="margin-top:22px">' + msg + '</h2><p>' + sub + '</p>' +
     '<p><a href="' + SITE + '" target="_top" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Go to sign in</a></p></div>')
     .setTitle("SISD Design and Computing");
+}
+
+
+/* ---------- Study Plus: one email to you after every finished topic ----------
+   Goes only to STUDY_TO (fixed here, never taken from the page). Says how long the student actually worked
+   (active time, not just signed in), the score, effort, what went well and what to improve. */
+const STUDY_TO = "aahmed.dbs@gmail.com";
+function study_(p){
+  const d = p && p.d; if (!d || typeof d !== "object") return { ok: false, reason: "bad" };
+  const cache = CacheService.getScriptCache(), n = +(cache.get("study-count") || 0);
+  if (n >= 30) return { ok: false, reason: "wait" };                         // at most 30 of these an hour
+  const once = "study:" + Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, String(p.e || p.n) + "|" + d.sid + "|" + d.tid + "|" + (d.retry ? "r" : "f") + "|" + d.score + "|" + d.secs));
+  if (cache.get(once)) return { ok: true, already: true };                   // the same report twice (double click, retry)
+  cache.put("study-count", String(n + 1), 3600); cache.put(once, "1", 21600);
+  const h = escH_, num = v => Math.max(0, Math.round(+v || 0));
+  const name = String(p.n || "").slice(0, 80) || String(p.e || "").slice(0, 120) || "Student";
+  const score = num(d.score), effort = num(d.effort), mins = num(d.mins), col = score >= 70 ? "#1E8A55" : score >= 50 ? "#B26A00" : "#C0283A";
+  const li = a => (a || []).slice(0, 8).map(x => "<li style=\"margin-bottom:4px\">" + x + "</li>").join("");
+  const well = li((d.well || []).map(q => h(String(q).slice(0, 140))));
+  const imp = li((d.improve || []).map(x => h(String(x.q || "").slice(0, 140)) + '<br><span style="color:#5B6782;font-size:13px">' +
+    (x.unsure ? "Right, but not confident yet. " : "Answered: " + h(String(x.given || "—").slice(0, 80)) + ". ") + "Correct: <b>" + h(String(x.right || "").slice(0, 80)) + "</b>" + (x.fixed ? " · fixed on retry ✓" : "") + "</span>"));
+  const cell = (label, value, c) => '<td style="padding:10px;text-align:center;background:#F3F5F9;border-radius:8px"><div style="font-size:22px;font-weight:bold;color:' + (c || "#16223A") + '">' + value + '</div><div style="font-size:11px;color:#5B6782;text-transform:uppercase;letter-spacing:.05em">' + label + '</div></td>';
+  const body = mailBox_("Study Plus report",
+    '<p><b>' + h(name) + '</b> ' + (d.retry ? 'fixed mistakes in' : 'finished') + ' <b>' + h(d.subject) + ': ' + h(d.topic) + '</b> <span style="color:#5B6782">(' + h(d.strand || "MYP 2") + ')</span>.</p>' +
+    '<table style="width:100%;border-collapse:separate;border-spacing:6px"><tr>' + cell("Active work", mins + " min") + cell("Score", score + "%", col) + cell("Right first time", num(d.right) + "/" + num(d.n)) + cell("Effort", effort + "%") + '</tr></table>' +
+    (d.retry ? '<p>On the retry they fixed <b>' + num(d.fixed) + '</b> of their mistakes.</p>' : '') +
+    '<p style="color:#5B6782;font-size:13px">Self-rating: 😀 got it ' + num(d.got) + ' · 🤔 partly ' + num(d.unsure) + ' · 😟 need help ' + num(d.need) + '. Focus ' + num(d.focus) + '% (real working time compared with about 40 seconds a task). Total Study Plus work time so far: ' + num((+d.totalMs || 0) / 60000) + ' min.</p>' +
+    '<h3 style="color:#1E8A55;font-size:16px;margin:16px 0 6px">What went well</h3>' + (well ? '<ul style="padding-left:18px;margin:0">' + well + '</ul>' : '<p style="color:#5B6782">No tasks were both correct and rated "I\'ve got it" this time.</p>') +
+    '<h3 style="color:#C0283A;font-size:16px;margin:16px 0 6px">What to improve</h3>' + (imp ? '<ul style="padding-left:18px;margin:0">' + imp + '</ul>' : '<p style="color:#5B6782">No knowledge gaps in this topic.</p>') +
+    '<p style="color:#5B6782;font-size:13px;margin-top:16px">Effort = 60% score + 20% tasks finished + 20% focus. Full history: staff dashboard → ✦ Study Plus.</p>' +
+    '<p><a href="' + SITE + 'admin.html" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Open the staff dashboard</a></p>');
+  MailApp.sendEmail({ to: STUDY_TO, name: "SISD Design and Computing", subject: "Study Plus: " + name + " · " + String(d.subject || "") + " · " + String(d.topic || "") + " · " + score + "%" + (d.retry ? " (retry)" : ""), htmlBody: body });
+  return { ok: true, sent: true };
 }

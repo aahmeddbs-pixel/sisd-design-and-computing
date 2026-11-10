@@ -89,6 +89,21 @@ const freshSwitches = st => !!(st && st.t && ay(Date.parse(st.t)) >= ay());
 /* the teacher's test student: can enter every course and see every grade, level and criterion */
 const TESTERS = ["test@sisd.ae"];
 const isTester = e => TESTERS.indexOf(normEmail(e)) >= 0;
+/* ---------- Study Plus: a private space only the named student(s) can see ----------
+   A student matches when a word in their name, or the start of their email, is one of these names. */
+const STUDY_PLUS = ["mikhail"];
+function studyPlusOK(a){
+  if (!a) return false;
+  const e = normEmail(a.email), local = e.split("@")[0], words = String(a.name || "").toLowerCase().split(/[^a-z\u0400-\u04ff]+/).filter(Boolean);
+  if (isTester(e)) return true;
+  return STUDY_PLUS.some(n => words.indexOf(n) >= 0 || local.split(/[._-]/).indexOf(n) >= 0 || local.indexOf(n) === 0);
+}
+/* email the teacher (Gmail) a Study Plus section report, through the school's email script */
+function studyReport(a, data){
+  if (!VERIFY.url || offline()) return;
+  const body = { a:"study", n:String((a && a.name) || "").slice(0, 80), e:normEmail(a && a.email), d:data };
+  try { fetch(VERIFY.url, { method:"POST", mode:"no-cors", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body: JSON.stringify(body), keepalive:true }).catch(() => {}); } catch(e){}
+}
 const TEST_PW = "b6fbc936080011b082b40a66fa98641e0c132ae742d915f7c1baaed0e4a92577";   // SHA-256 of the test student's password
 async function testerPw(email, pw){
   if (!isTester(email) || !(window.crypto && crypto.subtle)) return false;
@@ -1087,7 +1102,9 @@ function paintStrip(){
   if (sel){ const opts = courseChoices(STRIP.c);
     sel.innerHTML = STRIP.signedIn ? `<option value="">Change course ▾</option>` + opts.map(k => `<option value="${k}">Switch to ${esc(COURSES[k].name)}</option>`).join("")
       : `<option value="">Change course ▾</option>` + Object.keys(COURSES).filter(k => k !== STRIP.c).map(k => `<option value="${k}">Sign in to ${esc(COURSES[k].name)}</option>`).join("") + `<option value="__portal">＋ Sign up for a course</option>`;
-    sel.value = ""; sel.style.display = STRIP.signedIn && !opts.length ? "none" : ""; }
+    const sp = STRIP.signedIn && studyPlusOK((gate() || {}).acct || (gate() || {}).who);
+    if (sp) sel.innerHTML += `<option value="__study">✦ Other subjects (Study Plus)</option>`;
+    sel.value = ""; sel.style.display = STRIP.signedIn && !opts.length && !sp ? "none" : ""; }
 }
 function setSignedIn(on){ if (STRIP){ STRIP.signedIn = !!on; paintStrip(); } }
 function strip(c, onSignOut, noLang, mainSel, onSignIn){
@@ -1117,11 +1134,12 @@ function strip(c, onSignOut, noLang, mainSel, onSignIn){
     const link = (gate() || {}).link || null, was = STRIP.signedIn;
     if (was && onSignOut){ try { onSignOut(true); } catch(x){} }   // save this course first (the link to the other course is kept)
     if (to === "__portal"){ leave(""); return; }
+    if (to === "__study"){ location.href = PORTAL + "study.html"; return; }
     setGate({ mode: link && was ? "link" : "signin", course:to, link: was ? link : null }); location.href = COURSES[to].app;
   };
 }
 function signedOutNotice(msg, kind){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg, kind: kind || "bad" })); } catch(e){} }
 
-return { PORTAL, COURSES, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
+return { PORTAL, COURSES, studyPlusOK, studyReport, STUDY_PLUS, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
   log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, forgot, forgotDialog, resetDone, emailCode, checkCode, usernameOf, isUsername, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, gloss, listen, stopReading, speak, slow, rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();

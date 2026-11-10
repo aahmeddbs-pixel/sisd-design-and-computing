@@ -9,7 +9,14 @@
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
 <script src="/python-pathways/pp-sync.js?v=20261109f"></script>
 <script src="/python-pathways/answers-view.js?v=20261109f"></script>
-<script src="sdc.js?v=20261109f"></script>
+<script src="sdc.js?v=20261110a"></script>
+<script src="study/maths.js?v=20261110a"></script>
+<script src="study/english.js?v=20261110a"></script>
+<script src="study/science.js?v=20261110a"></script>
+<script src="study/ins.js?v=20261110a"></script>
+<script src="study/islamic.js?v=20261110a"></script>
+<script src="study/french.js?v=20261110a"></script>
+<script src="study/arabic.js?v=20261110a"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -125,7 +132,7 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
   <div id="app" class="hidden">
     <div class="row" style="justify-content:space-between;margin-bottom:4px"><div><h1 id="whoTitle">Admin</h1><div class="muted small" id="whoSub"></div></div><div class="row"><span class="muted small" id="loadState"></span><button class="btn ghost sm" id="refresh">↻ Refresh</button></div></div>
     <div class="tabs" role="tablist">
-      <button data-t="students" aria-selected="true">👥 Students &amp; progress</button><button data-t="hp">🏠 House Points</button><button data-t="log">📋 Sign-in log</button><button data-t="teachers" data-super>🧑‍🏫 Teachers</button><button data-t="switches" data-super>🔀 Criteria switches</button><button data-t="setup" data-super>⚙️ Setup</button>
+      <button data-t="students" aria-selected="true">👥 Students &amp; progress</button><button data-t="hp">🏠 House Points</button><button data-t="log">📋 Sign-in log</button><button data-t="teachers" data-super>🧑‍🏫 Teachers</button><button data-t="switches" data-super>🔀 Criteria switches</button><button data-t="study" data-super>✦ Study Plus</button><button data-t="setup" data-super>⚙️ Setup</button>
     </div>
 
     <section id="t-hp" class="hidden">
@@ -159,6 +166,13 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
       </div>
     </section>
 
+    <section id="t-study" class="hidden">
+      <div class="card">
+        <div class="row" style="justify-content:space-between"><h2>✦ Study Plus <span class="n" id="spCount">0</span></h2><button class="btn ghost sm" id="spPreview">👁 Preview as a student</button></div>
+        <p class="muted small" style="margin-top:4px">The private Other-subjects space (MYP 2 Maths, English, Science, I&amp;S, Islamic, French, Arabic). Only the student(s) named in <b>sdc.js → STUDY_PLUS</b> can see it. <b>Work time</b> is active time only: it stops after 60 seconds without typing or clicking, and when the page is hidden. <b>Effort</b> = 60% score + 20% tasks finished + 20% focus (work time compared with about 40 seconds a task). You also get an email at aahmed.dbs@gmail.com after every finished topic.</p>
+        <div id="spBody" style="margin-top:12px"></div>
+      </div>
+    </section>
     <section id="t-log" class="hidden">
       <div class="card">
         <h2>Sign-in log <span class="n" id="lgCount">0</span></h2>
@@ -486,15 +500,21 @@ function enter(){
 $("outBtn").onclick = () => location.reload();
 
 /* ---------------- tabs ---------------- */
-const TABS = ["hp","students","log","teachers","switches","setup"];
+const TABS = ["hp","students","log","teachers","switches","setup","study"];
 document.querySelectorAll("#app .tabs button").forEach(b => b.onclick = () => {
   if (b.hasAttribute("data-super") && !isSuper()) return;
   document.querySelectorAll("#app .tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
   TABS.forEach(t => $("t-" + t).classList.toggle("hidden", t !== b.dataset.t));
   if (b.dataset.t === "teachers") renderTeachers();
   if (b.dataset.t === "switches") renderSwitches();
+  if (b.dataset.t === "study") renderStudy();
 });
 
+document.addEventListener("click", e => { if (e.target && e.target.id === "spPreview" && isSuper()){
+  const keep = SDC.gate();   // the preview tab gets a copy of this tab's session; this tab keeps its own
+  SDC.setGate({ mode:"study", course:"cs", who:{ email:SDC.TESTERS[0], name:"Test Student" }, acct:{ name:"Test Student", email:SDC.TESTERS[0], grade:"7", teacher:"Mr. Ahmed", course:"study" } });
+  window.open("study.html", "_blank");
+  if (keep) SDC.setGate(keep); else SDC.clearGate(); } });
 /* ---------------- setup ---------------- */
 const SHEET_KEY = "sdc_admin_sheet", NOTIFY_KEY = "sdc_admin_notify", DS_KEY = "sdc_admin_ds";
 function sheetLink(){ return load(SHEET_KEY, "") || load("pyl_admin_sheet", ""); }   // falls back to the Python admin's saved link
@@ -1450,7 +1470,42 @@ function renderLog(){
 }
 $("lgF").onchange = renderLog;
 
-function renderAll(){ renderHP(); renderResets(); renderSlow(); renderVerifyWaiting(); renderDesignRequests(); renderStudents(); renderLog(); setTimeout(healDeletes, 1500); }
+/* ---------------- Study Plus (super admin only) ---------------- */
+function renderStudy(){
+  if (!isSuper() || !$("spBody")) return;
+  const ST = window.STUDY || {}, total = Object.keys(ST).reduce((n, k) => n + ST[k].topics.length, 0);
+  const reps = ROWS.filter(r => r.type === "studyplus" && r.study), opens = ROWS.filter(r => r.type === "studyopen");
+  const by = {};
+  const rec = a => { const k = SDC.keyOf(a.email, a.name); return by[k] = by[k] || { name:a.name || a.email, email:a.email || "", reps:[], opens:0, last:0 }; };
+  opens.forEach(r => { const s = rec(r.acct); s.opens++; s.last = Math.max(s.last, r.when); });
+  reps.forEach(r => { const s = rec(r.acct); s.reps.push(r); s.last = Math.max(s.last, r.when); });
+  const people = Object.values(by).sort((a, b) => b.last - a.last);
+  $("spCount").textContent = people.length;
+  if (!people.length){ $("spBody").innerHTML = `<p class="muted">No Study Plus activity yet. It appears here once the student opens Other subjects and finishes a topic.</p>`; return; }
+  const pc = v => `<span class="pill ${v >= 70 ? "ok" : v >= 50 ? "warn" : "bad"}">${v}%</span>`, mm = s => Math.round(s / 60) + " min";
+  $("spBody").innerHTML = people.map(p => {
+    const latest = {};   // newest report per topic (first attempt), plus retries
+    p.reps.forEach(r => { const d = r.study, k = d.sid + "/" + d.tid; if (!d.retry && (!latest[k] || latest[k].when < r.when)) latest[k] = Object.assign({ when:r.when }, d); });
+    const L = Object.values(latest), secs = Object.values(p.reps.reduce((m, r) => { const d = r.study, k = d.sid + "/" + d.tid; m[k] = Math.max(m[k] || 0, +d.secs || 0); return m; }, {})).reduce((a, b) => a + b, 0);
+    const avg = f => L.length ? Math.round(L.reduce((a, d) => a + (+d[f] || 0), 0) / L.length) : 0;
+    const subj = {}; L.forEach(d => { const s = subj[d.sid] = subj[d.sid] || { name:d.subject, n:0, score:0, effort:0, secs:0 }; s.n++; s.score += +d.score || 0; s.effort += +d.effort || 0; });
+    Object.keys(subj).forEach(k => { subj[k].secs = Object.entries(p.reps.reduce((m, r) => { const d = r.study; if (d.sid === k){ const t = d.tid; m[t] = Math.max(m[t] || 0, +d.secs || 0); } return m; }, {})).reduce((a, [, v]) => a + v, 0); });
+    const rows = Object.keys(ST).map(k => { const s = subj[k]; const tot = ST[k].topics.length;
+      return `<tr><td><b>${esc(ST[k].name)}</b></td><td>${s ? s.n : 0} / ${tot}</td><td>${s ? mm(s.secs) : "—"}</td><td>${s ? pc(Math.round(s.score / s.n)) : "—"}</td><td>${s ? pc(Math.round(s.effort / s.n)) : "—"}</td></tr>`; }).join("");
+    const recent = p.reps.slice().sort((a, b) => b.when - a.when).slice(0, 25).map(r => { const d = r.study;
+      const imp = (d.improve || []).map(x => `<li>${esc(x.q)} <span class="muted">→ ${esc(x.right)}${x.unsure ? " (unsure)" : ""}${x.fixed ? " ✓ fixed" : ""}</span></li>`).join("");
+      return `<tr><td class="small">${esc(fmtDT(r.when))}</td><td><b>${esc(d.subject)}</b><br><span class="small">${esc(d.topic)}${d.retry ? ` <span class="pill warn">retry: fixed ${+d.fixed || 0}</span>` : ""}</span></td><td>${pc(+d.score || 0)}<br><span class="small muted">${+d.right || 0}/${+d.n || 0}</span></td><td>${pc(+d.effort || 0)}</td><td>${+d.mins || 0} min<br><span class="small muted">focus ${+d.focus || 0}%</span></td>
+        <td class="small">${(d.well || []).length ? `<b style="color:var(--ok)">Did well:</b> ${(d.well || []).length} task(s)<br>` : ""}${imp ? `<b style="color:var(--bad)">To improve:</b><ul style="margin:4px 0 0 16px">${imp}</ul>` : `<span class="muted">No gaps</span>`}</td></tr>`; }).join("");
+    return `<div class="card" style="margin-top:12px;box-shadow:none">
+      <div class="row" style="justify-content:space-between"><div><h2 style="font-size:1.1rem">${esc(p.name)}</h2><div class="muted small">${esc(p.email)} · last active ${p.last ? esc(fmtDT(p.last)) : "—"} · opened Study Plus ${p.opens} time(s)</div></div></div>
+      <div class="row" style="margin-top:10px;gap:8px">
+        <span class="pill">⏱ ${mm(secs)} active work</span><span class="pill">📚 ${L.length} / ${total} topics</span><span class="pill">🎯 Avg score ${avg("score")}%</span><span class="pill">💪 Avg effort ${avg("effort")}%</span></div>
+      <div class="scroll" style="margin-top:10px"><table class="tbl"><tr><th>Subject</th><th>Topics done</th><th>Work time</th><th>Avg score</th><th>Avg effort</th></tr>${rows}</table></div>
+      <h3 style="margin-top:14px;font-size:1rem">Recent sections</h3>
+      <div class="scroll" style="margin-top:6px"><table class="tbl"><tr><th>When</th><th>Topic</th><th>Score</th><th>Effort</th><th>Work time</th><th>Strengths and gaps</th></tr>${recent || `<tr><td colspan="6" class="muted">No finished topics yet.</td></tr>`}</table></div>
+    </div>`; }).join("");
+}
+function renderAll(){ renderHP(); renderResets(); renderSlow(); renderVerifyWaiting(); renderDesignRequests(); renderStudents(); renderLog(); try { renderStudy(); } catch(e){} setTimeout(healDeletes, 1500); }
 /* ---------- students who signed up but can't get in because they haven't verified their email ---------- */
 /* ---------- students who've been stuck on one task for a long time (after two reminders on their screen) ---------- */
 function renderSlow(){
