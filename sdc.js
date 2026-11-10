@@ -407,8 +407,8 @@ async function confirm(a, signup){
     }
     A = null; if (L.reg && L.reg.ver <= L.assign.at) L.reg = null;   // a new account made after the deletion: start fresh
   }
-  const both = !!(A && A.also && (A.also === c || A.c === c));   // set up for both courses (Computer Science + Design)
-  if (A && A.c !== c && (A.also === c || bothOk(A.c, c, a.grade, A.g, g && g.grade))) A = null;   // approved for both: this change was for the other course   // also taking the other course: fine, the change was for that one
+  const both = !!(A && A.also && (A.also === c || A.c === c)) || studyPlusOK(a);   // set up for both courses (Computer Science + Design); a Study Plus student always is
+  if (A && A.c !== c && (A.also === c || studyPlusOK(a) || bothOk(A.c, c, a.grade, A.g, g && g.grade))) A = null;   // approved for both: this change was for the other course   // also taking the other course: fine, the change was for that one
   if (A && A.c !== c){ log("wrongcourse", Object.assign({}, a, { course:c }), { registered:A.c, byAdmin:true }); return { ok:false, msg:MSG.other(A.c, true), registered:A.c }; }
   const csToo = c === "cs" && L.reg && L.reg.c === "design" && ["6","7","8"].indexOf(String(L.reg.g || a.grade || "")) >= 0;   // Grades 6–8 take both: their own Computer Science account still opens
   if (!A && L.reg && L.reg.c !== c && (both || csToo || bothOk(L.reg.c, c, a.grade, L.reg.g, g && g.grade))){ /* Grade 6–8: registered for both is allowed */ }
@@ -1109,7 +1109,7 @@ function paintStrip(){
   if (sel){ const opts = courseChoices(STRIP.c);
     sel.innerHTML = STRIP.signedIn ? `<option value="">Change course ▾</option>` + opts.map(k => `<option value="${k}">Switch to ${esc(COURSES[k].name)}</option>`).join("")
       : `<option value="">Change course ▾</option>` + Object.keys(COURSES).filter(k => k !== STRIP.c).map(k => `<option value="${k}">Sign in to ${esc(COURSES[k].name)}</option>`).join("") + `<option value="__portal">＋ Sign up for a course</option>`;
-    const sp = STRIP.signedIn && studyPlusOK((gate() || {}).acct || (gate() || {}).who);
+    const g1 = gate() || {}, sp = STRIP.signedIn && studyPlusOK(g1.acct || g1.who || (g1.link && g1.link.cs));
     if (sp) sel.innerHTML += `<option value="__study">✦ Other subjects (Study Plus)</option>`;
     sel.value = ""; sel.style.display = STRIP.signedIn && !opts.length && !sp ? "none" : ""; }
 }
@@ -1147,6 +1147,29 @@ function strip(c, onSignOut, noLang, mainSel, onSignIn){
 }
 function signedOutNotice(msg, kind){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg, kind: kind || "bad" })); } catch(e){} }
 
+/* ---------- 3D sign-in buttons on every page: they press down when clicked and stay down (with a spinner) while working ---------- */
+(function press3d(){
+  const SEL = "#loginBtn,#signBtn,#lGo,#inGo,#upGo,#pwGo,#kGo";
+  function css(){ if (document.getElementById("sdc3d")) return; const st = document.createElement("style"); st.id = "sdc3d";
+    const L = SEL.split(","), all = (sfx) => L.map(x => x + sfx).join(",");
+    st.textContent = `${all("")}{position:relative;box-shadow:0 6px 0 #0b1628,0 8px 14px rgba(0,0,0,.18)!important;transform:translateY(0);transition:transform .07s ease,box-shadow .07s ease,filter .15s;border-bottom:none}
+${all(":hover:not(:disabled)")}{filter:brightness(1.08)}
+${all(":active:not(:disabled)")},${all(".sdc-pressed")}{transform:translateY(6px)!important;box-shadow:0 0 0 #0b1628,0 2px 4px rgba(0,0,0,.2)!important}
+${all(".sdc-pressed:disabled")}{opacity:1!important}
+${all(".sdc-busy::after")}{content:"";width:16px;height:16px;border:3px solid rgba(255,255,255,.45);border-top-color:#fff;border-radius:50%;margin-left:10px;animation:sdcspin .7s linear infinite;display:inline-block;vertical-align:-3px}
+@keyframes sdcspin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){${all("")}{transition:none}${all(".sdc-busy::after")}{animation:none}}`;
+    (document.head || document.documentElement).appendChild(st); }
+  function press(b){ if (!b || b.disabled) return; b.classList.add("sdc-pressed"); b.dataset.sdcGo = "1"; const t0 = Date.now();
+    const tick = () => { const busy = b.disabled || b.classList.contains("busy"); b.classList.toggle("sdc-busy", busy && !b.classList.contains("busy"));
+      if ((busy || Date.now() - t0 < 250) && Date.now() - t0 < 30000) return setTimeout(tick, 120); b.classList.remove("sdc-pressed", "sdc-busy"); delete b.dataset.sdcGo; };
+    setTimeout(tick, 60); }
+  css(); document.addEventListener("DOMContentLoaded", css);
+  document.addEventListener("pointerdown", e => { const b = e.target && e.target.closest && e.target.closest(SEL); if (!b || b.disabled) return; b.classList.add("sdc-pressed"); b.dataset.sdcAt = Date.now();
+    setTimeout(() => { if (!b.dataset.sdcGo && !b.disabled && !b.classList.contains("busy")) b.classList.remove("sdc-pressed"); }, 700); }, true);
+  document.addEventListener("click", e => { const b = e.target && e.target.closest && e.target.closest(SEL); if (b) press(b); }, true);
+  document.addEventListener("keydown", e => { if (e.key === "Enter"){ const f = e.target && e.target.closest && e.target.closest("form"), b = f && f.querySelector(SEL); if (b) press(b); } }, true);
+})();
 return { PORTAL, COURSES, studyPlusOK, studyPlusEmail, studyReport, STUDY_PLUS, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
   log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, forgot, forgotDialog, resetDone, emailCode, checkCode, usernameOf, isUsername, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, gloss, listen, stopReading, speak, slow, rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();
