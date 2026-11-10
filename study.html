@@ -8,13 +8,20 @@
 <meta name="robots" content="noindex,nofollow">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
 <script src="sdc.js?v=20261110c"></script>
-<script src="study/maths.js?v=20261110a"></script>
-<script src="study/english.js?v=20261110a"></script>
-<script src="study/science.js?v=20261110a"></script>
-<script src="study/ins.js?v=20261110a"></script>
-<script src="study/islamic.js?v=20261110a"></script>
-<script src="study/french.js?v=20261110a"></script>
-<script src="study/arabic.js?v=20261110a"></script>
+<script src="study/maths.js?v=20261110d"></script>
+<script src="study/english.js?v=20261110d"></script>
+<script src="study/science.js?v=20261110d"></script>
+<script src="study/ins.js?v=20261110d"></script>
+<script src="study/islamic.js?v=20261110d"></script>
+<script src="study/french.js?v=20261110d"></script>
+<script src="study/arabic.js?v=20261110d"></script>
+<script src="study/plus-maths.js?v=20261110d"></script>
+<script src="study/plus-english.js?v=20261110d"></script>
+<script src="study/plus-science.js?v=20261110d"></script>
+<script src="study/plus-ins.js?v=20261110d"></script>
+<script src="study/plus-islamic.js?v=20261110d"></script>
+<script src="study/plus-french.js?v=20261110d"></script>
+<script src="study/plus-arabic.js?v=20261110d"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -121,6 +128,12 @@ select.big{border:2px solid var(--line);background:var(--card);border-radius:10p
 .modal-bg{position:fixed;inset:0;background:rgba(8,15,30,.6);display:grid;place-items:center;padding:16px;z-index:60}
 .modal{background:var(--card);border-radius:var(--r);max-width:620px;width:100%;max-height:88vh;overflow:auto;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,.35)}
 .modal h3{font-size:1.2rem;font-weight:900}
+.modal{position:relative}
+.xclose{position:sticky;top:0;float:right;margin:-8px -8px 6px 10px;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:1.15rem;font-weight:900;display:grid;place-items:center;z-index:2;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.xclose:hover{background:var(--soft)}
+.lvl{display:inline-block;border-radius:999px;padding:2px 10px;font-size:.75rem;font-weight:900;letter-spacing:.03em;margin-left:6px;vertical-align:middle}
+.lvl.l1{background:var(--okbg);color:var(--ok)} .lvl.l2{background:var(--warnbg);color:var(--warn)} .lvl.l3{background:var(--badbg);color:var(--bad)}
+.dots i.c3{outline:2px solid var(--red);outline-offset:1px}
 .agree{display:flex;gap:10px;align-items:flex-start;font-weight:700;cursor:pointer;margin-top:14px}
 .agree input{width:20px;height:20px;accent-color:var(--red);flex:none;margin-top:2px}
 /* summary */
@@ -204,7 +217,7 @@ $("outBtn").onclick = () => { save(); stopWork(); SDC.leave("out"); };
 
 /* ---------- marking ---------- */
 const strip = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "");
-const clean = s => String(s || "").toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, " ").trim().replace(/[.!]$/, "");
+const clean = s => String(s || "").toLowerCase().replace(/[’`]/g, "'").replace(/[−–]/g, "-").replace(/\s+/g, " ").trim().replace(/[.!]$/, "").replace(/\s*([(),])\s*/g, "$1");
 function toNum(v){ const t = String(v || "").trim().replace(/[−–—]/g, "-").replace(/\s/g, "").replace(/,(\d{1,2})$/, ".$1").replace(/,/g, "").replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[a-z%°²³]+$/i, ""); if (!/^-?\d*\.?\d+$/.test(t)) return NaN; return parseFloat(t); }
 function mark(task, given){
   if (task.k === "mcq") return { ok: given === task.a };
@@ -241,7 +254,8 @@ function topicScore(s, t){
   const score = n ? Math.round(right / n * 100) : 0, completion = n ? answered / n : 0;
   const focus = Math.min(1, (st.ms / 1000) / (Math.max(1, answered) * FOCUS_SEC_PER_TASK));
   const effort = Math.round(100 * (0.6 * (score / 100) + 0.2 * completion + 0.2 * focus));
-  return { n, right, answered, score, effort, focus: Math.round(focus * 100), need, unsure, got, ms: st.ms };
+  const lv = {}; T.tasks.forEach((tk, i) => { const d = lvlOf(tk), o = lv[d] = lv[d] || { n:0, right:0 }; o.n++; if (st.ans[i] && st.ans[i].ok) o.right++; });
+  return { n, right, answered, score, effort, focus: Math.round(focus * 100), need, unsure, got, ms: st.ms, lv };
 }
 function subjectProgress(s){ const T = S[s].topics; const done = T.filter(t => tstate(s, t.id).done).length; return { done, total: T.length, pct: Math.round(done / T.length * 100) }; }
 function totals(){
@@ -303,7 +317,8 @@ function renderSubject(){
 }
 function openTopic(s, t){
   const st = tstate(s, t);
-  if (st.done) return go({ v:"summary", s, t });
+  const T = topicOf(s, t), allDone = T.tasks.every((_, i) => st.ans[i] && st.ans[i].rate);
+  if (st.done && allDone) return go({ v:"summary", s, t });   // new tasks added to a finished topic open straight at the first new one
   go({ v:"topic", s, t });
   if (!st.read) showKnowledge(s, t, true);
 }
@@ -335,13 +350,13 @@ function renderTopic(){
   VIEW.pos = pos;
   const i = list[pos], task = T.tasks[i], prev = retry ? (st.retry || {})[i] : st.ans[i];
   startWork(s, t); pick = prev ? prev.g : null;
-  const dots = T.tasks.map((_, j) => { const a = st.ans[j]; return `<i class="${j === i ? "cur" : ""} ${a ? (a.ok ? "r" : "w") : ""}"></i>`; }).join("");
+  const dots = T.tasks.map((_, j) => { const a = st.ans[j]; return `<i class="${j === i ? "cur" : ""} ${a ? (a.ok ? "r" : "w") : ""} ${lvlOf(T.tasks[j]) === 3 ? "c3" : ""}"></i>`; }).join("");
   $("app").innerHTML = `<button class="back" id="bk">← ${esc(SUB.name)}</button>
   <div class="card stack" style="border-top:6px solid ${SUB.colour}">
     <div class="qhead"><div><div class="eyebrow">${esc(SUB.name)} · ${esc(T.title)}${retry ? " · Fix my mistakes" : ""}</div><div class="muted small">Task ${pos + 1} of ${list.length}</div></div>
       <div class="row"><button class="btn sm ghost" id="kAgain">📘 Key knowledge</button></div></div>
     <div class="dots" aria-hidden="true">${dots}</div>
-    <div class="q" dir="auto">${esc(task.q)}</div>
+    <div class="q" dir="auto">${lvlTag(task)} ${esc(task.q)}</div>
     <div id="answerBox">${answerUI(task, SUB.rtl)}</div>
     <div id="after"></div>
     <div class="row" style="justify-content:flex-end"><button class="btn red" id="checkBtn">Check my answer</button></div>
@@ -352,8 +367,14 @@ function renderTopic(){
   if (prev && prev.checked !== false) showAfter(s, t, i, task, prev, !!retry, list, pos);
   else $("checkBtn").onclick = () => check(s, t, i, task, !!retry, list, pos);
 }
+/* options appear in a shuffled order that stays the same for this student and task (the right answer isn't always first) */
+function order(task){ let h = 2166136261; for (const ch of KEY + "|" + task.q) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+  const ix = task.o.map((_, j) => j); for (let j = ix.length - 1; j > 0; j--){ h = Math.imul(h ^ (h >>> 15), 2246822519) >>> 0; const r = h % (j + 1); [ix[j], ix[r]] = [ix[r], ix[j]]; } return ix; }
+const LVL = { 1:"Core", 2:"Extended", 3:"Challenge" };
+const lvlOf = t => t.d || 1;
+const lvlTag = t => `<span class="lvl l${lvlOf(t)}" style="margin:0 6px 0 0">${"●".repeat(lvlOf(t))} ${LVL[lvlOf(t)]}</span>`;
 function answerUI(task, rtl){
-  if (task.k === "mcq") return `<div class="opts">${task.o.map((o, j) => `<button class="opt" data-o="${j}" aria-pressed="false" dir="auto">${esc(o)}</button>`).join("")}</div>`;
+  if (task.k === "mcq") return `<div class="opts">${order(task).map(j => `<button class="opt" data-o="${j}" aria-pressed="false" dir="auto">${esc(task.o[j])}</button>`).join("")}</div>`;
   if (task.k === "tf") return `<div class="opts" style="grid-template-columns:1fr 1fr"><button class="opt" data-o="t" aria-pressed="false">True</button><button class="opt" data-o="f" aria-pressed="false">False</button></div>`;
   const ph = task.k === "num" ? "Type a number" : "Type your answer";
   return `<div class="ans">${task.prefix ? `<span class="pre">${esc(task.prefix)}</span>` : ""}<input id="inp" ${task.k === "num" ? 'inputmode="decimal"' : 'autocapitalize="off"'} autocomplete="off" spellcheck="false" placeholder="${ph}" dir="auto"></div>`;
@@ -408,7 +429,8 @@ function explain(task, rec, rtl){
 
 /* ---------- finishing: summary, log for the super admin, email to the teacher ---------- */
 function finishTopic(s, t){
-  const st = tstate(s, t), first = !st.done; st.done = true; st.runs = (st.runs || 0) + 1; st.finishedAt = Date.now(); save();
+  const st = tstate(s, t), n = Object.keys(st.ans).length, first = !st.done || (st.reportedN || 0) < n;
+  st.done = true; st.runs = (st.runs || 0) + 1; st.finishedAt = Date.now(); st.reportedN = n; save();
   if (first) report(s, t, false);
   go({ v:"summary", s, t });
 }
@@ -424,7 +446,7 @@ function analysis(s, t){
 function report(s, t, isRetry){
   const T = topicOf(s, t), sc = topicScore(s, t), A = analysis(s, t), st = tstate(s, t);
   const fixedNow = isRetry ? Object.values(st.retry || {}).filter(r => r.ok).length : 0;
-  const data = { subject: S[s].name, sid: s, topic: T.title, tid: t, strand: T.strand, score: sc.score, right: sc.right, n: sc.n, effort: sc.effort, focus: sc.focus,
+  const data = { subject: S[s].name, sid: s, topic: T.title, tid: t, strand: T.strand, score: sc.score, right: sc.right, n: sc.n, lv: sc.lv, effort: sc.effort, focus: sc.focus,
     mins: Math.max(1, mins(sc.ms)), secs: Math.round(sc.ms / 1000), got: sc.got, unsure: sc.unsure, need: sc.need, retry: !!isRetry, fixed: fixedNow,
     well: A.well.slice(0, 6).map(q => q.slice(0, 120)), improve: A.improve.slice(0, 8).map(x => ({ q: x.q.slice(0, 120), right: String(x.right).slice(0, 80), given: String(x.given).slice(0, 80), unsure: !!x.unsure, fixed: !!x.fixed })),
     totalMs: totals().ms };
@@ -440,6 +462,7 @@ function renderSummary(){
   <div class="card stack" style="border-top:6px solid ${SUB.colour}">
     <div><div class="eyebrow">${esc(SUB.name)} · Topic complete</div><h1>${esc(T.title)}</h1><p class="muted" style="margin-top:4px">${msg}</p></div>
     <div class="sumgrid"><div class="sum"><b>${sc.score}%</b><span>Score</span></div><div class="sum"><b>${sc.right}/${sc.n}</b><span>Right first time</span></div><div class="sum"><b>${fmt(sc.ms)}</b><span>Active work time</span></div><div class="sum"><b>${sc.effort}%</b><span>Effort</span></div></div>
+    <div class="row small">${[1,2,3].filter(d => sc.lv[d]).map(d => `<span class="lvl l${d}" style="margin:0">${"●".repeat(d)} ${LVL[d]}: ${sc.lv[d].right}/${sc.lv[d].n}</span>`).join("")}</div>
     <div class="two">
       <div class="card" style="box-shadow:none"><h2>⭐ What you did well</h2>${A.well.length ? `<ul class="list">${A.well.map(q => `<li dir="auto">${esc(q)}</li>`).join("")}</ul>` : `<p class="muted small" style="margin-top:6px">Answer confidently and correctly to see your strengths here.</p>`}</div>
       <div class="card" style="box-shadow:none"><h2>🎯 What to improve</h2>${A.improve.length ? `<ul class="list">${A.improve.map(x => `<li dir="auto">${esc(x.q)}${x.fixed ? ` <span class="pill ok">fixed</span>` : x.unsure ? ` <span class="pill warn">not sure yet</span>` : ""}</li>`).join("")}</ul>` : `<p class="muted small" style="margin-top:6px">No gaps found in this topic. 🎉</p>`}</div>
@@ -463,8 +486,13 @@ function renderSummary(){
 function nextTopic(s, t){ const L = S[s].topics, i = L.findIndex(x => x.id === t); for (let j = i + 1; j < L.length; j++) if (!tstate(s, L[j].id).done) return L[j].id; return null; }
 
 /* ---------- small UI helpers ---------- */
-function modal(html){ $("modalRoot").innerHTML = `<div class="modal-bg" role="dialog" aria-modal="true"><div class="modal">${html}</div></div>`; }
-function closeModal(){ $("modalRoot").innerHTML = ""; }
+function modal(html){
+  $("modalRoot").innerHTML = `<div class="modal-bg" role="dialog" aria-modal="true"><div class="modal"><button class="xclose" id="mClose" aria-label="Close" title="Close">✕</button>${html}</div></div>`;
+  $("mClose").onclick = closeModal;
+  $("modalRoot").querySelector(".modal-bg").addEventListener("click", e => { if (e.target.classList.contains("modal-bg")) closeModal(); });
+}
+function closeModal(){ hush(); $("modalRoot").innerHTML = ""; }
+document.addEventListener("keydown", e => { if (e.key === "Escape" && $("modalRoot").innerHTML) closeModal(); });
 function toast(m){ const d = document.createElement("div"); d.className = "toast"; d.textContent = m; document.body.appendChild(d); setTimeout(() => d.remove(), 2600); }
 
 paintSwitcher();

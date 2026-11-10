@@ -13,6 +13,6 @@ One sign-in page for SISD's Computer Science (Python Pathways), Design and IT co
 ## Study Plus (private)
 - A private "Other subjects" space (`study.html`) seen only by the student(s) named in `sdc.js → STUDY_PLUS` (currently Mikaeel Ahmed: first and last name, or mikaeel.ahmed@sisd.ae). He signs in once, in Computer Science, and switches to Design and Study Plus without signing in again.
 - In Computer Science or Design, the **Change course** menu shows **✦ Other subjects (Study Plus)** for that student only. Study Plus has a switcher back to Computer Science and Design.
-- 7 MYP 2 subjects (Maths, English, Science, I&S, Islamic, French, Arabic), 36 topics, 288 auto-marked tasks in `study/*.js`. Each topic: key knowledge pop-up, tasks, Check, explanation pop-up (even when right), self-rating, corrections and "Fix my mistakes".
+- 7 MYP 2 subjects (Maths, English, Science, I&S, Islamic, French, Arabic), 50 topics, 572 auto-marked tasks (Core, Extended, Challenge) in `study/*.js` and `study/plus-*.js`. Each topic: key knowledge pop-up, tasks, Check, explanation pop-up (even when right), self-rating, corrections and "Fix my mistakes".
 - Active work time only (stops after 60 s idle or when the page is hidden). Effort = 60% score + 20% tasks finished + 20% focus.
 - Each finished topic logs to the teacher log (super admin → ✦ Study Plus tab) and emails aahmed.dbs@gmail.com via `verify-script.gs` (needs the script redeployed once).
