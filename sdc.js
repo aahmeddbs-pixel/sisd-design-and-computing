@@ -90,14 +90,17 @@ const freshSwitches = st => !!(st && st.t && ay(Date.parse(st.t)) >= ay());
 const TESTERS = ["test@sisd.ae"];
 const isTester = e => TESTERS.indexOf(normEmail(e)) >= 0;
 /* ---------- Study Plus: a private space only the named student(s) can see ----------
-   A student matches when a word in their name, or the start of their email, is one of these names. */
-const STUDY_PLUS = ["mikhail"];
+   Matched on first AND last name (CS signs in by name), or on the school email firstname.lastname@sisd.ae. */
+const STUDY_PLUS = [{ first:"mikaeel", last:"ahmed" }];
+const spWords = n => String(n || "").toLowerCase().split(/[^a-z\u0400-\u04ff]+/).filter(Boolean);
 function studyPlusOK(a){
   if (!a) return false;
-  const e = normEmail(a.email), local = e.split("@")[0], words = String(a.name || "").toLowerCase().split(/[^a-z\u0400-\u04ff]+/).filter(Boolean);
+  const e = normEmail(a.email), local = e.split("@")[0], w = spWords(a.name);
   if (isTester(e)) return true;
-  return STUDY_PLUS.some(n => words.indexOf(n) >= 0 || local.split(/[._-]/).indexOf(n) >= 0 || local.indexOf(n) === 0);
+  return STUDY_PLUS.some(p => (w[0] === p.first && w[w.length - 1] === p.last) || (/@sisd\.ae$/.test(e) && local === p.first + "." + p.last));
 }
+/* the school email a Study Plus student's linked Design account uses when their Computer Science account has none */
+function studyPlusEmail(a){ const w = spWords(a && a.name); return w.length >= 2 ? w[0] + "." + w[w.length - 1] + "@sisd.ae" : ""; }
 /* email the teacher (Gmail) a Study Plus section report, through the school's email script */
 function studyReport(a, data){
   if (!VERIFY.url || offline()) return;
@@ -235,6 +238,9 @@ async function lookup(email, name){
   const fd = fixedDeletion(email); if (fd && (!assign || !(assign.at > fd.at))) assign = { k:id, del:true, at:fd.at };
   let reg = null;
   for (const r of G){ try { const o = JSON.parse(r.text); if (o && course(o.c) && (!reg || r.ver < reg.ver)) reg = Object.assign({ ver:r.ver }, o); } catch(e){} }
+  // Study Plus student: one Computer Science sign-in also opens Design, with no approval step
+  if (studyPlusOK({ email, name }) && !(assign && assign.del) && (gate() || {}).course === "design" && !(assign && assign.c === "design"))
+    assign = Object.assign({ at: reg && reg.ver }, assign || {}, { k:id, c:"design", also:"cs", g: (assign && assign.g) || (reg && reg.g) || (((gate() || {}).link || {}).cs || {}).grade || "", sp:true });
   return { id, assign, reg };
 }
 function register(email, name, c, grade){
@@ -1093,7 +1099,8 @@ function courseChoices(cur){
   const g0 = gate() || {}, L = g0.link;
   if (!STRIP || !STRIP.signedIn || !L || !L.cs) return [];
   const n = parseInt(String(L.cs.grade || (g0.acct || {}).grade || "").replace(/^G/i, ""), 10);
-  return ["cs", "design"].filter(k => k !== cur && (k === "cs" || (!!L.design && !isNaN(n) && n >= 6 && n <= 10)));
+  const sp = studyPlusOK(g0.acct || g0.who || L.cs);
+  return ["cs", "design"].filter(k => k !== cur && (k === "cs" || (!!L.design && (sp || (!isNaN(n) && n >= 6 && n <= 10)))));
 }
 function paintStrip(){
   if (!STRIP) return;
@@ -1140,6 +1147,6 @@ function strip(c, onSignOut, noLang, mainSel, onSignIn){
 }
 function signedOutNotice(msg, kind){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg, kind: kind || "bad" })); } catch(e){} }
 
-return { PORTAL, COURSES, studyPlusOK, studyReport, STUDY_PLUS, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
+return { PORTAL, COURSES, studyPlusOK, studyPlusEmail, studyReport, STUDY_PLUS, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
   log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, forgot, forgotDialog, resetDone, emailCode, checkCode, usernameOf, isUsername, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, gloss, listen, stopReading, speak, slow, rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();
