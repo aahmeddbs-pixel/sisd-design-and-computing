@@ -10,7 +10,7 @@
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
 <script src="/python-pathways/pp-sync.js?v=20261109f"></script>
 <script src="/python-pathways/answers-view.js?v=20261109f"></script>
-<script src="sdc.js?v=20261112ink"></script>
+<script src="sdc.js?v=20261112hp"></script>
 <script src="study/maths.js?v=20261110a"></script>
 <script src="study/english.js?v=20261110a"></script>
 <script src="study/science.js?v=20261110a"></script>
@@ -539,7 +539,10 @@ function paintSetup(){
   $("dsMsg").innerHTML = sheetId(load(DS_KEY, "")) ? `<div class="notice ok">Connected.</div>` : `<div class="notice warn">Not connected yet: Design and IT progress needs this.</div>`;
   $("sheetMsg").innerHTML = sheetId(sheetLink()) ? `<div class="notice ok">Connected.</div>` : `<div class="notice warn">Not connected yet: the House Points, Students and Sign-in log tabs need this.</div>`;
   $("notifyMsg").innerHTML = parseForm(load(NOTIFY_KEY, "")) ? `<div class="notice ok">Connected: lesson emails will be sent.</div>` : `<div class="notice warn">Not connected yet: lesson results show here but can't be emailed.</div>`;
-  $("hpWarn").innerHTML = !sheetId(sheetLink()) ? `<div class="notice warn">Connect your log sheet in <b>Setup</b> first.</div>` : !parseForm(load(NOTIFY_KEY, "")) ? `<div class="notice warn">Emails are off until you add the alerts form in <b>Setup</b>. Results still appear below.</div>` : "";
+  $("hpWarn").innerHTML = !sheetId(sheetLink()) ? `<div class="notice warn">Connect your log sheet in <b>Setup</b> first.</div>`
+    : HPSRV && HPSRV.on ? `<div class="notice ok"><b>✓ Automatic emails are on.</b> The top 5 of every lesson is emailed to ${esc(HPSRV.to || "you")} about 15 minutes after the class goes quiet, even when this page is closed.${HPSRV.last ? " Last check " + esc(fmtT(HPSRV.last)) + "." : ""}</div>`
+    : HPSRV && HPSRV.reason ? `<div class="notice warn"><b>Automatic emails are not on yet</b> (${esc(HPSRV.reason === "trigger" ? "the email script needs your permission" : HPSRV.reason === "unknown" ? "the email script needs updating" : HPSRV.reason)}). Update the email script once: open it in Apps Script, paste the new <b>verify-script.gs</b>, then <b>Deploy → Manage deployments → ✏️ → Version: New version → Deploy</b> and allow access. Until then, emails go out only while this page is open.</div>`
+    : !parseForm(load(NOTIFY_KEY, "")) ? `<div class="notice warn">Emails are off until you add the alerts form in <b>Setup</b>. Results still appear below.</div>` : "";
 }
 $("saveSet").onclick = async () => {
   const s = $("setSheet").value.trim(), n = $("setNotify").value.trim(), d = $("setDs").value.trim();
@@ -681,6 +684,7 @@ function lessons(){
 function sentSet(){
   const s = Object.assign({}, load("sdc_hpsent", {}));
   ROWS.filter(r => r.type === "hpsent" && r.lesson).forEach(r => { s[r.lesson] = s[r.lesson] || r.when; });
+  if (HPSRV && HPSRV.sent) Object.keys(HPSRV.sent).forEach(k => { s[k] = s[k] || HPSRV.sent[k]; });
   return s;
 }
 const fmtScore = n => Math.round(n * 10) / 10;
@@ -720,8 +724,21 @@ async function sendLesson(L, manual){
   if (manual) toast("Emailed: " + classLabel(L.cls));
   return true;
 }
+/* the school email script sends the top 5 by itself (every 10 minutes), so the page doesn't have to be open.
+   HPSRV = its status { on, sent:{lessonKey: when}, last, to } or { reason } when it isn't set up yet. */
+let HPSRV = null, hpAsked = 0;
+async function hpServer(){
+  if (!isSuper() || !SDC.jsonp || !SDC.VERIFY.url) return;
+  const id = sheetId(sheetLink()); if (!id) return;
+  try { HPSRV = await SDC.jsonp(Date.now() - hpAsked > 30 * 60000 || !(HPSRV && HPSRV.on) ? { a:"hpsetup", sheet:id } : { a:"hpstatus" }, 25000); hpAsked = Date.now(); }
+  catch(e){ HPSRV = HPSRV && HPSRV.on ? HPSRV : { reason:"unreachable" }; }
+  if (HPSRV && HPSRV.ok === false && !HPSRV.reason) HPSRV.reason = "error";
+  paintSetup();
+}
 let sending = false;
 async function autoSend(){
+  await hpServer();
+  if (HPSRV && HPSRV.on){ renderHP(); return; }   // the email script is sending them: don't send twice
   if (!isSuper() || sending || !parseForm(load(NOTIFY_KEY, ""))) return; sending = true;
   try { for (const L of lessons()) if (L.lesson && L.ended && !L.sent && Date.now() - L.end < CATCHUP_H * 3600000 && L.top.length){ await sendLesson(L, false); await new Promise(r => setTimeout(r, 800)); } }
   finally { sending = false; }
@@ -768,7 +785,7 @@ function renderHP(){
   if (!all.length){ $("hpList").innerHTML = filters + `<div id="hpRank"></div>` + weekCard + `<div class="card muted">No lessons yet. Once students complete tasks through the platform, each class's lesson appears here.</div>`; bindF(); renderRank(tOK, cOK); return; }
   const canMail = isSuper() && !!parseForm(load(NOTIFY_KEY, ""));
   $("hpList").innerHTML = filters + `<div id="hpRank"></div>` + weekCard + all.map((L, i) => {
-    const state = !L.ended ? `<span class="pill bad">● Live, last work ${fmtT(L.last)}</span>` : L.sent ? `<span class="pill ok">✓ Emailed ${fmtT(L.sent)}</span>` : !L.lesson ? `<span class="pill">Fewer than ${MIN_STUDENTS} students</span>` : `<span class="pill warn">Not emailed yet</span>`;
+    const state = !L.ended ? `<span class="pill bad">● Live, last work ${fmtT(L.last)}</span>` : L.sent ? `<span class="pill ok">✓ Emailed ${fmtT(L.sent)}</span>` : !L.lesson ? `<span class="pill">Fewer than ${MIN_STUDENTS} students</span>` : HPSRV && HPSRV.on && Date.now() - L.end < CATCHUP_H * 3600000 ? `<span class="pill">Emailing within 10 minutes</span>` : `<span class="pill warn">Not emailed yet</span>`;
     const btn = !isSuper() ? "" : !L.ended ? `<button class="btn red sm" data-end="${i}">End lesson now and email</button>` : `<button class="btn ghost sm" data-send="${i}" ${canMail ? "" : "disabled"}>${L.sent ? "Email again" : "Email now"}</button>`;
     return `<div class="card lesson ${L.ended ? "" : "live"}"><h3>${pill(L.cls.course)} ${esc(classLabel(L.cls))} ${state}</h3>
       <div class="muted small">${esc(fmtD(L.start))}, ${esc(fmtT(L.start))}–${esc(fmtT(L.end))} · ${L.n} student${L.n === 1 ? "" : "s"} completed work${L.signins ? " · " + L.signins + " signed in" : ""}${L.wrong.length ? ` · <b style="color:var(--bad)">${L.wrong.length} wrong-course attempt${L.wrong.length === 1 ? "" : "s"}</b>` : ""}</div>

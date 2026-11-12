@@ -40,6 +40,8 @@ function doGet(e){
     return out_(e, m);
   }
   if (a === "notify") return out_(e, notify_(p));
+  if (a === "hpsetup") return out_(e, hpSetup_(String(p.sheet || "")));
+  if (a === "hpstatus") return out_(e, hpStatus_());
   if (a === "vstatus") return out_(e, vstatus_(String(p.id || "")));
   if (a === "cstatus") return out_(e, cstatus_(String(p.id || "")));
   if (a === "start"){
@@ -337,4 +339,132 @@ function study_(p){
     '<p><a href="' + SITE + 'admin.html" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Open the staff dashboard</a></p>');
   MailApp.sendEmail({ to: STUDY_TO, name: "SISD Design and Computing", subject: "Study Plus: " + name + " · " + String(d.subject || "") + " · " + String(d.topic || "") + " · " + score + "%" + (d.retry ? " (retry)" : ""), htmlBody: body });
   return { ok: true, sent: true };
+}
+
+
+/* ---------- House Points: email the top 5 after every lesson, automatically ----------
+   Runs by itself every 10 minutes (a time trigger), so the email arrives even when nobody has the admin page open.
+   Reads the platform log sheet (the Google Sheet of the Python Pathways Log form). A lesson = a class's completed
+   tasks with no gap of more than 15 minutes; it has ended once the class has been quiet for 15 minutes, and it only
+   counts when at least 3 students worked (so home learning isn't emailed). Top 5 = most new tasks, weighted by
+   difficulty, among students who worked actively for at least 30 minutes. One email per lesson, to HP_TO.
+   Set-up happens by itself: the admin page sends the log sheet's link here once (it must be your own sheet). */
+const HP_TO = "aahmed.dbs@gmail.com";
+const HP_QUIET_MIN = 15, HP_MIN_STUDENTS = 3, HP_WORK_MIN = 30, HP_CATCHUP_H = 24, HP_EVERY_MIN = 10;
+const HP_TESTERS = ["test@sisd.ae"];
+const HP_LEVELS = { beginner:"Beginner", intermediate:"Intermediate", advanced:"Advanced", dp_beginner:"IB DP Beginner", dp_intermediate:"IB DP Intermediate", dp_advanced:"IB DP Advanced" };
+function hpProps_(){ return PropertiesService.getScriptProperties(); }
+function hpSetup_(link){
+  const id = (String(link).match(/[a-zA-Z0-9_-]{25,}/) || [])[0];
+  if (!id) return { ok: false, reason: "sheet" };
+  const P = hpProps_(), cur = P.getProperty("HP_SHEET");
+  if (cur !== id){
+    let ss; try { ss = SpreadsheetApp.openById(id); } catch(err){ return { ok: false, reason: "open" }; }
+    let mine = false; try { mine = ss.getOwner().getEmail() === Session.getEffectiveUser().getEmail(); } catch(err){}
+    if (!mine) return { ok: false, reason: "owner" };                       // only your own log sheet
+    const head = ss.getSheets()[0].getRange(1, 1, 1, Math.max(1, ss.getSheets()[0].getLastColumn())).getValues()[0].map(x => String(x).toLowerCase());
+    if (!head.some(x => x.indexOf("data") === 0)) return { ok: false, reason: "notlog" };
+    P.setProperty("HP_SHEET", id);
+  }
+  try { hpTrigger_(); } catch(err){ return { ok: false, reason: "trigger", msg: String(err).slice(0, 200) }; }
+  return hpStatus_();
+}
+function hpTrigger_(){
+  if (ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === "hpTick")) return;
+  ScriptApp.newTrigger("hpTick").timeBased().everyMinutes(HP_EVERY_MIN).create();
+}
+function hpSent_(){ try { return JSON.parse(hpProps_().getProperty("HP_SENT") || "{}"); } catch(err){ return {}; } }
+function hpStatus_(){
+  let on = false; try { on = ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === "hpTick"); } catch(err){}
+  const P = hpProps_();
+  return { ok: true, on: on && !!P.getProperty("HP_SHEET"), sent: hpSent_(), last: +(P.getProperty("HP_LAST") || 0), to: HP_TO.replace(/^(.).*(@.*)$/, "$1…$2") };
+}
+/* Run this once from the Apps Script editor if the admin page can't switch it on: it asks for permission and starts the timer. */
+function setupHousePoints(){ hpTrigger_(); hpTick(); }
+
+const hpNorm_ = e => String(e || "").trim().toLowerCase();
+const hpKeyOf_ = (email, name) => { const e = hpNorm_(email); return e ? "e:" + e : "n:" + String(name || "").trim().toLowerCase().replace(/\s+/g, " "); };
+const hpClassKey_ = a => [a.course, a.grade, a.teacher, a.cls || ""].join("|");
+const hpLabel_ = a => "G" + a.grade + " " + courseName_(a.course) + (a.cls ? " · " + a.cls : "") + " (" + (a.teacher || "no teacher") + ")";
+/* the log rows of the last day and a bit, newest last (reads only the bottom of the sheet) */
+function hpRows_(){
+  const id = hpProps_().getProperty("HP_SHEET"); if (!id) return null;
+  const sh = SpreadsheetApp.openById(id).getSheets()[0], last = sh.getLastRow(), cols = sh.getLastColumn();
+  if (last < 2) return [];
+  const head = sh.getRange(1, 1, 1, cols).getValues()[0].map(x => String(x).toLowerCase());
+  const di = head.findIndex(x => x.indexOf("data") === 0); if (di < 0) return [];
+  const since = Date.now() - (HP_CATCHUP_H + 4) * 3600000;
+  let first = 2; const CH = 1500;
+  for (let end = last; end >= 2; end -= CH){                       // walk up the timestamp column until we pass "since"
+    const start = Math.max(2, end - CH + 1), ts = sh.getRange(start, 1, end - start + 1, 1).getValues();
+    const k = ts.findIndex(r => r[0] instanceof Date && r[0].getTime() >= since);
+    if (k !== 0){ first = k < 0 ? end + 1 : start + k; break; }   // the cut-off is inside this block (or just below it)
+    first = start;                                                  // the whole block is recent: keep going up
+  }
+  if (first > last) return [];
+  const vals = sh.getRange(first, di + 1, last - first + 1, 1).getValues(), seen = {}, rows = [];
+  vals.forEach(r => { const t = String(r[0] || ""); if (!t || seen[t]) return; seen[t] = 1;   // each save arrives twice
+    let d = null; try { d = JSON.parse(t); } catch(err){ return; }
+    if (!d || !d.sdc || !d.acct) return; d.when = Date.parse(d.at) || 0; rows.push(d); });
+  rows.sort((a, b) => a.when - b.when);
+  return rows;
+}
+function hpLessons_(rows){
+  const byClass = {}, out = [];
+  rows.filter(r => r.type === "task" && r.task && HP_TESTERS.indexOf(hpNorm_(r.acct.email)) < 0).forEach(r => { const k = hpClassKey_(r.acct); (byClass[k] = byClass[k] || []).push(r); });
+  Object.keys(byClass).forEach(k => {
+    let cur = null;
+    byClass[k].forEach(r => {
+      if (cur && r.when - cur.last > HP_QUIET_MIN * 60000){ out.push(cur); cur = null; }
+      if (!cur) cur = { key: k + "|" + new Date(r.when).toISOString().slice(0, 16), cls: r.acct, start: r.when, last: r.when, students: {} };
+      cur.last = r.when;
+      const sk = hpKeyOf_(r.acct.email, r.acct.name), st = cur.students[sk] = cur.students[sk] || { name: r.acct.name, level: r.acct.level, course: r.acct.course, tasks: 0, score: 0, last: 0, seen: {}, mins: 0 };
+      st.mins = Math.max(st.mins, +r.mins || 0);
+      const tk = r.task.t; if (st.seen[tk]) return; st.seen[tk] = 1;
+      st.tasks++; st.score += +r.task.w || 1; st.last = r.when;
+    });
+    if (cur) out.push(cur);
+  });
+  const now = Date.now();
+  out.forEach(L => {
+    L.n = Object.keys(L.students).length; L.ended = now - L.last >= HP_QUIET_MIN * 60000; L.end = L.last;
+    rows.forEach(r => { if (r.type !== "work" || r.when < L.start - 3600000 || r.when > L.end + 20 * 60000) return; const st = L.students[hpKeyOf_(r.acct.email, r.acct.name)]; if (st) st.mins = Math.max(st.mins, +r.mins || 0); });
+    const all = Object.keys(L.students).map(k => L.students[k]);
+    L.short = all.filter(x => x.mins < HP_WORK_MIN);
+    L.top = all.filter(x => x.mins >= HP_WORK_MIN).sort((a, b) => b.score - a.score || b.tasks - a.tasks || a.last - b.last).slice(0, 5);
+  });
+  return out;
+}
+function hpEmail_(L){
+  const h = escH_, t = ms => Utilities.formatDate(new Date(ms), "Asia/Dubai", "HH:mm"), d = ms => Utilities.formatDate(new Date(ms), "Asia/Dubai", "EEE d MMM");
+  const sc = n => Math.round(n * 10) / 10, lv = s => s.course === "cs" ? (HP_LEVELS[s.level] || s.level || "") : "";
+  const medal = ["🥇", "🥈", "🥉", "4.", "5."];
+  const rows = L.top.map((s, i) => '<tr><td style="padding:6px 10px;font-size:18px">' + medal[i] + '</td><td style="padding:6px 10px"><b>' + h(s.name) + '</b>' + (lv(s) ? '<br><span style="color:#5B6782;font-size:13px">' + h(lv(s)) + '</span>' : '') +
+    '</td><td style="padding:6px 10px">' + s.tasks + ' task' + (s.tasks === 1 ? '' : 's') + '</td><td style="padding:6px 10px">score ' + sc(s.score) + '</td><td style="padding:6px 10px">' + s.mins + ' min</td></tr>').join("");
+  return '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#16223A;max-width:620px">' +
+    '<div style="background:#1B2D4E;color:#fff;padding:14px 18px;border-bottom:4px solid #DC2B3E;font-weight:bold">SISD Design and Computing · House Points</div>' +
+    '<h2 style="margin:16px 0 4px;font-size:20px">' + h(hpLabel_(L.cls)) + '</h2>' +
+    '<p style="margin:0 0 12px;color:#5B6782">' + d(L.start) + ', ' + t(L.start) + '–' + t(L.end) + ' · ' + L.n + ' student' + (L.n === 1 ? '' : 's') + ' completed work</p>' +
+    (L.top.length ? '<p style="margin:0 0 6px"><b>Top ' + L.top.length + ': one House Point each</b></p><table style="border-collapse:collapse;background:#F3F5F9;border-radius:10px;font-size:15px">' + rows + '</table>'
+      : '<p>Nobody worked actively for ' + HP_WORK_MIN + ' minutes in this lesson, so no House Points this time.</p>') +
+    (L.short.length ? '<p style="color:#5B6782;font-size:13px;margin-top:12px">Not eligible (under ' + HP_WORK_MIN + ' minutes of active work): ' + L.short.map(s => h(s.name) + ' (' + s.mins + ' min)').join(', ') + '</p>' : '') +
+    '<p style="color:#5B6782;font-size:12.5px;margin-top:14px">Most new tasks in the lesson, weighted by difficulty: Python Beginner ×1, Intermediate ×1.5, Advanced ×3 per exercise; Design/IT practice ×1, criterion submitted ×2, strand ×3. Only students with ' + HP_WORK_MIN + '+ minutes of active work. Sent automatically ' + HP_QUIET_MIN + ' minutes after the class went quiet.</p>' +
+    '<p><a href="' + SITE + 'admin.html" style="color:#DC2B3E;font-weight:bold">Open the House Points tab</a></p></div>';
+}
+function hpTick(){
+  const lock = LockService.getScriptLock(); if (!lock.tryLock(5000)) return;
+  try {
+    const P = hpProps_(); P.setProperty("HP_LAST", String(Date.now()));
+    const rows = hpRows_(); if (!rows || !rows.length) return;
+    const sent = hpSent_(), now = Date.now();
+    rows.filter(r => r.type === "hpsent" && r.lesson).forEach(r => { sent[r.lesson] = sent[r.lesson] || r.when; });   // already emailed from the admin page
+    hpLessons_(rows).forEach(L => {
+      if (!L.ended || L.n < HP_MIN_STUDENTS || sent[L.key] || now - L.end > HP_CATCHUP_H * 3600000) return;
+      if (MailApp.getRemainingDailyQuota() < 2) return;
+      MailApp.sendEmail({ to: HP_TO, name: "SISD Design and Computing", subject: "🏠 House Points top 5: " + hpLabel_(L.cls) + " · " + Utilities.formatDate(new Date(L.start), "Asia/Dubai", "EEE d MMM HH:mm"), htmlBody: hpEmail_(L) });
+      sent[L.key] = now;
+    });
+    Object.keys(sent).forEach(k => { if (now - sent[k] > 7 * 86400000) delete sent[k]; });   // keep a week
+    P.setProperty("HP_SENT", JSON.stringify(sent));
+  } finally { lock.releaseLock(); }
 }
