@@ -612,10 +612,9 @@ function setLang(code, first){
   try { localStorage.setItem("sdc_lang", code); } catch(e){}
   document.documentElement.lang = code; langCookie(code);
   document.querySelectorAll(".sdcLang select").forEach(x => { x.value = code; });
-  if (code === "en"){ if (!first && gtLoaded) location.reload(); return; }
-  gloss(document.body); loadTranslator();
-  let tries = 0; const t = setInterval(() => { const sel = document.querySelector(".goog-te-combo");
-    if (sel){ if (sel.value !== code){ sel.value = code; sel.dispatchEvent(new Event("change")); } clearInterval(t); } else if (++tries > 40) clearInterval(t); }, 250);
+  if (code === "en"){ if (!first && TR.on()) location.reload(); return; }
+  if (TR.on()){ location.reload(); return; }   // switching between two other languages: start clean from English
+  TR.start(code);
 }
 /* never translate code, program output, names typed by students or the language list itself */
 const KEEP = "code,pre,textarea,.editor,.ed-wrap,.console,.gutter,.snip,#whoPill,.sdcLang,.notranslate-auto";
@@ -743,7 +742,122 @@ function glossNode(tn, code){
   hits.forEach(h => { if (h.s > at) frag.append(raw.slice(at, h.s)); frag.append(span(h.w, true)); at = h.e; }); if (at < raw.length) frag.append(raw.slice(at));
   tn.replaceWith(frag);
 }
-function gloss(root){
+/* ---------- full-page translation: every text, button, box hint and pop-up, on every page ----------
+   Our own translator (Google's page widget left parts in English and fought with live text such as timers).
+   Every piece of text is translated through Google's translation service, remembered on this computer
+   (so pages switch language instantly next time), and kept translated when the page changes it.
+   Numbers are kept as they are ("35:46 left" -> "Noch 35:46"), using one remembered pattern for all numbers. */
+const TR = (() => {
+  const SKIP = "head,title,script,style,noscript,textarea,input,code,pre,svg,canvas,.notranslate,[translate=no],[contenteditable],[contenteditable=true],.editor,.ed-wrap,.console,.gutter,.snip,#gtHost,.sdcLang";
+  const ATTRS = ["placeholder", "title", "aria-label", "alt"];
+  const NUM = /\d+(?:[.,:]\d+)*/g, MAX = 8000;
+  let code = "en", mem = {}, tpl = {}, pend = new Set(), waitT = null, obs = null, on = false, saveT = null;
+  const NODE = new WeakMap(), ATTR = new WeakMap(), users = new Map();   // text -> nodes/attrs waiting for it
+  const LSK = c => "sdc_tr2_" + c;
+  function loadCache(){ try { const o = JSON.parse(localStorage.getItem(LSK(code)) || "{}"); mem = o.m || {}; tpl = o.t || {}; } catch(e){ mem = {}; tpl = {}; } }
+  function saveCache(){ clearTimeout(saveT); saveT = setTimeout(() => { try { if (Object.keys(mem).length > MAX) mem = {}; localStorage.setItem(LSK(code), JSON.stringify({ m: mem, t: tpl })); } catch(e){ try { localStorage.removeItem(LSK(code)); } catch(_){} } }, 1500); }
+  const worth = s => /[A-Za-z]{2}/.test(s);
+  const split = raw => { const m = String(raw).match(/^(\s*)([\s\S]*?)(\s*)$/); return { a: m[1], core: m[2].replace(/\s+/g, " "), z: m[3] }; };
+  const tkey = core => core.replace(NUM, "#");
+  /* our school words: whole labels and strand names are fixed; Google's wrong words are swapped afterwards */
+  function fixed(core){
+    const ph = GL_PHRASE[core.toLowerCase().replace(/[\s→←.:!?…]+$/, "")]; if (ph && ph[code]) return GL_CAP(core, ph[code]) + (core.match(/[\s→←.:!?…]+$/) || [""])[0];
+    for (const [re, tr] of GL_RX){ if (tr[code] && re.test(core)) return core.replace(re, tr[code]); }
+    return null;
+  }
+  function post(out){ (GL_POST[code] || []).forEach(([re, f]) => { re.lastIndex = 0; out = out.replace(re, f); }); return out; }
+  function lookup(core){
+    if (mem[core] != null) return mem[core];
+    const f = fixed(core); if (f){ mem[core] = f; return f; }
+    const nums = core.match(NUM); if (nums){ const t = tpl[tkey(core)]; if (t != null){ let i = 0; return t.replace(/\{(\d+)\}/g, (m, k) => nums[+k] != null ? nums[+k] : m); } }
+    return null;
+  }
+  function learn(core, out){
+    out = post(out); mem[core] = out;
+    const nums = core.match(NUM); if (nums){ let t = out, ok = true, at = 0;
+      nums.forEach((n, i) => { const j = t.indexOf(n, at); if (j < 0){ ok = false; return; } t = t.slice(0, j) + "{" + i + "}" + t.slice(j + n.length); at = j + String(i).length + 2; });
+      if (ok) tpl[tkey(core)] = t; }
+    saveCache(); return out;
+  }
+  async function fetchBatch(list){
+    const q = list.join("\n");
+    const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${code}&dt=t&q=${encodeURIComponent(q)}`);
+    if (!r.ok) throw new Error("translate " + r.status);
+    const j = await r.json(), txt = ((j && j[0]) || []).map(x => (x && x[0]) || "").join("");
+    return txt.split("\n").map(s => s.trim());
+  }
+  async function flush(){
+    waitT = null; if (!on) return;
+    const all = [...pend]; pend.clear(); const batches = []; let cur = [], len = 0;
+    all.forEach(s => { const n = encodeURIComponent(s).length + 3; if (cur.length && (len + n > 1800 || cur.length >= 60)){ batches.push(cur); cur = []; len = 0; } cur.push(s); len += n; });
+    if (cur.length) batches.push(cur);
+    let go = 0; const next = async () => { while (go < batches.length){ const b = batches[go++], lang = code;
+      try { let res = await fetchBatch(b);
+        if (res.length !== b.length) res = await Promise.all(b.map(s => fetchBatch([s]).then(x => x.join(" "), () => null)));
+        if (lang !== code) return;
+        b.forEach((s, i) => { if (res[i]) { learn(s, res[i]); paintAll(s); } });
+      } catch(e){ b.forEach(s => users.delete(s)); } } };
+    await Promise.all([next(), next(), next()]);
+  }
+  function want(core, fn){ let u = users.get(core); if (!u){ u = new Set(); users.set(core, u); } u.add(fn); pend.add(core); if (!waitT) waitT = setTimeout(flush, 80); }
+  function paintAll(core){ const u = users.get(core); users.delete(core); if (u) u.forEach(fn => { try { fn(); } catch(e){} }); }
+  const skipEl = el => !el || (el.closest && el.closest(SKIP));
+  function doText(tn){
+    const el = tn.parentElement; if (skipEl(el)) return;
+    let rec = NODE.get(tn); const v = tn.nodeValue;
+    if (rec && v === rec.out) return;                    // our own translation
+    if (!rec){ rec = { en: v, out: null }; NODE.set(tn, rec); } else rec.en = v;   // new text from the page
+    const { a, core, z } = split(rec.en); if (!worth(core)) return;
+    const put = () => { const t = lookup(core); if (t == null || NODE.get(tn) !== rec || split(rec.en).core !== core) return; rec.out = a + t + z; if (tn.nodeValue !== rec.out) tn.nodeValue = rec.out; };
+    if (lookup(core) != null) put(); else want(core, put);
+  }
+  function doAttr(el, at){
+    let all = ATTR.get(el); if (!all){ all = {}; ATTR.set(el, all); }
+    const v = el.getAttribute(at); if (v == null) return; let rec = all[at];
+    if (rec && v === rec.out) return; if (!rec){ rec = all[at] = { en: v, out: null }; } else rec.en = v;
+    const core = split(v).core; if (!worth(core)) return;
+    const put = () => { const t = lookup(core); if (t == null || all[at] !== rec || split(rec.en).core !== core) return; rec.out = t; if (el.getAttribute(at) !== t) el.setAttribute(at, t); };
+    if (lookup(core) != null) put(); else want(core, put);
+  }
+  function doEl(el){
+    if (el.closest && el.closest(".notranslate,[translate=no],.sdcLang")) return;
+    ATTRS.forEach(at => { if (el.hasAttribute(at)) doAttr(el, at); });
+    if (el.tagName === "INPUT" && /^(button|submit|reset)$/i.test(el.type) && el.value) doAttr(el, "value");
+  }
+  function scan(root){
+    if (!on || !root) return;
+    if (root.nodeType === 3) return doText(root);
+    if (root.nodeType !== 1) return;
+    doEl(root); root.querySelectorAll("[placeholder],[title],[aria-label],[alt],input[type=button],input[type=submit],input[type=reset]").forEach(doEl);
+    if (root.closest(SKIP)) return;
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n; const list = []; while ((n = w.nextNode())) list.push(n); list.forEach(doText);
+  }
+  let tEn = null, tOut = null;
+  function title(){ const t = document.title; if (t === tOut) return; tEn = t; if (!worth(t)) return; const c = split(t).core, x = lookup(c);
+    if (x != null){ tOut = x; if (document.title !== x) document.title = x; } else want(c, () => { if (tEn === t) title(); }); }
+  /* pop-up messages (alert / confirm / prompt) in the chosen language */
+  function wrapDialogs(){
+    if (window.__sdcDlg) return; window.__sdcDlg = true;
+    ["alert", "confirm", "prompt"].forEach(k => { const f = window[k]; if (!f) return; window[k] = function(msg, ...rest){
+      if (on && msg != null){ const s = String(msg); const t = s.split("\n").map(line => { const { a, core, z } = split(line); if (!worth(core)) return line; const x = lookup(core); if (x == null) want(core, () => {}); return x == null ? line : a + x + z; }).join("\n"); msg = t; }
+      return f.call(window, msg, ...rest); }; });
+  }
+  function start(c){
+    if (!LANGS[c] || c === "en" || offline()) return;
+    code = c; on = true; loadCache(); wrapDialogs();
+    scan(document.body); title();
+    if (obs) obs.disconnect();
+    obs = new MutationObserver(ms => { if (!on) return; ms.forEach(m => {
+      if (m.type === "characterData"){ if (m.target.nodeType === 3) doText(m.target); }
+      else if (m.type === "attributes"){ if (m.target.nodeType === 1) doEl(m.target); }
+      else m.addedNodes.forEach(n => scan(n)); });
+      title(); });
+    obs.observe(document.documentElement, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRS.concat("value") });
+  }
+  return { start, scan, on: () => on, lookup: s => lookup(split(s).core), _mem: () => mem };
+})();
+function gloss(root){ TR.scan(root); }
+function glossOld(root){
   const code = getLang(); if (code === "en" || !root) return;
   if (root.nodeType === 3) return glossNode(root, code);
   if (root.nodeType !== 1 || (root.closest && root.closest(GL_SKIP))) return;
@@ -759,12 +873,11 @@ function bindPickers(){ document.querySelectorAll(".sdcLang select").forEach(x =
   css.textContent = "#gtHost,.goog-te-banner-frame,.skiptranslate>iframe,#goog-gt-tt,.goog-te-balloon-frame,.VIpgJd-ZVi9od-ORHb-OEVmcd,.VIpgJd-ZVi9od-aZ2wEe-wOHMyf{display:none!important}body{top:0!important}.goog-text-highlight{background:none!important;box-shadow:none!important}";
   document.head.appendChild(css);
   const start = () => {
-    protect(); bindPickers(); gloss(document.body);
+    protect(); bindPickers();
     new MutationObserver(ms => { ms.forEach(m => {
       m.addedNodes.forEach(n => { if (n.nodeType === 1 && !(n.classList && n.classList.contains("sdcTmp"))){ if (n.matches && n.matches(KEEP)) protect(n.parentNode || n); else protect(n); }
-        if (!(n.classList && n.classList.contains("sdcGl")) && !(n.parentElement && n.parentElement.classList.contains("sdcGl"))) gloss(n); });
-      if (m.type === "characterData" && m.target.nodeType === 3){ const code = getLang(); if (code !== "en" && m.target.parentElement && !m.target.parentElement.closest(GL_SKIP)) glossPost(m.target, code); } });
-      bindPickers(); }).observe(document.body, { childList:true, subtree:true, characterData:true });
+      }); });
+      bindPickers(); }).observe(document.body, { childList:true, subtree:true });
     if (!window.SDC_ownLang && getLang() !== "en") setLang(getLang(), true);
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
