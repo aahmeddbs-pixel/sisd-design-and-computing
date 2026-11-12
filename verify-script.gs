@@ -348,7 +348,7 @@ function study_(p){
    tasks with no gap of more than 15 minutes; it has ended once the class has been quiet for 15 minutes, and it only
    counts when at least 3 students worked (so home learning isn't emailed). Top 5 = most new tasks, weighted by
    difficulty, among students who worked actively for at least 30 minutes. One email per lesson, to HP_TO.
-   Set-up happens by itself: the admin page sends the log sheet's link here once (it must be your own sheet). */
+   Set-up happens by itself: the admin page sends the log sheet's link here once (any account's sheet, as long as it can be read). */
 const HP_TO = "aahmed.dbs@gmail.com";
 const HP_QUIET_MIN = 15, HP_MIN_STUDENTS = 3, HP_WORK_MIN = 30, HP_CATCHUP_H = 24, HP_EVERY_MIN = 10;
 const HP_TESTERS = ["test@sisd.ae"];
@@ -359,15 +359,48 @@ function hpSetup_(link){
   if (!id) return { ok: false, reason: "sheet" };
   const P = hpProps_(), cur = P.getProperty("HP_SHEET");
   if (cur !== id){
-    let ss; try { ss = SpreadsheetApp.openById(id); } catch(err){ return { ok: false, reason: "open" }; }
-    let mine = false; try { mine = ss.getOwner().getEmail() === Session.getEffectiveUser().getEmail(); } catch(err){}
-    if (!mine) return { ok: false, reason: "owner" };                       // only your own log sheet
-    const head = ss.getSheets()[0].getRange(1, 1, 1, Math.max(1, ss.getSheets()[0].getLastColumn())).getValues()[0].map(x => String(x).toLowerCase());
-    if (!head.some(x => x.indexOf("data") === 0)) return { ok: false, reason: "notlog" };
+    // the log sheet may belong to another Google account: it only has to be readable (opened here, or "Anyone with the link: Viewer")
+    if (cur && hpData_(cur, 0)) return hpStatus_();                    // already working with a log sheet: keep it
+    const data = hpData_(id, 0);
+    if (!data) return { ok: false, reason: "can't read the log sheet: set Share â†’ Anyone with the link: Viewer" };
+    if (!data.some(t => t.indexOf('"sdc":1') >= 0)) return { ok: false, reason: "that sheet isn't the platform log" };
     P.setProperty("HP_SHEET", id);
   }
   try { hpTrigger_(); } catch(err){ return { ok: false, reason: "trigger", msg: String(err).slice(0, 200) }; }
   return hpStatus_();
+}
+/* the Data column of the log sheet (JSON strings), for rows since `since` (0 = a quick sample). null = can't read it. */
+function hpData_(id, since){
+  try {                                                                // 1. the script's own account can open it
+    const sh = SpreadsheetApp.openById(id).getSheets()[0], last = sh.getLastRow(), cols = sh.getLastColumn();
+    if (last < 2) return [];
+    const head = sh.getRange(1, 1, 1, cols).getValues()[0].map(x => String(x).toLowerCase());
+    const di = head.findIndex(x => x.indexOf("data") === 0); if (di < 0) return null;
+    let first = Math.max(2, last - 199);
+    if (since){ first = 2; const CH = 1500;
+      for (let end = last; end >= 2; end -= CH){                       // walk up the timestamp column until we pass "since"
+        const start = Math.max(2, end - CH + 1), ts = sh.getRange(start, 1, end - start + 1, 1).getValues();
+        const k = ts.findIndex(r => r[0] instanceof Date && r[0].getTime() >= since);
+        if (k !== 0){ first = k < 0 ? end + 1 : start + k; break; }
+        first = start;
+      }
+      if (first > last) return [];
+    }
+    return sh.getRange(first, di + 1, last - first + 1, 1).getValues().map(r => String(r[0] || ""));
+  } catch(err){}
+  try {                                                                // 2. through its view-only link
+    const base = "https://docs.google.com/spreadsheets/d/" + id + "/gviz/tq?tqx=out:csv&headers=1";
+    const after = Utilities.formatDate(new Date((since || Date.now() - 86400000) - 14 * 3600000), "UTC", "yyyy-MM-dd HH:mm:ss");
+    const urls = [base + "&tq=" + encodeURIComponent("select * where A > datetime '" + after + "'"), base, "https://docs.google.com/spreadsheets/d/" + id + "/export?format=csv"];
+    for (const u of urls){
+      const r = UrlFetchApp.fetch(u, { muteHttpExceptions: true, followRedirects: true });
+      const t = r.getContentText(); if (r.getResponseCode() !== 200 || /^\s*<(!doctype|html)/i.test(t.slice(0, 300))) continue;
+      const R = Utilities.parseCsv(t); if (!R.length) continue;
+      const di = R[0].map(x => String(x).trim().toLowerCase()).findIndex(x => x.indexOf("data") === 0); if (di < 0) continue;
+      return R.slice(1).map(r => String(r[di] || ""));
+    }
+  } catch(err){}
+  return null;
 }
 function hpTrigger_(){
   if (ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === "hpTick")) return;
@@ -389,23 +422,12 @@ const hpLabel_ = a => "G" + a.grade + " " + courseName_(a.course) + (a.cls ? " Â
 /* the log rows of the last day and a bit, newest last (reads only the bottom of the sheet) */
 function hpRows_(){
   const id = hpProps_().getProperty("HP_SHEET"); if (!id) return null;
-  const sh = SpreadsheetApp.openById(id).getSheets()[0], last = sh.getLastRow(), cols = sh.getLastColumn();
-  if (last < 2) return [];
-  const head = sh.getRange(1, 1, 1, cols).getValues()[0].map(x => String(x).toLowerCase());
-  const di = head.findIndex(x => x.indexOf("data") === 0); if (di < 0) return [];
   const since = Date.now() - (HP_CATCHUP_H + 4) * 3600000;
-  let first = 2; const CH = 1500;
-  for (let end = last; end >= 2; end -= CH){                       // walk up the timestamp column until we pass "since"
-    const start = Math.max(2, end - CH + 1), ts = sh.getRange(start, 1, end - start + 1, 1).getValues();
-    const k = ts.findIndex(r => r[0] instanceof Date && r[0].getTime() >= since);
-    if (k !== 0){ first = k < 0 ? end + 1 : start + k; break; }   // the cut-off is inside this block (or just below it)
-    first = start;                                                  // the whole block is recent: keep going up
-  }
-  if (first > last) return [];
-  const vals = sh.getRange(first, di + 1, last - first + 1, 1).getValues(), seen = {}, rows = [];
-  vals.forEach(r => { const t = String(r[0] || ""); if (!t || seen[t]) return; seen[t] = 1;   // each save arrives twice
+  const vals = hpData_(id, since); if (!vals) return null;
+  const seen = {}, rows = [];
+  vals.forEach(t => { if (!t || seen[t]) return; seen[t] = 1;          // each save arrives twice
     let d = null; try { d = JSON.parse(t); } catch(err){ return; }
-    if (!d || !d.sdc || !d.acct) return; d.when = Date.parse(d.at) || 0; rows.push(d); });
+    if (!d || !d.sdc || !d.acct) return; d.when = Date.parse(d.at) || 0; if (d.when < since) return; rows.push(d); });
   rows.sort((a, b) => a.when - b.when);
   return rows;
 }
