@@ -339,7 +339,7 @@ async function showFeedbackButton(){
     const bg = document.createElement("div"); bg.setAttribute("style", "position:fixed;inset:0;background:rgba(8,15,30,.6);z-index:2147483600;display:flex;align-items:flex-start;justify-content:center;padding:60px 16px;overflow:auto");
     const sec = (h, t) => t ? `<h4 style="margin:12px 0 4px;font-size:14px;color:#1B2D4E">${esc(h)}</h4><p style="margin:0;white-space:pre-wrap">${esc(t)}</p>` : "";
     bg.innerHTML = `<div role="dialog" aria-label="Feedback" style="background:#fff;color:#16223A;border-radius:14px;max-width:640px;width:100%;padding:22px;font:15px/1.55 Arial,Helvetica,sans-serif">
-      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><h3 style="margin:0;font-size:20px">Feedback from your teacher</h3><button type="button" data-x style="border:1px solid #D8DEEA;background:#fff;border-radius:8px;padding:6px 12px;font-weight:700;cursor:pointer">Close</button></div>
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><h3 style="margin:0;font-size:20px">Feedback from your teacher</h3><button type="button" data-x style="border:1px solid #D8DEEA;background:#fff;color:#1B2D4E;border-radius:8px;padding:6px 12px;font-weight:700;cursor:pointer">Close</button></div>
       ${mine.map(f => `<div class="sdcFbItem" style="border:1px solid #D8DEEA;border-left:4px solid #DC2B3E;border-radius:10px;padding:12px 14px;margin-top:14px">
         <div style="font-size:12.5px;color:#5B6782;font-weight:700">${esc(f.about || "")}${f.about ? " · " : ""}${esc(new Date(f.at || f.ver).toLocaleDateString("en-GB", { day:"numeric", month:"short" }))}${f.from ? " · " + esc(f.from) : ""}</div>
         ${f.lvl ? `<div style="margin-top:6px;font-weight:800">Suggested level: ${esc(f.lvl)} / 8</div>` : ""}
@@ -909,7 +909,7 @@ const rank = (() => {
     return `<div class="sdcRank" style="border:1px solid #DCE2EE;border-radius:16px;padding:16px 18px;background:#fff;color:#16223A;font:15px/1.45 Arial,Helvetica,sans-serif">
       <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline"><b style="font-size:1.15rem">🏆 Class rankings</b><span style="color:#5B6782;font-size:13px">Resets every Monday · ${days} day${days === 1 ? "" : "s"} left this week</span></div>
       ${meW >= 0 ? `<p style="margin:6px 0 0">You're <b>#${meW + 1}</b> this week and <b>#${meT + 1}</b> overall.${meW > 2 ? " Complete more exercises to reach the top three!" : T.byWeek[meW].week > 0 ? " Keep it up: the top three on Monday get House Points!" : ""}</p>` : ""}
-      ${T.winners.length ? `<div style="margin:12px 0 0;padding:10px 12px;border-radius:12px;background:#EEF6F1"><b>Last week's House Points</b><div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px">${T.winners.map(x => `<span>${MED[x.place - 1]} <b>${esc(x.n)}</b>${x.me ? " (you)" : ""} · ${x.last} exercises · <b>+${x.hp} HP</b></span>`).join("")}</div></div>` : ""}
+      ${T.winners.length ? `<div style="margin:12px 0 0;padding:10px 12px;border-radius:12px;background:#EEF6F1;color:#16223A"><b>Last week's House Points</b><div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px">${T.winners.map(x => `<span>${MED[x.place - 1]} <b>${esc(x.n)}</b>${x.me ? " (you)" : ""} · ${x.last} exercises · <b>+${x.hp} HP</b></span>`).join("")}</div></div>` : ""}
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;margin-top:12px">
         <div><b>This week</b> <span style="color:#5B6782;font-size:13px">exercises completed</span>${tbl(T.byWeek, x => x.week, "No exercises completed yet this week. Be the first!")}</div>
         <div><b>Overall</b> <span style="color:#5B6782;font-size:13px">exercises completed</span>${tbl(T.byTotal, x => x.total, "No one has completed an exercise yet.")}</div></div>
@@ -1172,4 +1172,112 @@ ${all(".sdc-busy::after")}{content:"";width:16px;height:16px;border:3px solid rg
 })();
 return { PORTAL, COURSES, studyPlusOK, studyPlusEmail, studyReport, STUDY_PLUS, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
   log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, forgot, forgotDialog, resetDone, emailCode, checkCode, usernameOf, isUsername, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, gloss, listen, stopReading, speak, slow, rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
+})();
+
+/* ---------- Readable everywhere: light mode, dark mode, any screen ----------
+   Watches every page that loads this file. When a piece of text (or a typing box) ends up too close
+   in colour to the box behind it — e.g. light dark-mode text inside a box with a fixed light background —
+   it switches that text to dark ink or light ink, whichever reads best. Re-checks whenever the page
+   changes or the device switches between light and dark. Mark an element data-sdc-noink to leave it alone. */
+(function(){
+  "use strict";
+  if (window.__sdcInk || !window.MutationObserver || !window.getComputedStyle) return; window.__sdcInk = true;
+  const DARK_INK = "#16223A", LIGHT_INK = "#F2F5FB", MIN = 3.2;
+  const SKIP = /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|OPTION|OPTGROUP|CANVAS|VIDEO|AUDIO|IMG|IFRAME|SVG|svg|BR|HR)$/;
+  const parse = s => { const m = s && s.match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[\s,\/]+/).filter(Boolean).map(parseFloat); return p.length < 3 ? null : { r:p[0], g:p[1], b:p[2], a: p.length > 3 ? p[3] : 1 }; };
+  const lin = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); };
+  const lum = c => .2126 * lin(c.r) + .7152 * lin(c.g) + .0722 * lin(c.b);
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
+  const over = (t, b) => ({ r: t.r * t.a + b.r * (1 - t.a), g: t.g * t.a + b.g * (1 - t.a), b: t.b * t.a + b.b * (1 - t.a), a:1 });
+  const DK = parse("rgb(22,34,58)"), LT = parse("rgb(242,245,251)");
+  let bgCache = new Map();
+  function canvasBg(){
+    const de = document.documentElement, b = document.body;
+    const c1 = b && parse(getComputedStyle(b).backgroundColor), c2 = parse(getComputedStyle(de).backgroundColor);
+    if (c1 && c1.a > .5) return c1; if (c2 && c2.a > .5) return c2;
+    return /dark/.test(getComputedStyle(de).colorScheme || "") ? { r:18, g:18, b:18, a:1 } : { r:255, g:255, b:255, a:1 };
+  }
+  /* the solid colour actually showing behind an element, or null when it sits on a picture */
+  function bgOf(el){
+    if (bgCache.has(el)) return bgCache.get(el);
+    const cs = getComputedStyle(el); let res;
+    const img = cs.backgroundImage && cs.backgroundImage !== "none" ? cs.backgroundImage : "";
+    const own = parse(cs.backgroundColor);
+    if (img && /url\(/.test(img)) res = null;
+    else if (img && /gradient/.test(img)){
+      const stops = (img.match(/rgba?\([^)]+\)/g) || []).map(parse).filter(Boolean);
+      if (stops.length){ const n = stops.length, avg = stops.reduce((s, c) => ({ r:s.r + c.r / n, g:s.g + c.g / n, b:s.b + c.b / n, a:s.a + c.a / n }), { r:0, g:0, b:0, a:0 });
+        const under = avg.a >= .99 ? null : (el.parentElement ? bgOf(el.parentElement) : canvasBg());
+        res = avg.a >= .99 ? Object.assign(avg, { a:1 }) : (under ? over(avg, under) : null);
+      } else res = el.parentElement ? bgOf(el.parentElement) : canvasBg();
+    }
+    else if (own && own.a >= .99) res = own;
+    else { const under = el.parentElement ? bgOf(el.parentElement) : canvasBg(); res = under && own && own.a > 0 ? over(own, under) : under; }
+    bgCache.set(el, res); return res;
+  }
+  function restore(el){
+    if (!el.__sdcInk) return;
+    const [v, pr] = el.__sdcInk; el.__sdcInk = null; el.removeAttribute("data-sdc-ink");
+    if (v) el.style.setProperty("color", v, pr); else el.style.removeProperty("color");
+    if (el.__sdcFill !== undefined){ if (el.__sdcFill) el.style.setProperty("-webkit-text-fill-color", el.__sdcFill); else el.style.removeProperty("-webkit-text-fill-color"); el.__sdcFill = undefined; }
+  }
+  function hasText(el){
+    if (/^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(el.tagName)) return true;
+    for (let n = el.firstChild; n; n = n.nextSibling) if (n.nodeType === 3 && n.nodeValue.trim()) return true;
+    return false;
+  }
+  function check(el){
+    if (SKIP.test(el.tagName) || el.closest("svg,[data-sdc-noink]")) return;
+    if (el.tagName === "INPUT" && /^(checkbox|radio|range|color|file|image|hidden)$/i.test(el.type)) return;
+    if (!hasText(el)) { if (el.__sdcInk) restore(el); return; }
+    if (el.__sdcInk) restore(el);
+    if (!el.getClientRects().length) return;
+    const cs = getComputedStyle(el);
+    if (cs.visibility === "hidden" || /text/.test(cs.webkitBackgroundClip || cs.backgroundClip || "")) return;
+    const fg = parse(cs.webkitTextFillColor && !/currentcolor/i.test(cs.webkitTextFillColor) ? cs.webkitTextFillColor : cs.color);
+    if (!fg || fg.a < .05) return;           // deliberately invisible text
+    const bg = bgOf(el); if (!bg) return;     // text on a picture: leave it
+    if (ratio(over(fg, bg), bg) >= MIN) return;
+    const ink = ratio(DK, bg) >= ratio(LT, bg) ? DARK_INK : LIGHT_INK;
+    el.__sdcInk = [el.style.getPropertyValue("color"), el.style.getPropertyPriority("color")];
+    el.__sdcFill = el.style.getPropertyValue("-webkit-text-fill-color");
+    el.style.setProperty("color", ink, "important"); el.style.setProperty("-webkit-text-fill-color", ink, "important");
+    el.setAttribute("data-sdc-ink", ink === DARK_INK ? "dark" : "light");
+  }
+  function scan(root){
+    if (!root || root.nodeType !== 1 || !root.isConnected) return;
+    if (root.closest && root.closest("svg,[data-sdc-noink]")) return;
+    check(root);
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, { acceptNode: n => SKIP.test(n.tagName) || n.hasAttribute("data-sdc-noink") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+    while (w.nextNode()) check(w.currentNode);
+  }
+  let pending = new Set(), full = false, timer = 0, obs = null;
+  function flush(){
+    timer = 0; if (!document.body) return;
+    bgCache = new Map();
+    let roots = full ? [document.body] : [...pending].filter(n => n.isConnected);
+    pending.clear(); full = false;
+    roots = roots.filter(r => !roots.some(o => o !== r && o.contains(r)));   // outermost only
+    try { roots.forEach(scan); } catch(e){}
+    if (obs) obs.takeRecords();               // ignore the colour changes this pass made itself
+  }
+  function queue(n, all){ if (all) full = true; else if (n) pending.add(n.nodeType === 1 ? n : n.parentElement); if (!timer) timer = setTimeout(flush, 120); }
+  function start(){
+    obs = new MutationObserver(list => {
+      for (const m of list){
+        if (m.type === "attributes"){
+          if (m.attributeName === "data-sdc-ink") continue;
+          if (m.target === document.documentElement || m.target === document.body){ queue(null, true); continue; }
+          queue(m.target);
+        } else if (m.type === "characterData") queue(m.target);
+        else { m.addedNodes.forEach(n => queue(n.nodeType === 1 ? n : m.target)); }
+      }
+    });
+    obs.observe(document.documentElement, { subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:["class", "style", "hidden", "open", "data-theme"] });
+    queue(null, true);
+    try { const mq = matchMedia("(prefers-color-scheme: dark)"); const re = () => queue(null, true); mq.addEventListener ? mq.addEventListener("change", re) : mq.addListener(re); } catch(e){}
+    window.addEventListener("load", () => queue(null, true));
+  }
+  window.SDC_INK = { rescan: () => queue(null, true) };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
 })();

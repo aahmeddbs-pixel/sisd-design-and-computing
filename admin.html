@@ -5,11 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Platform Admin · SISD Design and Computing</title>
 <meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
 <script src="/python-pathways/pp-sync.js?v=20261109f"></script>
 <script src="/python-pathways/answers-view.js?v=20261109f"></script>
-<script src="sdc.js?v=20261110c"></script>
+<script src="sdc.js?v=20261112ink"></script>
 <script src="study/maths.js?v=20261110a"></script>
 <script src="study/english.js?v=20261110a"></script>
 <script src="study/science.js?v=20261110a"></script>
@@ -743,7 +744,7 @@ async function renderRank(tOK, cOK){
     if (!$("hpRankList")) return;
     const top = (list, val) => list.filter(x => val(x) > 0).slice(0, 5).map((x, i) => `<li>${i < 3 ? MED[i] : i + 1 + "."} <b>${esc(x.n)}</b> <span class="small">${val(x)}</span></li>`).join("") || `<li class="muted">Nobody yet</li>`;
     out.push(`<div style="border:1px solid var(--line,#DCE2EE);border-radius:12px;padding:10px 12px"><h3 style="margin:0 0 6px">${pill(g.s.course)} ${esc(classLabel(g.s))}</h3>
-      ${T && T.winners.length ? `<div class="small" style="background:#EEF6F1;border-radius:8px;padding:6px 10px;margin-bottom:8px"><b>Last week's House Points:</b> ${T.winners.map(x => `${MED[x.place - 1]} ${esc(x.n)} (${x.last}) <b>+${x.hp}</b>`).join(" · ")}</div>` : ""}
+      ${T && T.winners.length ? `<div class="small" style="background:var(--okbg);border-radius:8px;padding:6px 10px;margin-bottom:8px"><b>Last week's House Points:</b> ${T.winners.map(x => `${MED[x.place - 1]} ${esc(x.n)} (${x.last}) <b>+${x.hp}</b>`).join(" · ")}</div>` : ""}
       ${T ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><b class="small">This week</b><ol style="list-style:none;margin:4px 0 0;padding:0">${top(T.byWeek, x => x.week)}</ol></div><div><b class="small">Overall</b><ol style="list-style:none;margin:4px 0 0;padding:0">${top(T.byTotal, x => x.total)}</ol></div></div>` : `<p class="muted small">Couldn't load the rankings just now.</p>`}</div>`);
     $("hpRankList").innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">${out.join("")}</div>`;
   }
