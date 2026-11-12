@@ -9,7 +9,7 @@
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
 <script src="/python-pathways/pp-sync.js?v=20261109f"></script>
-<script src="/python-pathways/answers-view.js?v=20261109f"></script>
+<script src="/python-pathways/answers-view.js?v=20261112all"></script>
 <script src="sdc.js?v=20261112tr"></script>
 <script src="study/maths.js?v=20261110a"></script>
 <script src="study/english.js?v=20261110a"></script>
@@ -140,7 +140,7 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
   <div id="app" class="hidden">
     <div class="row" style="justify-content:space-between;margin-bottom:4px"><div><h1 id="whoTitle">Admin</h1><div class="muted small" id="whoSub"></div></div><div class="row"><span class="muted small" id="loadState"></span><button class="btn ghost sm" id="refresh">↻ Refresh</button></div></div>
     <div class="tabs" role="tablist">
-      <button data-t="students" aria-selected="true">👥 Students &amp; progress</button><button data-t="hp">🏠 House Points</button><button data-t="log">📋 Sign-in log</button><button data-t="teachers" data-super>🧑‍🏫 Teachers</button><button data-t="switches" data-super>🔀 Criteria switches</button><button data-t="study" data-super>✦ Study Plus</button><button data-t="setup" data-super>⚙️ Setup</button>
+      <button data-t="students" aria-selected="true">👥 Students &amp; progress</button><button data-t="hp">🏠 House Points</button><button data-t="log">📋 Sign-in log</button><button data-t="answers">📘 CS answers</button><button data-t="teachers" data-super>🧑‍🏫 Teachers</button><button data-t="switches" data-super>🔀 Criteria switches</button><button data-t="study" data-super>✦ Study Plus</button><button data-t="setup" data-super>⚙️ Setup</button>
     </div>
 
     <section id="t-hp" class="hidden">
@@ -180,6 +180,19 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
         <p class="muted small" style="margin-top:4px">The private Other-subjects space (MYP 2 Maths, English, Science, I&amp;S, Islamic, French, Arabic). Only the student(s) named in <b>sdc.js → STUDY_PLUS</b> can see it. <b>Work time</b> is active time only: it stops after 60 seconds without typing or clicking, and when the page is hidden. <b>Effort</b> = 60% score + 20% tasks finished + 20% focus (work time compared with about 40 seconds a task). You also get an email at aahmed.dbs@gmail.com after every finished topic.</p>
         <div id="spBody" style="margin-top:12px"></div>
       </div>
+    </section>
+    <section id="t-answers" class="hidden">
+      <div class="card">
+        <h2>Computer Science answers</h2>
+        <p class="muted small" style="margin-top:4px">Every task in every lesson with its answer: the worked example, Exercise 1, 2 and 3, and every kind of practice question. For teachers and the super admin only.</p>
+        <div class="row" style="gap:10px;margin-top:10px;flex-wrap:wrap">
+          <label class="small"><b>Level</b><br><select id="anLevel"><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option><option value="dp_beginner">IB DP Beginner (G11–12)</option><option value="dp_intermediate">IB DP Intermediate (G11–12)</option><option value="dp_advanced">IB DP Advanced (G11–12)</option></select></label>
+          <label class="small"><b>Lesson</b><br><select id="anLesson"></select></label>
+          <label class="small"><b>Grade (words used in examples)</b><br><select id="anGrade"><option>6</option><option selected>7</option><option>8</option><option>11</option><option>12</option></select></label>
+          <button class="btn ghost sm" id="anPrint" style="align-self:flex-end">🖨 Print / save as PDF</button>
+        </div>
+      </div>
+      <div id="anOut"></div>
     </section>
     <section id="t-log" class="hidden">
       <div class="card">
@@ -508,7 +521,7 @@ function enter(){
 $("outBtn").onclick = () => location.reload();
 
 /* ---------------- tabs ---------------- */
-const TABS = ["hp","students","log","teachers","switches","setup","study"];
+const TABS = ["hp","students","log","answers","teachers","switches","setup","study"];
 document.querySelectorAll("#app .tabs button").forEach(b => b.onclick = () => {
   if (b.hasAttribute("data-super") && !isSuper()) return;
   document.querySelectorAll("#app .tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
@@ -516,7 +529,32 @@ document.querySelectorAll("#app .tabs button").forEach(b => b.onclick = () => {
   if (b.dataset.t === "teachers") renderTeachers();
   if (b.dataset.t === "switches") renderSwitches();
   if (b.dataset.t === "study") renderStudy();
+  if (b.dataset.t === "answers") renderAnswers();
 });
+/* ---------------- CS answers: any task, not tied to a student (teachers and super admin) ---------------- */
+function fillAnLessons(){
+  const A = window.PPAnswers, lv = $("anLevel").value, sel = $("anLesson"), was = sel.value;
+  const list = (A && A.LESSONS && A.LESSONS[lv]) || [];
+  sel.innerHTML = list.map((L, i) => `<option value="${i + 1}">Lesson ${i + 1}: ${esc(L.title)}</option>`).join("");
+  if (was && +was <= list.length) sel.value = was;
+  const dp = /^dp_/.test(lv); [...$("anGrade").options].forEach(o => { o.hidden = dp !== (+o.value >= 11); });
+  if ($("anGrade").selectedOptions[0].hidden) $("anGrade").value = dp ? "11" : "7";
+}
+let anTok = 0;
+async function renderAnswers(){
+  const A = window.PPAnswers, out = $("anOut"), my = ++anTok;
+  if (!A || !window.PPAnswerView || !PPAnswerView.lessonAll){ out.innerHTML = `<div class="card" style="margin-top:12px"><p class="notice warn">The answer key isn't open on this computer yet. ${isSuper() ? "Sign out and sign in again with the super admin password." : "Ask the super admin to sign in to this dashboard once; your answers then open the next time you sign in."}</p></div>`; return; }
+  if (!$("anLesson").options.length) fillAnLessons();
+  const lv = $("anLevel").value, n = +$("anLesson").value || 1;
+  out.innerHTML = `<div class="card" style="margin-top:12px"><p class="muted">Loading…</p></div>`;
+  const html = await PPAnswerView.lessonAll(A, lv, n, $("anGrade").value); if (my !== anTok) return;
+  const L = A.LESSONS[lv][n - 1];
+  out.innerHTML = `<div class="card" style="margin-top:12px"><h2 style="margin:0">${esc($("anLevel").selectedOptions[0].textContent)} · Lesson ${n}: ${esc(L.title)}</h2>${L.goal ? `<p class="muted small" style="margin-top:4px">${esc(L.goal)}</p>` : ""}${html}</div>`;
+  PPAnswerView.bindAll(out, A);
+}
+$("anLevel").onchange = () => { fillAnLessons(); renderAnswers(); };
+$("anLesson").onchange = renderAnswers; $("anGrade").onchange = renderAnswers;
+$("anPrint").onclick = () => { $("anOut").querySelectorAll("details").forEach(d => d.open = true); window.print(); };
 
 document.addEventListener("click", e => { if (e.target && e.target.id === "spPreview" && isSuper()){
   const keep = SDC.gate();   // the preview tab gets a copy of this tab's session; this tab keeps its own
