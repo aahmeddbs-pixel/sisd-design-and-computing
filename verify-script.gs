@@ -42,6 +42,7 @@ function doGet(e){
   if (a === "notify") return out_(e, notify_(p));
   if (a === "hpsetup"){ hpTeachersIn_(String(p.tm || "")); return out_(e, hpSetup_(String(p.sheet || ""))); }
   if (a === "hpstatus") return out_(e, hpStatus_());
+  if (a === "hptest") return out_(e, hpTest_());
   if (a === "vstatus") return out_(e, vstatus_(String(p.id || "")));
   if (a === "cstatus") return out_(e, cstatus_(String(p.id || "")));
   if (a === "start"){
@@ -411,7 +412,7 @@ function hpStatus_(){
   let on = false; try { on = ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === "hpTick"); } catch(err){}
   const P = hpProps_();
   return { ok: true, on: on && !!P.getProperty("HP_SHEET"), sent: hpSent_(), last: +(P.getProperty("HP_LAST") || 0), to: HP_TO.replace(/^(.).*(@.*)$/, "$1…$2"),
-    teachers: Object.keys(hpTeachers_()).length, teacherCopies: hpCanCopy_() };
+    teachers: Object.keys(hpTeachers_()).length, teacherCopies: hpCanCopy_(), sender: (hpOwner_().split("@")[1] || "unknown") };
 }
 /* Run this once from the Apps Script editor if the admin page can't switch it on: it asks for permission and starts the timer. */
 function setupHousePoints(){ hpTrigger_(); hpTick(); }
@@ -492,7 +493,16 @@ function hpTeachersIn_(json){
     if (sn.length >= 3 && DOMAIN.test(em) && em.split("@")[0].replace(/[^a-z]/g, "").indexOf(sn.replace(/[^a-z]/g, "")) >= 0) out[sn] = em; });
   if (Object.keys(out).length) hpProps_().setProperty("HP_TEACHERS", JSON.stringify(out));
 }
-function hpCanCopy_(){ try { return DOMAIN.test(Session.getEffectiveUser().getEmail() || ""); } catch(err){ return false; } }   // only from the school account
+/* the account this script sends from (cached): only a school account may send the teachers' copies */
+function hpOwner_(){
+  const P = hpProps_(); let em = P.getProperty("HP_OWNER") || "";
+  if (em) return em;
+  try { em = Session.getEffectiveUser().getEmail() || ""; } catch(err){}
+  if (!em){ try { const th = GmailApp.search("in:sent", 0, 1); if (th.length){ const f = th[0].getMessages()[0].getFrom(), m = f.match(/[^\s<>"]+@[^\s<>"]+/); if (m) em = m[0]; } } catch(err){} }
+  em = String(em || "").toLowerCase(); if (em) P.setProperty("HP_OWNER", em);
+  return em;
+}
+function hpCanCopy_(){ return DOMAIN.test(hpOwner_()); }   // only from the school account
 function hpTeacherEmail_(L, rows){
   const h = escH_, t = ms => Utilities.formatDate(new Date(ms), "Asia/Dubai", "HH:mm"), d = ms => Utilities.formatDate(new Date(ms), "Asia/Dubai", "EEEE d MMMM");
   const lv = s => s.course === "cs" ? (HP_LEVELS[s.level] || s.level || "") : "";
@@ -528,6 +538,21 @@ function hpTeacherEmail_(L, rows){
     '<p style="color:#5B6782;font-size:12.5px;margin-top:10px">Expectations: at least ' + HP_WORK_MIN + ' minutes of active work and at least half as many new tasks as the middle of the class. House Points go to the top 5 by new tasks weighted by difficulty (Python Beginner ×1, Intermediate ×1.5, Advanced ×3; Design/IT practice ×1, criterion submitted ×2, strand ×3).</p>' +
     '<p><a href="' + SITE + 'admin.html" style="color:#DC2B3E;font-weight:bold">Open your class on the staff dashboard</a></p>' +
     '<p style="margin-top:14px">Regards,<br>Mr. Ahmed</p></div>';
+}
+/* a sample teacher summary (made-up students), sent only to the school address, so you can see what teachers receive */
+function hpTest_(){
+  const P = hpProps_(), last = +(P.getProperty("HP_TEST") || 0);
+  if (Date.now() - last < 10 * 60000) return { ok: false, reason: "wait" };
+  if (!hpCanCopy_()) return { ok: false, reason: "account", sender: hpOwner_().split("@")[1] || "unknown" };
+  P.setProperty("HP_TEST", String(Date.now()));
+  const now = Date.now(), st = now - 50 * 60000, cls = { course: "design", grade: "7", teacher: "Miss Abdelaziz", cls: "7X" };
+  const S = (name, tasks, mins) => ({ name: name, course: "design", tasks: tasks, score: tasks, mins: mins, last: st, seen: {} });
+  const studs = { a: S("Sample Student A", 8, 42), b: S("Sample Student B", 6, 38), c: S("Sample Student C", 5, 33), d: S("Sample Student D", 1, 12) };
+  const L = { key: "test", cls: cls, start: st, end: now - 5 * 60000, students: studs, n: 4 };
+  L.top = [studs.a, studs.b, studs.c];
+  const rows = [{ type: "signin", when: st + 60000, acct: { name: "Sample Student E", email: "", course: "design", grade: "7", teacher: "Miss Abdelaziz" } }];
+  MailApp.sendEmail({ to: HP_REPLY_TO, name: HP_FROM_NAME, replyTo: HP_REPLY_TO, subject: "TEST · Lesson summary and House Points: " + hpLabel_(cls), htmlBody: '<p style="font-family:Arial;color:#B4580B"><b>This is a test with made-up students.</b> It is what a class teacher receives after each lesson.</p>' + hpTeacherEmail_(L, rows) });
+  return { ok: true, sent: true, to: HP_REPLY_TO };
 }
 function hpTick(){
   const lock = LockService.getScriptLock(); if (!lock.tryLock(5000)) return;
