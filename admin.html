@@ -10,7 +10,7 @@
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
 <script src="/python-pathways/pp-sync.js?v=20261109f"></script>
 <script src="/python-pathways/answers-view.js?v=20261112all"></script>
-<script src="sdc.js?v=20261112tr"></script>
+<script src="sdc.js?v=20261113ef"></script>
 <script src="study/maths.js?v=20261110a"></script>
 <script src="study/english.js?v=20261110a"></script>
 <script src="study/science.js?v=20261110a"></script>
@@ -694,8 +694,8 @@ function lessons(){
       if (cur && (r.when - cur.last > QUIET_MIN * 60000 || (forced[cur.key] && r.when > forced[cur.key]))) close();
       if (!cur) cur = { key: k + "|" + new Date(r.when).toISOString().slice(0, 16), cls: r.acct, start: r.when, last: r.when, students: {} };
       cur.last = r.when;
-      const sk = SDC.keyOf(r.acct.email, r.acct.name), st = cur.students[sk] = cur.students[sk] || { key: sk, name: r.acct.name, level: r.acct.level, course: r.acct.course, tasks: 0, score: 0, last: 0, seen: {}, mins: 0 };
-      st.mins = Math.max(st.mins, +r.mins || 0);
+      const sk = SDC.keyOf(r.acct.email, r.acct.name), st = cur.students[sk] = cur.students[sk] || { key: sk, name: r.acct.name, level: r.acct.level, course: r.acct.course, tasks: 0, score: 0, last: 0, seen: {}, mins: 0, chars: 0 };
+      st.mins = Math.max(st.mins, +r.mins || 0); st.chars = Math.max(st.chars, +r.chars || 0);
       const tk = r.task.t; if (st.seen[tk]) return; st.seen[tk] = 1;     // each task counts once
       st.tasks++; st.score += +r.task.w || 1; st.last = r.when;
     });
@@ -707,11 +707,11 @@ function lessons(){
     L.ended = !!forced[L.key] || now - L.last >= QUIET_MIN * 60000;
     L.end = forced[L.key] ? Math.max(L.last, Math.min(forced[L.key], now)) : L.last;
     // active work minutes this session also come from the "30 minutes reached" and sign-out records
-    ROWS.forEach(r => { if (r.type !== "work" || r.when < L.start - 60 * 60000 || r.when > L.end + 20 * 60000) return; const st = L.students[SDC.keyOf(r.acct.email, r.acct.name)]; if (st) st.mins = Math.max(st.mins, +r.mins || 0); });
+    ROWS.forEach(r => { if (r.type !== "work" || r.when < L.start - 60 * 60000 || r.when > L.end + 20 * 60000) return; const st = L.students[SDC.keyOf(r.acct.email, r.acct.name)]; if (st){ st.mins = Math.max(st.mins, +r.mins || 0); st.chars = Math.max(st.chars || 0, +r.chars || 0); } });
     // one House Point per student per session, and only after 30 minutes of active work
     L.eligible = Object.values(L.students).filter(x => x.mins >= WORK_MIN);
     L.short = Object.values(L.students).filter(x => x.mins < WORK_MIN);
-    L.top = L.eligible.sort((a, b) => b.score - a.score || b.tasks - a.tasks || a.last - b.last).slice(0, 5);
+    L.top = L.eligible.sort((a, b) => b.score - a.score || b.tasks - a.tasks || (b.chars || 0) - (a.chars || 0) || a.last - b.last).slice(0, 5);
     L.sent = sent[L.key] || null;
     L.lesson = L.n >= MIN_STUDENTS || !!forced[L.key];
     L.wrong = ROWS.filter(r => r.type === "wrongcourse" && r.when >= L.start - 10 * 60000 && r.when <= L.end + 60000 && (r.acct.teacher === L.cls.teacher || Object.values(L.students).some(s => s.name === r.acct.name)));
@@ -721,18 +721,20 @@ function lessons(){
 }
 /* who achieved the lesson's expectations, and who worked below them and needs encouraging next lesson */
 function lessonSummary(L){
-  const all = Object.values(L.students), tasks = all.map(s => s.tasks).sort((a, b) => a - b), med = tasks.length ? tasks[Math.floor((tasks.length - 1) / 2)] : 0;
+  const all = Object.values(L.students), mid = a => { a = a.slice().sort((x, y) => x - y); return a.length ? a[Math.floor((a.length - 1) / 2)] : 0; };
+  const med = mid(all.map(s => s.tasks)), withChars = all.filter(s => s.chars > 0), cmed = withChars.length >= 2 ? mid(all.map(s => s.chars || 0)) : 0;
   const below = [], achieved = [];
   all.forEach(s => { const why = [];
-    if (s.mins < WORK_MIN) why.push("only " + s.mins + " min of active work");
-    if (med >= 2 && s.tasks <= Math.floor(med / 2)) why.push(s.tasks + " task" + (s.tasks === 1 ? "" : "s") + " (class middle: " + med + ")");
+    if (s.mins < WORK_MIN) why.push("only " + s.mins + " min of active work (typing or answering)");
+    if (med >= 2 && s.tasks <= Math.floor(med / 2)) why.push(s.tasks + " task" + (s.tasks === 1 ? "" : "s") + " saved (class middle: " + med + ")");
+    if (cmed >= 200 && (s.chars || 0) < cmed / 4) why.push("typed " + (s.chars || 0).toLocaleString() + " characters (class middle: " + cmed.toLocaleString() + ")");
     (why.length ? below : achieved).push({ s, why }); });
   // signed in for this class during the lesson, but completed no tasks
   const same = a => a && a.course === L.cls.course && String(a.grade) === String(L.cls.grade) && SDC.sameTeacher(a.teacher, L.cls.teacher) && (!L.cls.cls || !a.cls || a.cls === L.cls.cls);
   const idle = {}; ROWS.forEach(r => { if ((r.type === "signin" || r.type === "signup") && r.when >= L.start - 15 * 60000 && r.when <= L.end && same(r.acct) && !SDC.isTester(r.acct.email)){ const k = SDC.keyOf(r.acct.email, r.acct.name); if (!L.students[k]) idle[k] = r.acct.name; } });
   Object.values(idle).forEach(n => below.push({ s: { name: n, tasks: 0, mins: 0 }, why: ["signed in but completed no tasks"] }));
   achieved.sort((a, b) => b.s.score - a.s.score); below.sort((a, b) => a.s.tasks - b.s.tasks);
-  return { achieved, below, med };
+  return { achieved, below, med, cmed };
 }
 function sentSet(){
   const s = Object.assign({}, load("sdc_hpsent", {}));
@@ -849,10 +851,10 @@ function renderHP(){
       ${(() => { const S = lessonSummary(L), top = new Set(L.top.map(x => x.name));
         return `<div class="grid2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:12px">
           <div style="background:#ECFAF1;border-radius:10px;padding:10px 12px"><b>✅ Achieved the lesson expectations (${S.achieved.length})</b>
-            ${S.achieved.length ? `<ul class="small" style="margin:6px 0 0;padding-left:18px">${S.achieved.map(x => `<li>${esc(x.s.name)}${top.has(x.s.name) ? " 🏠" : ""} <span class="muted">· ${x.s.tasks} task${x.s.tasks === 1 ? "" : "s"}, ${x.s.mins} min</span></li>`).join("")}</ul>` : `<p class="muted small" style="margin:6px 0 0">None ${L.ended ? "this lesson" : "yet"}.</p>`}</div>
+            ${S.achieved.length ? `<ul class="small" style="margin:6px 0 0;padding-left:18px">${S.achieved.map(x => `<li>${esc(x.s.name)}${top.has(x.s.name) ? " 🏠" : ""} <span class="muted">· ${x.s.tasks} task${x.s.tasks === 1 ? "" : "s"}, ${x.s.mins} min${x.s.chars ? ", " + x.s.chars.toLocaleString() + " characters typed" : ""}</span></li>`).join("")}</ul>` : `<p class="muted small" style="margin:6px 0 0">None ${L.ended ? "this lesson" : "yet"}.</p>`}</div>
           <div style="background:#FFF7E8;border-radius:10px;padding:10px 12px"><b>⚠️ Working below expectation: encourage next lesson (${S.below.length})</b>
             ${S.below.length ? `<ul class="small" style="margin:6px 0 0;padding-left:18px">${S.below.map(x => `<li>${esc(x.s.name)} <span class="muted">· ${esc(x.why.join("; "))}</span></li>`).join("")}</ul>` : `<p class="muted small" style="margin:6px 0 0">Everyone met the expectations.</p>`}</div>
-        </div><p class="muted small" style="margin-top:6px">Expectations: at least ${WORK_MIN} minutes of active work and at least half as many new tasks as the middle of the class. 🏠 = House Point.</p>`; })()}
+        </div><p class="muted small" style="margin-top:6px">Effort expectations: at least ${WORK_MIN} minutes of active work (typing, answering or building: scrolling and browsing don't count), at least half as many tasks saved as the middle of the class, and typing at least a quarter as much as the middle of the class. 🏠 = House Point.</p>`; })()}
       <div class="row" style="margin-top:10px">${btn}</div></div>`;
   }).join("");
   $("hpList").querySelectorAll("[data-send]").forEach(b => b.onclick = async () => { b.disabled = true; await sendLesson(all[+b.dataset.send], true); renderHP(); });
@@ -1698,10 +1700,10 @@ function lessonPopups(){
     <div class="muted small">${esc(fmtD(due.start))}, ${esc(fmtT(due.start))}–${esc(fmtT(due.last))} · ${due.n} student${due.n === 1 ? "" : "s"} completed work</div>
     <div><b>🏠 House Points</b>${due.top.length ? `<ol class="top5" style="margin-top:6px">${due.top.map(x => `<li><b>${esc(x.name)}</b><span class="small"> · ${x.tasks} task${x.tasks === 1 ? "" : "s"} · ${x.mins} min</span></li>`).join("")}</ol><p class="muted small" style="margin:4px 0 0">One House Point each.</p>` : `<p class="muted small" style="margin:6px 0 0">Nobody worked actively for ${WORK_MIN} minutes, so no House Points this lesson.</p>`}</div>
     <div style="background:#ECFAF1;border-radius:10px;padding:10px 12px"><b>✅ Achieved the lesson expectations (${S.achieved.length})</b>
-      ${S.achieved.length ? `<ul class="small" style="margin:6px 0 0;padding-left:18px">${S.achieved.map(x => `<li>${esc(x.s.name)}${top.has(x.s.name) ? " 🏠" : ""} <span class="muted">· ${x.s.tasks} task${x.s.tasks === 1 ? "" : "s"}, ${x.s.mins} min</span></li>`).join("")}</ul>` : `<p class="muted small" style="margin:6px 0 0">None this lesson.</p>`}</div>
+      ${S.achieved.length ? `<ul class="small" style="margin:6px 0 0;padding-left:18px">${S.achieved.map(x => `<li>${esc(x.s.name)}${top.has(x.s.name) ? " 🏠" : ""} <span class="muted">· ${x.s.tasks} task${x.s.tasks === 1 ? "" : "s"}, ${x.s.mins} min${x.s.chars ? ", " + x.s.chars.toLocaleString() + " characters typed" : ""}</span></li>`).join("")}</ul>` : `<p class="muted small" style="margin:6px 0 0">None this lesson.</p>`}</div>
     <div style="background:#FFF7E8;border-radius:10px;padding:10px 12px"><b>⚠️ Working below expectation: encourage next lesson (${S.below.length})</b>
       ${S.below.length ? `<ul class="small" style="margin:6px 0 0;padding-left:18px">${S.below.map(x => `<li>${esc(x.s.name)} <span class="muted">· ${esc(x.why.join("; "))}</span></li>`).join("")}</ul>` : `<p class="muted small" style="margin:6px 0 0">Everyone met the expectations. Well done!</p>`}</div>
-    <p class="muted small" style="margin:0">Expectations: at least ${WORK_MIN} minutes of active work and at least half as many new tasks as the middle of the class. This summary stays in the House Points tab.</p>
+    <p class="muted small" style="margin:0">Effort expectations: at least ${WORK_MIN} minutes of active work (typing, answering or building: scrolling and browsing don't count), at least half as many tasks saved as the middle of the class, and typing at least a quarter as much as the middle of the class. This summary stays in the House Points tab.</p>
     <div class="row" style="justify-content:flex-end;gap:8px"><button class="btn ghost" id="lsPopHP">Open House Points tab</button><button class="btn" id="lsPopOk">OK</button></div></div>`;
   document.body.appendChild(bg);
   const close = () => { bg.remove(); setTimeout(lessonPopups, 400); };   // another finished lesson may be waiting

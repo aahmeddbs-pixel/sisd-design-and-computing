@@ -255,7 +255,7 @@ function log(type, a, extra){
   enqueue(LOG.url, { [LOG.entries.type]:"sdc-" + type, [LOG.entries.student]:acct.name, [LOG.entries.email]:acct.email, [LOG.entries.teacher]:acct.teacher, [LOG.entries.data]:JSON.stringify(data) });
 }
 /* one completed task, for the end-of-lesson House Points ranking. w = difficulty weight */
-function task(a, title, w, kind){ const wk = work(); log("task", a, { task:{ t:String(title || "").slice(0, 120), w:+w || 1, kind:kind || "task" }, sid: wk && wk.sid, mins: wk ? Math.floor(wk.ms / 60000) : 0 }); }
+function task(a, title, w, kind){ const wk = work(); log("task", a, { task:{ t:String(title || "").slice(0, 120), w:+w || 1, kind:kind || "task" }, sid: wk && wk.sid, mins: wk ? Math.floor(wk.ms / 60000) : 0, chars: wk ? wk.chars : 0 }); }
 
 /* ---------- staff: the signed course state (criteria switches + approved teachers) ----------
    Published by the super admin to the Design Studio Switches form and signed with the admin key, so nobody else
@@ -349,17 +349,27 @@ async function showFeedbackButton(){
   };
 }
 
-/* ---------- active work time ----------
-   Counts only while the student is actually working: the page is open and they typed, clicked or ran something
-   in the last 2 minutes. Being signed in and idle does not count. One session = one sign-in, on one day. */
+/* ---------- active work time and effort ----------
+   Effort = engaging with the work, not just looking at it. Time only counts while the student is working: in the
+   last 2 minutes they typed, answered a question (a button, choice or checkbox), changed a field, or built/drew
+   on a canvas. Scrolling, moving the mouse and clicking around the page do not count. We also count the characters
+   they TYPE (pasted text does not count), so a teacher can see how much content each student wrote.
+   One session = one sign-in, on one day. */
 const IDLE_MS = 120000, WORK_GOAL_MIN = 30;
-let lastAct = 0;
+let lastAct = 0, typedNew = 0;
 const dayNow = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
-["keydown", "input", "pointerdown", "change"].forEach(ev => window.addEventListener(ev, e => { if (e.isTrusted !== false) lastAct = Date.now(); }, true));
+const EDITABLE = el => !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName || ""));
+const WORK_CLICK = "button,[role=button],input,select,textarea,label,canvas,.opt,.choice,[data-opt],[data-ans]";
+window.addEventListener("keydown", e => { if (e.isTrusted !== false && EDITABLE(e.target)) lastAct = Date.now(); }, true);
+window.addEventListener("input", e => { if (e.isTrusted === false) return; lastAct = Date.now();
+  const t = String(e.inputType || ""); if (/^insert(Text|ReplacementText|CompositionText|LineBreak|Paragraph)?$/.test(t)) typedNew += Math.max(1, String(e.data || "").length); }, true);
+window.addEventListener("change", e => { if (e.isTrusted !== false) lastAct = Date.now(); }, true);
+window.addEventListener("pointerdown", e => { if (e.isTrusted !== false && e.target && e.target.closest && e.target.closest(WORK_CLICK) && !e.target.closest("nav,header,.sdc-strip,#sdcStrip,.tabs,.steps,.strand-tabs")) lastAct = Date.now(); }, true);
 function work(){
   const g = gate(); if (!g || !g.who) return null;
-  if (!g.sid || g.day !== dayNow()){ const sid = Math.random().toString(36).slice(2, 10); patchGate({ sid, day: dayNow(), work: 0, told30: false }); return { sid, ms: 0 }; }
-  return { sid: g.sid, ms: g.work || 0 };
+  if (!g.sid || g.day !== dayNow()){ const sid = Math.random().toString(36).slice(2, 10); patchGate({ sid, day: dayNow(), work: 0, told30: false, chars: 0 }); typedNew = 0; return { sid, ms: 0, chars: 0 }; }
+  if (typedNew){ const add = typedNew; typedNew = 0; patchGate({ chars: (g.chars || 0) + add }); return { sid: g.sid, ms: g.work || 0, chars: (g.chars || 0) + add }; }
+  return { sid: g.sid, ms: g.work || 0, chars: g.chars || 0 };
 }
 let workTick = Date.now();
 setInterval(() => {
@@ -367,9 +377,9 @@ setInterval(() => {
   const g = gate(); if (!g || !g.who || document.hidden || now - lastAct > IDLE_MS) return;
   const w = work(); if (!w) return;
   const ms = w.ms + dt; patchGate({ work: ms });
-  if (ms >= WORK_GOAL_MIN * 60000 && !gate().told30){ patchGate({ told30: true }); log("work", Object.assign({ course: g.course }, g.acct || g.who), { sid: w.sid, mins: Math.floor(ms / 60000) }); }
+  if (ms >= WORK_GOAL_MIN * 60000 && !gate().told30){ patchGate({ told30: true }); log("work", Object.assign({ course: g.course }, g.acct || g.who), { sid: w.sid, mins: Math.floor(ms / 60000), chars: w.chars }); }
 }, 5000);
-window.addEventListener("pagehide", () => { const g = gate(), w = work(); if (g && w && w.ms > 60000) log("work", Object.assign({ course: g.course }, g.acct || g.who), { sid: w.sid, mins: Math.floor(w.ms / 60000), end: true }); });
+window.addEventListener("pagehide", () => { const g = gate(), w = work(); if (g && w && w.ms > 60000) log("work", Object.assign({ course: g.course }, g.acct || g.who), { sid: w.sid, mins: Math.floor(w.ms / 60000), chars: w.chars, end: true }); });
 
 /* ---------- checks used by the course pages ---------- */
 const MSG = {
