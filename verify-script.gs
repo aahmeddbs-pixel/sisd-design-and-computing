@@ -539,6 +539,15 @@ function hpTeacherEmail_(L, rows){
     '<p><a href="' + SITE + 'admin.html" style="color:#DC2B3E;font-weight:bold">Open your class on the staff dashboard</a></p>' +
     '<p style="margin-top:14px">Regards,<br>Mr. Ahmed</p></div>';
 }
+/* RUN THIS ONCE from the Apps Script editor (choose "checkTeacherCopies" next to ▶ Run, then Run, then Allow):
+   it gives the script permission to see which account it sends from, then emails you a sample teacher summary. */
+function checkTeacherCopies(){
+  const em = String(Session.getEffectiveUser().getEmail() || "").toLowerCase();
+  if (em) hpProps_().setProperty("HP_OWNER", em);
+  hpProps_().deleteProperty("HP_TEST");
+  const r = hpTest_();
+  Logger.log("Sending account: " + (em || "unknown") + " · teacher copies " + (DOMAIN.test(em) ? "ON" : "OFF (not a school account)") + " · test: " + JSON.stringify(r));
+}
 /* a sample teacher summary (made-up students), sent only to the school address, so you can see what teachers receive */
 function hpTest_(){
   const P = hpProps_(), last = +(P.getProperty("HP_TEST") || 0);
