@@ -578,7 +578,7 @@ function paintSetup(){
   $("sheetMsg").innerHTML = sheetId(sheetLink()) ? `<div class="notice ok">Connected.</div>` : `<div class="notice warn">Not connected yet: the House Points, Students and Sign-in log tabs need this.</div>`;
   $("notifyMsg").innerHTML = parseForm(load(NOTIFY_KEY, "")) ? `<div class="notice ok">Connected: lesson emails will be sent.</div>` : `<div class="notice warn">Not connected yet: lesson results show here but can't be emailed.</div>`;
   $("hpWarn").innerHTML = !sheetId(sheetLink()) ? `<div class="notice warn">Connect your log sheet in <b>Setup</b> first.</div>`
-    : HPSRV && HPSRV.on ? `<div class="notice ok"><b>✓ Automatic emails are on.</b> The top 5 of every lesson is emailed to ${esc(HPSRV.to || "you")} about 15 minutes after the class goes quiet, even when this page is closed.${HPSRV.last ? " Last check " + esc(fmtT(HPSRV.last)) + "." : ""}${HPSRV.teachers != null ? (HPSRV.teacherCopies ? ` Each class teacher (${HPSRV.teachers} with a school email) also gets their class summary from Mr. Ahmed.` : " Class teachers' copies are off: the email script must run on your school account.") : " To send each class teacher their summary too, update the email script (Setup → copy the script, paste it into Apps Script, then Deploy → Manage deployments → Edit → New version)."}</div>`
+    : HPSRV && HPSRV.on ? `<div class="notice ok"><b>✓ Automatic emails are on.</b> The top 5 of every lesson is emailed to ${esc(HPSRV.to || "you")} about 15 minutes after the class goes quiet, even when this page is closed.${HPSRV.last ? " Last check " + esc(fmtT(HPSRV.last)) + "." : ""} Each class teacher sees their own lesson summaries (House Points, who achieved, who needs encouraging) in the House Points tab.</div>`
     : HPSRV && HPSRV.reason ? `<div class="notice warn"><b>Automatic emails are not on yet</b> (${esc(HPSRV.reason === "trigger" ? "the email script needs your permission" : HPSRV.reason === "unknown" || HPSRV.reason === "owner" ? "the email script needs updating" : HPSRV.reason)}). Update the email script once: open it in Apps Script, paste the new <b>verify-script.gs</b>, then <b>Deploy → Manage deployments → ✏️ → Version: New version → Deploy</b> and allow access. Until then, emails go out only while this page is open.</div>`
     : !parseForm(load(NOTIFY_KEY, "")) ? `<div class="notice warn">Emails are off until you add the alerts form in <b>Setup</b>. Results still appear below.</div>` : "";
 }
@@ -719,6 +719,21 @@ function lessons(){
   });
   return out.filter(L => canSee(L.cls.teacher)).sort((a, b) => b.last - a.last);
 }
+/* who achieved the lesson's expectations, and who worked below them and needs encouraging next lesson */
+function lessonSummary(L){
+  const all = Object.values(L.students), tasks = all.map(s => s.tasks).sort((a, b) => a - b), med = tasks.length ? tasks[Math.floor((tasks.length - 1) / 2)] : 0;
+  const below = [], achieved = [];
+  all.forEach(s => { const why = [];
+    if (s.mins < WORK_MIN) why.push("only " + s.mins + " min of active work");
+    if (med >= 2 && s.tasks <= Math.floor(med / 2)) why.push(s.tasks + " task" + (s.tasks === 1 ? "" : "s") + " (class middle: " + med + ")");
+    (why.length ? below : achieved).push({ s, why }); });
+  // signed in for this class during the lesson, but completed no tasks
+  const same = a => a && a.course === L.cls.course && String(a.grade) === String(L.cls.grade) && SDC.sameTeacher(a.teacher, L.cls.teacher) && (!L.cls.cls || !a.cls || a.cls === L.cls.cls);
+  const idle = {}; ROWS.forEach(r => { if ((r.type === "signin" || r.type === "signup") && r.when >= L.start - 15 * 60000 && r.when <= L.end && same(r.acct) && !SDC.isTester(r.acct.email)){ const k = SDC.keyOf(r.acct.email, r.acct.name); if (!L.students[k]) idle[k] = r.acct.name; } });
+  Object.values(idle).forEach(n => below.push({ s: { name: n, tasks: 0, mins: 0 }, why: ["signed in but completed no tasks"] }));
+  achieved.sort((a, b) => b.s.score - a.s.score); below.sort((a, b) => a.s.tasks - b.s.tasks);
+  return { achieved, below, med };
+}
 function sentSet(){
   const s = Object.assign({}, load("sdc_hpsent", {}));
   ROWS.filter(r => r.type === "hpsent" && r.lesson).forEach(r => { s[r.lesson] = s[r.lesson] || r.when; });
@@ -831,7 +846,13 @@ function renderHP(){
       <div class="muted small">${esc(fmtD(L.start))}, ${esc(fmtT(L.start))}–${esc(fmtT(L.end))} · ${L.n} student${L.n === 1 ? "" : "s"} completed work${L.signins ? " · " + L.signins + " signed in" : ""}${L.wrong.length ? ` · <b style="color:var(--bad)">${L.wrong.length} wrong-course attempt${L.wrong.length === 1 ? "" : "s"}</b>` : ""}</div>
       <ol class="top5">${L.top.map(s => `<li><b>${esc(s.name)}</b><span class="small">${s.tasks} task${s.tasks === 1 ? "" : "s"} · score ${fmtScore(s.score)} · ${s.mins} min${levelName(s.course, s.level) ? " · " + esc(levelName(s.course, s.level)) : ""}</span></li>`).join("")}</ol>
       ${!L.top.length ? `<p class="muted small" style="margin-top:8px">Nobody has worked actively for ${WORK_MIN} minutes yet.</p>` : ""}
-      ${L.short.length ? `<p class="muted small" style="margin-top:8px">Under ${WORK_MIN} minutes of active work (not eligible): ${L.short.map(x => esc(x.name) + " (" + x.mins + " min)").join(", ")}</p>` : ""}
+      ${(() => { const S = lessonSummary(L), top = new Set(L.top.map(x => x.name));
+        return `<div class="grid2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:12px">
+          <div style="background:#ECFAF1;border-radius:10px;padding:10px 12px"><b>✅ Achieved the lesson expectations (${S.achieved.length})</b>
+            ${S.achieved.length ? `<ul class="small" style="margin:6px 0 0;padding-left:18px">${S.achieved.map(x => `<li>${esc(x.s.name)}${top.has(x.s.name) ? " 🏠" : ""} <span class="muted">· ${x.s.tasks} task${x.s.tasks === 1 ? "" : "s"}, ${x.s.mins} min</span></li>`).join("")}</ul>` : `<p class="muted small" style="margin:6px 0 0">None ${L.ended ? "this lesson" : "yet"}.</p>`}</div>
+          <div style="background:#FFF7E8;border-radius:10px;padding:10px 12px"><b>⚠️ Working below expectation: encourage next lesson (${S.below.length})</b>
+            ${S.below.length ? `<ul class="small" style="margin:6px 0 0;padding-left:18px">${S.below.map(x => `<li>${esc(x.s.name)} <span class="muted">· ${esc(x.why.join("; "))}</span></li>`).join("")}</ul>` : `<p class="muted small" style="margin:6px 0 0">Everyone met the expectations.</p>`}</div>
+        </div><p class="muted small" style="margin-top:6px">Expectations: at least ${WORK_MIN} minutes of active work and at least half as many new tasks as the middle of the class. 🏠 = House Point.</p>`; })()}
       <div class="row" style="margin-top:10px">${btn}</div></div>`;
   }).join("");
   $("hpList").querySelectorAll("[data-send]").forEach(b => b.onclick = async () => { b.disabled = true; await sendLesson(all[+b.dataset.send], true); renderHP(); });
@@ -1570,7 +1591,7 @@ function renderStudy(){
       <div class="scroll" style="margin-top:6px"><table class="tbl"><tr><th>When</th><th>Topic</th><th>Score</th><th>Effort</th><th>Work time</th><th>Strengths and gaps</th></tr>${recent || `<tr><td colspan="6" class="muted">No finished topics yet.</td></tr>`}</table></div>
     </div>`; }).join("");
 }
-function renderAll(){ renderHP(); renderResets(); renderSlow(); renderVerifyWaiting(); renderDesignRequests(); renderStudents(); renderLog(); try { renderStudy(); } catch(e){} setTimeout(healDeletes, 1500); }
+function renderAll(){ setTimeout(lessonPopups, 800); renderHP(); renderResets(); renderSlow(); renderVerifyWaiting(); renderDesignRequests(); renderStudents(); renderLog(); try { renderStudy(); } catch(e){} setTimeout(healDeletes, 1500); }
 /* ---------- students who signed up but can't get in because they haven't verified their email ---------- */
 /* ---------- students who've been stuck on one task for a long time (after two reminders on their screen) ---------- */
 function renderSlow(){
@@ -1659,6 +1680,36 @@ function renderDesignRequests(){
 }
 let timer = null;
 try { document.getElementById("langSlot").innerHTML = SDC.langPicker(true); } catch(e){}
+/* 5 minutes after one of your lessons ends (no new work for 5 minutes), its summary pops up once */
+const POP_AFTER_MIN = 5;
+function myClass(t){ return ROLE === "super" ? SDC.sameTeacher("Mr. Ahmed", t) : canSee(t); }
+function lessonPopups(){
+  if (!ROLE || document.getElementById("lsPop")) return;
+  const seen = load("sdc_lpop", {}), now = Date.now(), forced = load("sdc_forced", {});
+  const due = lessons().filter(L => L.lesson && myClass(L.cls.teacher) && !seen[L.key] && now - Math.max(L.last, forced[L.key] || 0) >= POP_AFTER_MIN * 60000 && now - L.last < 3 * 3600000)
+    .sort((a, b) => a.last - b.last)[0];
+  if (!due) return;
+  seen[due.key] = now; Object.keys(seen).forEach(k => { if (now - seen[k] > 14 * 86400000) delete seen[k]; }); store("sdc_lpop", seen);
+  const S = lessonSummary(due), top = new Set(due.top.map(x => x.name)), medal = ["🥇", "🥈", "🥉", "4.", "5."];
+  const bg = document.createElement("div"); bg.id = "lsPop"; bg.style.cssText = "position:fixed;inset:0;background:rgba(11,26,51,.55);z-index:9999;display:grid;place-items:center;padding:16px";
+  bg.innerHTML = `<div class="card" style="max-width:640px;width:100%;max-height:88vh;overflow:auto;display:flex;flex-direction:column;gap:12px" role="dialog" aria-modal="true" aria-labelledby="lsPopH">
+    <div class="muted small" style="font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#C42236">Lesson summary</div>
+    <h2 id="lsPopH" style="margin:0">${pill(due.cls.course)} ${esc(classLabel(due.cls))}</h2>
+    <div class="muted small">${esc(fmtD(due.start))}, ${esc(fmtT(due.start))}–${esc(fmtT(due.last))} · ${due.n} student${due.n === 1 ? "" : "s"} completed work</div>
+    <div><b>🏠 House Points</b>${due.top.length ? `<ol class="top5" style="margin-top:6px">${due.top.map(x => `<li><b>${esc(x.name)}</b><span class="small"> · ${x.tasks} task${x.tasks === 1 ? "" : "s"} · ${x.mins} min</span></li>`).join("")}</ol><p class="muted small" style="margin:4px 0 0">One House Point each.</p>` : `<p class="muted small" style="margin:6px 0 0">Nobody worked actively for ${WORK_MIN} minutes, so no House Points this lesson.</p>`}</div>
+    <div style="background:#ECFAF1;border-radius:10px;padding:10px 12px"><b>✅ Achieved the lesson expectations (${S.achieved.length})</b>
+      ${S.achieved.length ? `<ul class="small" style="margin:6px 0 0;padding-left:18px">${S.achieved.map(x => `<li>${esc(x.s.name)}${top.has(x.s.name) ? " 🏠" : ""} <span class="muted">· ${x.s.tasks} task${x.s.tasks === 1 ? "" : "s"}, ${x.s.mins} min</span></li>`).join("")}</ul>` : `<p class="muted small" style="margin:6px 0 0">None this lesson.</p>`}</div>
+    <div style="background:#FFF7E8;border-radius:10px;padding:10px 12px"><b>⚠️ Working below expectation: encourage next lesson (${S.below.length})</b>
+      ${S.below.length ? `<ul class="small" style="margin:6px 0 0;padding-left:18px">${S.below.map(x => `<li>${esc(x.s.name)} <span class="muted">· ${esc(x.why.join("; "))}</span></li>`).join("")}</ul>` : `<p class="muted small" style="margin:6px 0 0">Everyone met the expectations. Well done!</p>`}</div>
+    <p class="muted small" style="margin:0">Expectations: at least ${WORK_MIN} minutes of active work and at least half as many new tasks as the middle of the class. This summary stays in the House Points tab.</p>
+    <div class="row" style="justify-content:flex-end;gap:8px"><button class="btn ghost" id="lsPopHP">Open House Points tab</button><button class="btn" id="lsPopOk">OK</button></div></div>`;
+  document.body.appendChild(bg);
+  const close = () => { bg.remove(); setTimeout(lessonPopups, 400); };   // another finished lesson may be waiting
+  bg.querySelector("#lsPopOk").onclick = close;
+  bg.querySelector("#lsPopHP").onclick = () => { close(); const t = document.querySelector('[data-t="hp"]'); if (t) t.click(); };
+  bg.onclick = e => { if (e.target === bg) close(); };
+}
+setInterval(() => { try { lessonPopups(); } catch(e){} }, 60000);
 function start(){ paintSetup(); paintVerify(); renderAll(); refresh(); clearInterval(timer); timer = setInterval(refresh, POLL_MS); }
 })();
 </script>
