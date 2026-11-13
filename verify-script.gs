@@ -40,7 +40,7 @@ function doGet(e){
     return out_(e, m);
   }
   if (a === "notify") return out_(e, notify_(p));
-  if (a === "hpsetup") return out_(e, hpSetup_(String(p.sheet || "")));
+  if (a === "hpsetup"){ hpTeachersIn_(String(p.tm || "")); return out_(e, hpSetup_(String(p.sheet || ""))); }
   if (a === "hpstatus") return out_(e, hpStatus_());
   if (a === "vstatus") return out_(e, vstatus_(String(p.id || "")));
   if (a === "cstatus") return out_(e, cstatus_(String(p.id || "")));
@@ -410,7 +410,8 @@ function hpSent_(){ try { return JSON.parse(hpProps_().getProperty("HP_SENT") ||
 function hpStatus_(){
   let on = false; try { on = ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === "hpTick"); } catch(err){}
   const P = hpProps_();
-  return { ok: true, on: on && !!P.getProperty("HP_SHEET"), sent: hpSent_(), last: +(P.getProperty("HP_LAST") || 0), to: HP_TO.replace(/^(.).*(@.*)$/, "$1…$2") };
+  return { ok: true, on: on && !!P.getProperty("HP_SHEET"), sent: hpSent_(), last: +(P.getProperty("HP_LAST") || 0), to: HP_TO.replace(/^(.).*(@.*)$/, "$1…$2"),
+    teachers: Object.keys(hpTeachers_()).length, teacherCopies: hpCanCopy_() };
 }
 /* Run this once from the Apps Script editor if the admin page can't switch it on: it asks for permission and starts the timer. */
 function setupHousePoints(){ hpTrigger_(); hpTick(); }
@@ -473,6 +474,61 @@ function hpEmail_(L){
     '<p style="color:#5B6782;font-size:12.5px;margin-top:14px">Most new tasks in the lesson, weighted by difficulty: Python Beginner ×1, Intermediate ×1.5, Advanced ×3 per exercise; Design/IT practice ×1, criterion submitted ×2, strand ×3. Only students with ' + HP_WORK_MIN + '+ minutes of active work. Sent automatically ' + HP_QUIET_MIN + ' minutes after the class went quiet.</p>' +
     '<p><a href="' + SITE + 'admin.html" style="color:#DC2B3E;font-weight:bold">Open the House Points tab</a></p></div>';
 }
+/* ---------- copies for class teachers ----------
+   After each lesson, the class's teacher gets their own summary from "Mr. Ahmed" (sent from this school account,
+   reply-to the school address: the super admin's private email never appears). It has the House Points, who
+   achieved the lesson's expectations, and who worked below expectation and needs encouraging next lesson.
+   Teachers' school emails come from the admin page (approved teachers). An address is only accepted when it is an
+   @sisd.ae address that contains the teacher's surname, so nobody can redirect a class's data elsewhere. */
+const HP_FROM_NAME = "Mr. Ahmed", HP_REPLY_TO = "abdulaziz.ahmed@sisd.ae";
+const hpSurname_ = n => String(n || "").toLowerCase().replace(/[^a-z\s'-]/g, " ").trim().split(/\s+/).pop() || "";
+function hpTeachers_(){ try { return JSON.parse(hpProps_().getProperty("HP_TEACHERS") || "{}"); } catch(err){ return {}; } }
+function hpTeachersIn_(json){
+  if (!json) return;
+  let m = null; try { m = JSON.parse(json); } catch(err){ return; }
+  if (!m || typeof m !== "object") return;
+  const out = {};
+  Object.keys(m).slice(0, 40).forEach(name => { const em = String(m[name] || "").trim().toLowerCase(), sn = hpSurname_(name);
+    if (sn.length >= 3 && DOMAIN.test(em) && em.split("@")[0].replace(/[^a-z]/g, "").indexOf(sn.replace(/[^a-z]/g, "")) >= 0) out[sn] = em; });
+  if (Object.keys(out).length) hpProps_().setProperty("HP_TEACHERS", JSON.stringify(out));
+}
+function hpCanCopy_(){ try { return DOMAIN.test(Session.getEffectiveUser().getEmail() || ""); } catch(err){ return false; } }   // only from the school account
+function hpTeacherEmail_(L, rows){
+  const h = escH_, t = ms => Utilities.formatDate(new Date(ms), "Asia/Dubai", "HH:mm"), d = ms => Utilities.formatDate(new Date(ms), "Asia/Dubai", "EEEE d MMMM");
+  const lv = s => s.course === "cs" ? (HP_LEVELS[s.level] || s.level || "") : "";
+  const all = Object.keys(L.students).map(k => L.students[k]);
+  const tasks = all.map(s => s.tasks).sort((a, b) => a - b), med = tasks.length ? tasks[Math.floor((tasks.length - 1) / 2)] : 0;
+  const topSet = {}; L.top.forEach(s => topSet[s.name] = 1);
+  // signed in for this class during the lesson but completed nothing
+  const inClass = a => a && a.course === L.cls.course && String(a.grade) === String(L.cls.grade) && hpSurname_(a.teacher) === hpSurname_(L.cls.teacher);
+  const idle = {}; rows.forEach(r => { if ((r.type === "signin" || r.type === "signup") && r.when >= L.start - 15 * 60000 && r.when <= L.end && inClass(r.acct) && !L.students[hpKeyOf_(r.acct.email, r.acct.name)]) idle[hpKeyOf_(r.acct.email, r.acct.name)] = r.acct.name; });
+  const below = [], achieved = [];
+  all.forEach(s => {
+    const why = [];
+    if (s.mins < HP_WORK_MIN) why.push("only " + s.mins + " min of active work");
+    if (med >= 2 && s.tasks <= Math.floor(med / 2)) why.push(s.tasks + " task" + (s.tasks === 1 ? "" : "s") + " (class middle: " + med + ")");
+    (why.length ? below : achieved).push({ s, why });
+  });
+  Object.keys(idle).forEach(k => below.push({ s: { name: idle[k], tasks: 0, mins: 0, course: L.cls.course }, why: ["signed in but completed no tasks"] }));
+  achieved.sort((a, b) => b.s.score - a.s.score); below.sort((a, b) => a.s.tasks - b.s.tasks);
+  const row = (cells, bg) => '<tr' + (bg ? ' style="background:' + bg + '"' : '') + '>' + cells.map(c => '<td style="padding:6px 10px;border-bottom:1px solid #E3E8F0;vertical-align:top">' + c + '</td>').join("") + '</tr>';
+  const tbl = (head, body) => '<table style="border-collapse:collapse;width:100%;font-size:14px;margin:6px 0 14px"><tr>' + head.map(x => '<th style="text-align:left;padding:6px 10px;background:#EEF2F7;font-size:12.5px;color:#5B6782">' + x + '</th>').join("") + '</tr>' + body + '</table>';
+  const medal = ["🥇", "🥈", "🥉", "4.", "5."];
+  return '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#16223A;max-width:640px">' +
+    '<div style="background:#1B2D4E;color:#fff;padding:14px 18px;border-bottom:4px solid #DC2B3E;font-weight:bold">SISD Design and Computing · Lesson summary</div>' +
+    '<p style="margin:14px 0 4px">Dear ' + h(L.cls.teacher || "colleague") + ',</p>' +
+    '<p style="margin:0 0 10px">Here is the summary of your <b>' + h(hpLabel_(L.cls)) + '</b> lesson on ' + d(L.start) + ' (' + t(L.start) + '–' + t(L.end) + '). ' + all.length + ' student' + (all.length === 1 ? '' : 's') + ' completed work' + (Object.keys(idle).length ? ' and ' + Object.keys(idle).length + ' signed in without completing a task' : '') + '.</p>' +
+    '<h3 style="margin:16px 0 2px;font-size:17px">🏠 House Points</h3>' +
+    (L.top.length ? tbl(["", "Student", "Tasks", "Active work"], L.top.map((s, i) => row([medal[i], '<b>' + h(s.name) + '</b>' + (lv(s) ? '<br><span style="color:#5B6782;font-size:12.5px">' + h(lv(s)) + '</span>' : ''), s.tasks, s.mins + ' min'])).join("")) + '<p style="margin:-6px 0 10px;font-size:13px;color:#5B6782">One House Point each. Please add them to the house system.</p>'
+      : '<p style="margin:4px 0 12px">No House Points this lesson: nobody worked actively for ' + HP_WORK_MIN + ' minutes.</p>') +
+    '<h3 style="margin:16px 0 2px;font-size:17px">✅ Achieved the lesson expectations (' + achieved.length + ')</h3>' +
+    (achieved.length ? tbl(["Student", "Tasks", "Active work"], achieved.map(x => row([h(x.s.name) + (topSet[x.s.name] ? ' 🏠' : '') + (lv(x.s) ? ' <span style="color:#5B6782;font-size:12.5px">· ' + h(lv(x.s)) + '</span>' : ''), x.s.tasks, x.s.mins + ' min'])).join("")) : '<p style="margin:4px 0 12px">None this lesson.</p>') +
+    '<h3 style="margin:16px 0 2px;font-size:17px">⚠️ Working below expectation: please encourage next lesson (' + below.length + ')</h3>' +
+    (below.length ? tbl(["Student", "Why", "Tasks"], below.map(x => row([h(x.s.name), h(x.why.join("; ")), x.s.tasks], "#FFF7E8")).join("")) : '<p style="margin:4px 0 12px">Everyone met the expectations. Well done!</p>') +
+    '<p style="color:#5B6782;font-size:12.5px;margin-top:10px">Expectations: at least ' + HP_WORK_MIN + ' minutes of active work and at least half as many new tasks as the middle of the class. House Points go to the top 5 by new tasks weighted by difficulty (Python Beginner ×1, Intermediate ×1.5, Advanced ×3; Design/IT practice ×1, criterion submitted ×2, strand ×3).</p>' +
+    '<p><a href="' + SITE + 'admin.html" style="color:#DC2B3E;font-weight:bold">Open your class on the staff dashboard</a></p>' +
+    '<p style="margin-top:14px">Regards,<br>Mr. Ahmed</p></div>';
+}
 function hpTick(){
   const lock = LockService.getScriptLock(); if (!lock.tryLock(5000)) return;
   try {
@@ -485,6 +541,11 @@ function hpTick(){
       if (MailApp.getRemainingDailyQuota() < 2) return;
       MailApp.sendEmail({ to: HP_TO, name: "SISD Design and Computing", subject: "🏠 House Points top 5: " + hpLabel_(L.cls) + " · " + Utilities.formatDate(new Date(L.start), "Asia/Dubai", "EEE d MMM HH:mm"), htmlBody: hpEmail_(L) });
       sent[L.key] = now;
+      // the same lesson's summary for the class teacher, from Mr. Ahmed
+      const te = hpTeachers_()[hpSurname_(L.cls.teacher)];
+      if (te && te !== HP_REPLY_TO && hpCanCopy_() && MailApp.getRemainingDailyQuota() > 1){
+        try { MailApp.sendEmail({ to: te, name: HP_FROM_NAME, replyTo: HP_REPLY_TO, subject: "Lesson summary and House Points: " + hpLabel_(L.cls) + " · " + Utilities.formatDate(new Date(L.start), "Asia/Dubai", "EEE d MMM HH:mm"), htmlBody: hpTeacherEmail_(L, rows) }); } catch(err){}
+      }
     });
     Object.keys(sent).forEach(k => { if (now - sent[k] > 7 * 86400000) delete sent[k]; });   // keep a week
     P.setProperty("HP_SENT", JSON.stringify(sent));

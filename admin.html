@@ -578,7 +578,7 @@ function paintSetup(){
   $("sheetMsg").innerHTML = sheetId(sheetLink()) ? `<div class="notice ok">Connected.</div>` : `<div class="notice warn">Not connected yet: the House Points, Students and Sign-in log tabs need this.</div>`;
   $("notifyMsg").innerHTML = parseForm(load(NOTIFY_KEY, "")) ? `<div class="notice ok">Connected: lesson emails will be sent.</div>` : `<div class="notice warn">Not connected yet: lesson results show here but can't be emailed.</div>`;
   $("hpWarn").innerHTML = !sheetId(sheetLink()) ? `<div class="notice warn">Connect your log sheet in <b>Setup</b> first.</div>`
-    : HPSRV && HPSRV.on ? `<div class="notice ok"><b>✓ Automatic emails are on.</b> The top 5 of every lesson is emailed to ${esc(HPSRV.to || "you")} about 15 minutes after the class goes quiet, even when this page is closed.${HPSRV.last ? " Last check " + esc(fmtT(HPSRV.last)) + "." : ""}</div>`
+    : HPSRV && HPSRV.on ? `<div class="notice ok"><b>✓ Automatic emails are on.</b> The top 5 of every lesson is emailed to ${esc(HPSRV.to || "you")} about 15 minutes after the class goes quiet, even when this page is closed.${HPSRV.last ? " Last check " + esc(fmtT(HPSRV.last)) + "." : ""}${HPSRV.teachers != null ? (HPSRV.teacherCopies ? ` Each class teacher (${HPSRV.teachers} with a school email) also gets their class summary from Mr. Ahmed.` : " Class teachers' copies are off: the email script must run on your school account.") : " To send each class teacher their summary too, update the email script (Setup → copy the script, paste it into Apps Script, then Deploy → Manage deployments → Edit → New version)."}</div>`
     : HPSRV && HPSRV.reason ? `<div class="notice warn"><b>Automatic emails are not on yet</b> (${esc(HPSRV.reason === "trigger" ? "the email script needs your permission" : HPSRV.reason === "unknown" || HPSRV.reason === "owner" ? "the email script needs updating" : HPSRV.reason)}). Update the email script once: open it in Apps Script, paste the new <b>verify-script.gs</b>, then <b>Deploy → Manage deployments → ✏️ → Version: New version → Deploy</b> and allow access. Until then, emails go out only while this page is open.</div>`
     : !parseForm(load(NOTIFY_KEY, "")) ? `<div class="notice warn">Emails are off until you add the alerts form in <b>Setup</b>. Results still appear below.</div>` : "";
 }
@@ -768,7 +768,9 @@ let HPSRV = null, hpAsked = 0;
 async function hpServer(){
   if (!isSuper() || !SDC.jsonp || !SDC.VERIFY.url) return;
   const id = sheetId(sheetLink()); if (!id) return;
-  try { HPSRV = await SDC.jsonp(Date.now() - hpAsked > 30 * 60000 || !(HPSRV && HPSRV.on) ? { a:"hpsetup", sheet:id } : { a:"hpstatus" }, 25000); hpAsked = Date.now(); }
+  // approved teachers' school emails, so each class teacher gets their own lesson summary from Mr. Ahmed
+  const tm = {}; ((STATE && STATE.teachers) || []).forEach(t => { if (t && t.name && /@sisd\.ae$/i.test(String(t.email || ""))) tm[t.name] = String(t.email).toLowerCase(); });
+  try { HPSRV = await SDC.jsonp(Date.now() - hpAsked > 30 * 60000 || !(HPSRV && HPSRV.on) ? { a:"hpsetup", sheet:id, tm: JSON.stringify(tm) } : { a:"hpstatus" }, 25000); hpAsked = Date.now(); }
   catch(e){ HPSRV = HPSRV && HPSRV.on ? HPSRV : { reason:"unreachable" }; }
   if (HPSRV && HPSRV.ok === false && !HPSRV.reason) HPSRV.reason = "error";
   paintSetup();
