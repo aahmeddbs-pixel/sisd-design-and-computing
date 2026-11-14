@@ -1573,11 +1573,13 @@ function renderStudy(){
   const pc = v => `<span class="pill ${v >= 70 ? "ok" : v >= 50 ? "warn" : "bad"}">${v}%</span>`, mm = s => Math.round(s / 60) + " min";
   $("spBody").innerHTML = people.map(p => {
     const latest = {};   // newest report per topic (first attempt), plus retries
-    p.reps.forEach(r => { const d = r.study, k = d.sid + "/" + d.tid; if (!d.retry && (!latest[k] || latest[k].when < r.when)) latest[k] = Object.assign({ when:r.when }, d); });
-    const L = Object.values(latest), secs = Object.values(p.reps.reduce((m, r) => { const d = r.study, k = d.sid + "/" + d.tid; m[k] = Math.max(m[k] || 0, +d.secs || 0); return m; }, {})).reduce((a, b) => a + b, 0);
+    p.reps.forEach(r => { const d = r.study, k = d.sid + "/" + d.tid; if (!d.retry && (+d.round || 1) === 1 && (!latest[k] || latest[k].when < r.when)) latest[k] = Object.assign({ when:r.when }, d); });
+    const setKey = d => d.sid + "/" + d.tid + "#" + (+d.round || 1), sets = p.reps.filter(r => !r.study.retry && (+r.study.round || 1) > 1), newSets = new Set(sets.map(r => setKey(r.study))).size;
+    const setAvg = sets.length ? Math.round(sets.reduce((a, r) => a + (+r.study.score || 0), 0) / sets.length) : 0;
+    const L = Object.values(latest), secs = Object.values(p.reps.reduce((m, r) => { const d = r.study, k = setKey(d); m[k] = Math.max(m[k] || 0, +d.secs || 0); return m; }, {})).reduce((a, b) => a + b, 0);
     const avg = f => L.length ? Math.round(L.reduce((a, d) => a + (+d[f] || 0), 0) / L.length) : 0;
     const subj = {}; L.forEach(d => { const s = subj[d.sid] = subj[d.sid] || { name:d.subject, n:0, score:0, effort:0, secs:0 }; s.n++; s.score += +d.score || 0; s.effort += +d.effort || 0; });
-    Object.keys(subj).forEach(k => { subj[k].secs = Object.entries(p.reps.reduce((m, r) => { const d = r.study; if (d.sid === k){ const t = d.tid; m[t] = Math.max(m[t] || 0, +d.secs || 0); } return m; }, {})).reduce((a, [, v]) => a + v, 0); });
+    Object.keys(subj).forEach(k => { subj[k].secs = Object.entries(p.reps.reduce((m, r) => { const d = r.study; if (d.sid === k){ const t = setKey(d); m[t] = Math.max(m[t] || 0, +d.secs || 0); } return m; }, {})).reduce((a, [, v]) => a + v, 0); });
     const rows = Object.keys(ST).map(k => { const s = subj[k]; const tot = ST[k].topics.length;
       return `<tr><td><b>${esc(ST[k].name)}</b></td><td>${s ? s.n : 0} / ${tot}</td><td>${s ? mm(s.secs) : "—"}</td><td>${s ? pc(Math.round(s.score / s.n)) : "—"}</td><td>${s ? pc(Math.round(s.effort / s.n)) : "—"}</td></tr>`; }).join("");
     const recent = p.reps.slice().sort((a, b) => b.when - a.when).slice(0, 25).map(r => { const d = r.study;
@@ -1587,7 +1589,7 @@ function renderStudy(){
     return `<div class="card" style="margin-top:12px;box-shadow:none">
       <div class="row" style="justify-content:space-between"><div><h2 style="font-size:1.1rem">${esc(p.name)}</h2><div class="muted small">${esc(p.email)} · last active ${p.last ? esc(fmtDT(p.last)) : "—"} · opened Study Plus ${p.opens} time(s)</div></div></div>
       <div class="row" style="margin-top:10px;gap:8px">
-        <span class="pill">⏱ ${mm(secs)} active work</span><span class="pill">📚 ${L.length} / ${total} topics</span><span class="pill">🎯 Avg score ${avg("score")}%</span><span class="pill">💪 Avg effort ${avg("effort")}%</span></div>
+        <span class="pill">⏱ ${mm(secs)} active work</span><span class="pill">📚 ${L.length} / ${total} topics</span><span class="pill">🎯 Avg score ${avg("score")}%</span><span class="pill">💪 Avg effort ${avg("effort")}%</span>${newSets ? `<span class="pill">✦ ${newSets} challenge set(s) done · avg ${setAvg}%</span>` : ""}</div>
       <div class="scroll" style="margin-top:10px"><table class="tbl"><tr><th>Subject</th><th>Topics done</th><th>Work time</th><th>Avg score</th><th>Avg effort</th></tr>${rows}</table></div>
       <h3 style="margin-top:14px;font-size:1rem">Recent sections</h3>
       <div class="scroll" style="margin-top:6px"><table class="tbl"><tr><th>When</th><th>Topic</th><th>Score</th><th>Effort</th><th>Work time</th><th>Strengths and gaps</th></tr>${recent || `<tr><td colspan="6" class="muted">No finished topics yet.</td></tr>`}</table></div>

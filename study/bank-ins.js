@@ -1,0 +1,88 @@
+/* Study Plus · Individuals and Societies · question bank for new challenge sets (d: 1 Core, 2 Extended, 3 Challenge). */
+(function(S){
+  const P = (id, L) => { const t = S.ins && S.ins.topics.find(x => x.id === id); if (t) t.pool = (t.pool || []).concat(L); };
+  P("maps", [
+    { d:1, k:"mcq", q:"Which direction is opposite to north-east?", o:["South-west","South-east","North-west","East"], a:0, x:"Opposite directions are 180° apart: NE ↔ SW." },
+    { d:1, k:"mcq", q:"What does a map key (legend) show?", o:["What the symbols mean","The scale only","The title","Who drew it"], a:0, x:"The key explains each symbol and colour on the map." },
+    { d:1, k:"mcq", q:"Lines of latitude run…", o:["East–west, measuring distance north or south of the Equator","North–south through the poles","Only in the oceans","Along roads"], a:0, x:"Latitude lines are parallel to the Equator (0°)." },
+    { d:2, k:"mcq", q:"On a grid reference like 345 672, which number comes first?", o:["Eastings (along the corridor)","Northings (up the stairs)","Height","Scale"], a:0, x:"'Along the corridor, then up the stairs': eastings first, then northings." },
+    { d:2, k:"mcq", q:"On a contour map, lines very close together show…", o:["Steep slopes","Flat land","A river","A town"], a:0, x:"Contours join points of equal height. Close lines = height changes quickly = steep." },
+    { d:2, k:"mcq", q:"What is the Prime Meridian?", o:["0° longitude, through Greenwich in London","0° latitude","The Tropic of Cancer","The International Date Line"], a:0, x:"Longitude is measured east or west of the Prime Meridian at 0°." },
+    { d:2, k:"mcq", q:"Which line of latitude passes close to the UAE?", o:["The Tropic of Cancer (about 23.5° N)","The Equator","The Arctic Circle","The Tropic of Capricorn"], a:0, x:"The UAE lies just south of the Tropic of Cancer, at roughly 22–26° N." },
+    { d:3, k:"mcq", q:"Why does every map projection distort something?", o:["You can't flatten a sphere without stretching size, shape or distance","Mapmakers are careless","The Earth is flat","Satellites are inaccurate"], a:0, x:"The Mercator projection keeps shapes for navigation but makes Greenland look as big as Africa." },
+    { d:3, k:"mcq", q:"A six-figure grid reference is more useful than a four-figure one because…", o:["It pinpoints a location within a grid square","It is shorter","It shows height","It shows the scale"], a:0, x:"Four figures identify a whole square; six figures locate a point to within about 100 m." },
+    { d:3, k:"mcq", q:"What is GIS?", o:["A computer system that layers and analyses data on maps","A type of compass","A paper atlas","A weather balloon"], a:0, x:"Geographic Information Systems combine map layers (roads, population, flood risk) to answer questions." }
+  ]);
+  P("climate", [
+    { d:1, k:"mcq", q:"What is the difference between weather and climate?", o:["Weather is day to day; climate is the average over many years","They are the same","Climate is day to day","Weather lasts 30 years"], a:0, x:"Climate is usually the average weather over 30 years or more." },
+    { d:1, k:"mcq", q:"Which instrument measures rainfall?", o:["Rain gauge","Thermometer","Barometer","Anemometer"], a:0, x:"A rain gauge collects and measures precipitation (in mm)." },
+    { d:1, k:"mcq", q:"Which instrument measures temperature?", o:["Thermometer","Barometer","Rain gauge","Wind vane"], a:0, x:"A thermometer measures temperature in °C." },
+    { d:2, k:"mcq", q:"What does an anemometer measure?", o:["Wind speed","Air pressure","Humidity","Temperature"], a:0, x:"Anemometer = wind speed. Barometer = pressure. Hygrometer = humidity." },
+    { d:2, k:"mcq", q:"Why is it usually colder at the top of a mountain?", o:["The air is thinner and holds less heat","It is closer to the Sun","There is more wind only","Snow creates cold"], a:0, x:"Temperature falls by about 6.5 °C for every 1000 m you climb." },
+    { d:2, k:"mcq", q:"Why are places near the Equator hotter?", o:["The Sun's rays hit more directly and are more concentrated","They are closer to the Sun","They have more sea","They have fewer clouds always"], a:0, x:"At high latitudes the same sunlight spreads over a larger area and passes through more atmosphere." },
+    { d:2, k:"tf", q:"True or false: the greenhouse effect is natural and keeps the Earth warm enough for life.", a:true, x:"Without it Earth would be about −18 °C. The problem is the enhanced greenhouse effect from extra gases." },
+    { d:3, k:"mcq", q:"Which human activity adds most to the enhanced greenhouse effect?", o:["Burning fossil fuels","Planting trees","Using solar power","Recycling"], a:0, x:"Burning coal, oil and gas releases carbon dioxide." },
+    { d:3, k:"mcq", q:"Why do coastal areas have milder temperatures than inland areas?", o:["The sea heats up and cools down more slowly than land","The sea is always cold","Coasts get more sun","There's no wind at the coast"], a:0, x:"Water has a high heat capacity, so it moderates nearby temperatures." },
+    { d:3, k:"mcq", q:"What is a climate graph made of?", o:["Bars for rainfall and a line for temperature, by month","A pie chart of seasons","A map of winds","A list of storms"], a:0, x:"Climate graphs show monthly average rainfall (bars) and temperature (line)." }
+  ]);
+  P("civilisations", [
+    { d:1, k:"mcq", q:"Which river was essential to Ancient Egypt?", o:["The Nile","The Thames","The Amazon","The Tigris"], a:0, x:"The Nile's yearly flood left fertile soil for farming." },
+    { d:1, k:"mcq", q:"What is a primary source?", o:["Something created at the time being studied","A modern textbook","A film made today","An encyclopaedia"], a:0, x:"Primary sources come from the time: letters, objects, photographs, diaries." },
+    { d:1, k:"mcq", q:"Mesopotamia lay between which two rivers?", o:["Tigris and Euphrates","Nile and Congo","Indus and Ganges","Yellow and Yangtze"], a:0, x:"Mesopotamia means 'land between the rivers' (in modern Iraq)." },
+    { d:2, k:"mcq", q:"What was cuneiform?", o:["An early writing system using wedge-shaped marks on clay","An Egyptian tomb","A Roman road","A type of boat"], a:0, x:"Cuneiform was developed in Sumer (Mesopotamia), one of the earliest writing systems." },
+    { d:2, k:"mcq", q:"Why did early civilisations grow up beside rivers?", o:["Water for drinking, farming and transport","Rivers kept them cold","To avoid trade","Rivers had no floods"], a:0, x:"Rivers gave water, fertile soil, fish and an easy way to move goods." },
+    { d:2, k:"mcq", q:"What were the pyramids of Giza built as?", o:["Tombs for pharaohs","Markets","Schools","Palaces for living in"], a:0, x:"The pyramids were royal tombs, built around 4500 years ago." },
+    { d:2, k:"mcq", q:"Which ancient civilisation is famous for planned cities such as Mohenjo-daro?", o:["Indus Valley","Aztec","Viking","Roman"], a:0, x:"Indus Valley cities had grid streets and drains, about 4500 years ago." },
+    { d:3, k:"mcq", q:"Why should historians compare several sources?", o:["To check reliability and reduce bias","Because one source is always false","To make essays longer","Sources never disagree"], a:0, x:"Comparing sources helps spot bias, gaps and agreement (corroboration)." },
+    { d:3, k:"mcq", q:"What is a significant reason the Code of Hammurabi matters?", o:["It is one of the earliest written sets of laws","It was the first map","It describes the pyramids","It is a religious text"], a:0, x:"Hammurabi's Babylonian law code (about 1750 BCE) set out rules and punishments in writing." },
+    { d:3, k:"mcq", q:"The site of Umm an-Nar near Abu Dhabi shows that, about 4500 years ago, people in the UAE…", o:["Traded copper and goods with Mesopotamia and the Indus","Had no contact with others","Built pyramids","Used cuneiform"], a:0, x:"Archaeology at Umm an-Nar shows tombs and trade links: copper from the region reached Mesopotamia." }
+  ]);
+  P("trade", [
+    { d:1, k:"mcq", q:"What is an export?", o:["A good sold to another country","A good bought from another country","A tax","A type of ship"], a:0, x:"Exports go out; imports come in." },
+    { d:1, k:"mcq", q:"Which animal was famous for carrying goods across Silk Road deserts?", o:["Camel","Horse only","Elephant","Donkey only"], a:0, x:"Bactrian camels could survive long desert journeys." },
+    { d:1, k:"mcq", q:"Silk first came along the Silk Road from…", o:["China","England","Brazil","Australia"], a:0, x:"China kept the secret of silk-making for centuries." },
+    { d:2, k:"mcq", q:"Besides goods, what else travelled along the Silk Road?", o:["Ideas, religions, technologies and diseases","Only silk","Nothing else","Only gold"], a:0, x:"Paper-making, Islam and Buddhism, and even the plague spread along trade routes." },
+    { d:2, k:"mcq", q:"What is a caravanserai?", o:["A roadside inn where traders and their animals could rest","A type of tax","A ship","A coin"], a:0, x:"Caravanserais were built along routes to shelter travelling merchants." },
+    { d:2, k:"mcq", q:"What is a trade surplus?", o:["When a country exports more than it imports","When it imports more than it exports","When it has no trade","A tax on imports"], a:0, x:"Surplus = exports > imports. Deficit = imports > exports." },
+    { d:2, k:"mcq", q:"Why are Dubai and Jebel Ali important today?", o:["They are major ports and trade hubs linking East and West","They are farming areas","They have no ships","They only export snow"], a:0, x:"Jebel Ali is one of the world's busiest ports, continuing the region's trading tradition." },
+    { d:3, k:"mcq", q:"Why did sea routes eventually replace much of the overland Silk Road?", o:["Ships could carry more goods more cheaply","Camels disappeared","The desert moved","Sea routes were shorter on land"], a:0, x:"Large ships carried bigger cargoes at lower cost than caravans." },
+    { d:3, k:"mcq", q:"What is interdependence in trade?", o:["Countries rely on each other for goods and services","A country makes everything itself","Trade stops","Only one country benefits"], a:0, x:"Global trade links countries so they depend on one another." },
+    { d:3, k:"mcq", q:"What is 'fair trade'?", o:["Trade that pays producers a fair price and supports good working conditions","Free goods","Trade with no rules","Trading only with neighbours"], a:0, x:"Fair trade schemes aim to give farmers and workers in poorer countries a fairer deal." }
+  ]);
+  P("population", [
+    { d:1, k:"mcq", q:"What is population density?", o:["The number of people per km²","The total number of people","The birth rate","The size of a country"], a:0, x:"Density = people ÷ area." },
+    { d:1, k:"mcq", q:"What is migration?", o:["Moving from one place to live in another","Being born","Visiting for a holiday","Counting people"], a:0, x:"Migration is moving to live somewhere else, inside a country or between countries." },
+    { d:1, k:"mcq", q:"Which is a 'pull factor' for migrants?", o:["Better jobs","War","Drought","Unemployment"], a:0, x:"Pull factors attract people to a place. Push factors make them leave." },
+    { d:2, k:"mcq", q:"What is a population pyramid?", o:["A graph showing the age and sex structure of a population","A pyramid in Egypt","A map of cities","A list of births"], a:0, x:"Bars show the percentage of males and females in each age group." },
+    { d:2, k:"mcq", q:"What is a megacity?", o:["A city with more than 10 million people","Any capital city","A city by the sea","A very old city"], a:0, x:"Megacities have over 10 million people, such as Tokyo, Delhi and Cairo." },
+    { d:2, k:"mcq", q:"Why are deserts usually sparsely populated?", o:["Little water and extreme heat make farming and living hard","They are too green","There are too many jobs","They are too cold always"], a:0, x:"Physical factors (water, climate, relief) strongly affect where people live." },
+    { d:2, k:"mcq", q:"Why does the UAE's population pyramid have many more men aged 25–45?", o:["Many male migrant workers came for jobs","There are more births of boys","Women live shorter lives","It is a counting error"], a:0, x:"Labour migration, especially in construction, has shaped the UAE's population structure." },
+    { d:3, k:"mcq", q:"A pyramid with a wide base and narrow top shows…", o:["High birth rate and lower life expectancy","An ageing population","Very few children","Equal numbers at all ages"], a:0, x:"A wide base means many children; a narrow top means fewer people reach old age." },
+    { d:3, k:"mcq", q:"What problem does an ageing population cause?", o:["Fewer workers supporting more retired people","Too many schools","Too many babies","More young workers"], a:0, x:"The dependency ratio rises: more pensions and healthcare paid for by fewer workers." },
+    { d:3, k:"mcq", q:"What is 'brain drain'?", o:["When skilled, educated people leave a country to work elsewhere","A disease","Young people moving to farms","A fall in birth rate"], a:0, x:"Brain drain can slow development because the country loses doctors, engineers and teachers." }
+  ]);
+  P("uae", [
+    { d:1, k:"mcq", q:"Which emirate is the largest by area?", o:["Abu Dhabi","Dubai","Sharjah","Fujairah"], a:0, x:"Abu Dhabi covers about 85% of the UAE's land." },
+    { d:1, k:"mcq", q:"What are the colours of the UAE flag?", o:["Red, green, white and black","Blue, white and red","Green and white only","Red and yellow"], a:0, x:"The UAE flag has a vertical red band and green, white and black horizontal stripes." },
+    { d:1, k:"mcq", q:"On which date is UAE National Day?", o:["2 December","1 January","15 August","10 March"], a:0, x:"The UAE was formed on 2 December 1971." },
+    { d:2, k:"mcq", q:"Before oil, which industry was very important along the UAE coast?", o:["Pearl diving","Car making","Coal mining","Rice farming"], a:0, x:"Pearling, fishing and trade were central until the 1930s, when cultured pearls collapsed the market." },
+    { d:2, k:"mcq", q:"Who is known as the Founding Father of the UAE?", o:["Sheikh Zayed bin Sultan Al Nahyan","Sheikh Rashid bin Saeed","Sheikh Saqr","Sheikh Khalifa"], a:0, x:"Sheikh Zayed was the UAE's first President." },
+    { d:2, k:"mcq", q:"Which emirate is on the east coast, facing the Gulf of Oman?", o:["Fujairah","Dubai","Abu Dhabi","Ajman"], a:0, x:"Fujairah is the only emirate entirely on the east coast." },
+    { d:2, k:"mcq", q:"What is a falaj (aflaj)?", o:["An ancient irrigation channel system","A type of boat","A desert fort","A traditional dance"], a:0, x:"Aflaj, such as those in Al Ain, bring underground water to farms and are UNESCO-listed." },
+    { d:3, k:"mcq", q:"Which emirate joined the UAE in February 1972, after the others?", o:["Ras Al Khaimah","Sharjah","Fujairah","Ajman"], a:0, x:"Six emirates formed the UAE in December 1971; Ras Al Khaimah joined on 10 February 1972." },
+    { d:3, k:"mcq", q:"Why is the UAE investing in solar parks like Mohammed bin Rashid Al Maktoum Solar Park?", o:["To diversify energy and reduce reliance on oil and gas","Because it has no sun","To stop tourism","Because oil is free"], a:0, x:"Plentiful sunshine and plans for a low-carbon future make solar a key part of diversification." },
+    { d:3, k:"mcq", q:"What is a barjeel?", o:["A traditional wind tower that cools buildings","A fishing net","A sweet","A coin"], a:0, x:"Wind towers catch breezes and push cooler air down into homes, as in Al Fahidi (Bastakiya)." }
+  ]);
+  P("economics", [
+    { d:1, k:"mcq", q:"What is 'spending'?", o:["Money going out to buy goods and services","Money coming in","Money kept in a bank","A type of tax"], a:0, x:"Spending (expenditure) is money paid out." },
+    { d:1, k:"mcq", q:"What is a budget?", o:["A plan for how to spend and save money","A type of bank","A shop","A loan"], a:0, x:"A budget compares income with spending so you can plan." },
+    { d:1, k:"mcq", q:"What is income?", o:["Money coming in","Money going out","A shop receipt","A tax"], a:0, x:"Income is money received, such as pocket money or wages." },
+    { d:2, k:"mcq", q:"What is opportunity cost?", o:["The next best thing you give up when you choose","The price on the label","A discount","A tax"], a:0, x:"If you spend on a film, the opportunity cost might be the book you could have bought." },
+    { d:2, k:"mcq", q:"What is scarcity?", o:["Wants are unlimited but resources are limited","Everything is free","There are too many resources","Prices never change"], a:0, x:"Scarcity forces choices: what to produce, how and for whom." },
+    { d:2, k:"mcq", q:"If many people want a toy but there are few, the price usually…", o:["Rises","Falls","Stays at zero","Disappears"], a:0, x:"High demand and low supply push prices up." },
+    { d:2, k:"mcq", q:"What is interest on savings?", o:["Extra money the bank pays you for keeping money there","A fee to open an account","A tax","A loan"], a:0, x:"Banks pay interest to savers. Borrowers pay interest on loans." },
+    { d:3, k:"mcq", q:"What is inflation?", o:["A general rise in prices over time","Prices falling","Wages doubling","A new currency"], a:0, x:"With inflation, the same money buys less than before." },
+    { d:3, k:"num", q:"You save 1000 AED at 5% simple interest per year. How much interest do you earn in 3 years, in AED?", a:150, x:"5% of 1000 = 50 AED per year. × 3 years = 150 AED." },
+    { d:3, k:"mcq", q:"Why might a government tax sugary drinks?", o:["To reduce consumption and raise money for health","To make them cheaper","To stop all trade","To increase sugar use"], a:0, x:"A tax raises the price, reducing demand, and the money can fund public services." }
+  ]);
+})(window.STUDY = window.STUDY || {});

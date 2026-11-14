@@ -17,3 +17,9 @@ One sign-in page for SISD's Computer Science (Python Pathways), Design and IT co
 - 7 MYP 2 subjects (Maths, English, Science, I&S, Islamic, French, Arabic), 50 topics, 572 auto-marked tasks (Core, Extended, Challenge) in `study/*.js` and `study/plus-*.js`. Each topic: key knowledge pop-up, tasks, Check, explanation pop-up (even when right), self-rating, corrections and "Fix my mistakes".
 - Active work time only (stops after 60 s idle or when the page is hidden). Effort = 60% score + 20% tasks finished + 20% focus.
 - Each finished topic logs to the teacher log (super admin → ✦ Study Plus tab) and emails aahmed.dbs@gmail.com via `verify-script.gs` (needs the script redeployed once).
+
+### Study Plus: saved everywhere, and a new challenge set every visit
+- Progress is saved on the device and, locked (AES-256, key made from the student's Computer Science secret), as scrambled "Y" rows in the sync sheet. Signing in on any computer loads it; each topic keeps whichever copy changed most recently.
+- Question bank: `study/bank-*.js` adds 456 new questions (Core / Extended / Challenge) that are not in Set 1. `study/gen.js` makes brand-new questions with fresh numbers for every Maths topic and for Science (forces, matter, cells, energy), I&S (maps, population, economics) and French numbers. Banks are append-only: saved sets point at question positions.
+- Every new sign-in (or after 4 hours away), each finished topic gets its next set of 8: up to 2 review questions on last set's gaps (asked a different way), then new questions ordered Core → Challenge. The level moves up 0.5 (85%+), up 0.25 (65–84%), stays (50–64%) or drops 0.5 (under 50%). Students can also start a new set straight away.
+- All earlier sets stay reviewable under 📚 My sets. Reports show "Set N (level)" in the super admin tab and the Gmail report.
