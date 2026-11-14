@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SISD Study Plus UK · Year 8 and Year 10</title>
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<meta name="robots" content="noindex,nofollow">
+<script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
+<script src="sdc.js?v=20261113ef"></script>
+<script src="study/gen.js?v=20261114b"></script>
+<script src="uk/gen.js?v=20261114b"></script>
+<script src="uk/y8.js?v=20261114b"></script>
+<script src="uk/y10.js?v=20261114b"></script>
+<style>
+:root{
+  --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
+  --ok:#1E8A55; --okbg:#E3F4EA; --warn:#8A4B00; --warnbg:#FFF2DC; --bad:#A3172A; --badbg:#FBE5E8; --r:14px;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0E1626; --card:#16213A; --ink:#E7ECF6; --muted:#9AA7C2; --line:#2A3858; --soft:#1D2A47; --okbg:#143326; --ok:#47C487; --warnbg:#3A2C10; --warn:#F0B44C; --badbg:#3E1820; --bad:#FF8A98; color-scheme:dark}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 Arial,Helvetica,sans-serif;min-height:100vh}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+:focus-visible{outline:3px solid var(--red);outline-offset:2px}
+/* top bar */
+.top{background:var(--navy);color:#fff;border-bottom:4px solid var(--red);position:sticky;top:0;z-index:20}
+.top .in{max-width:1080px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.logo{background:var(--red);border-radius:7px;padding:3px 9px;font-weight:900;letter-spacing:.06em;font-size:.88rem}
+.brand{font-weight:900;font-size:1.1rem}
+.brand small{display:block;font-weight:400;font-size:.72rem;opacity:.75;letter-spacing:.06em;text-transform:uppercase}
+.top .sp{flex:1}
+.top select{background:var(--navy-d);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:999px;padding:6px 12px;font-weight:700;font-size:.9rem;max-width:100%}
+.top .ghost{background:none;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:6px 12px;color:#fff;font-weight:700;font-size:.9rem}
+.clock{font-family:Menlo,Consolas,monospace;font-size:.85rem;background:rgba(255,255,255,.12);border-radius:999px;padding:4px 10px;font-variant-numeric:tabular-nums}
+main{max-width:1080px;margin:0 auto;padding:22px 16px 60px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;box-shadow:0 2px 10px rgba(11,33,73,.06)}
+h1{font-size:clamp(1.5rem,3.6vw,2.1rem);font-weight:900;line-height:1.15}
+h2{font-size:1.25rem;font-weight:900}
+.muted{color:var(--muted)}
+.small{font-size:.88rem}
+.eyebrow{font-size:.75rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--red)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.stack{display:flex;flex-direction:column;gap:14px}
+.btn{border:none;border-radius:10px;padding:11px 18px;background:var(--navy);color:#fff;font-weight:800;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{filter:brightness(1.1)}
+.btn.red{background:var(--red)}
+.btn.ok{background:var(--ok)}
+.btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.btn.sm{padding:7px 12px;font-size:.88rem}
+.btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
+.back{background:none;border:none;color:var(--muted);font-weight:800;padding:0;margin-bottom:12px}
+/* hero + home */
+.hero{background:linear-gradient(135deg,var(--navy) 60%,var(--red));color:#fff;border-radius:var(--r);padding:24px;display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center}
+@media(max-width:700px){.hero{grid-template-columns:1fr}}
+.hero p{opacity:.92;margin-top:8px;max-width:60ch}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;min-width:280px}
+@media(max-width:700px){.stats{min-width:0}}
+.stat{background:rgba(0,0,0,.2);border-radius:10px;padding:10px;text-align:center}
+.stat b{display:block;font-size:1.35rem;font-variant-numeric:tabular-nums}
+.stat span{font-size:.72rem;opacity:.85;text-transform:uppercase;letter-spacing:.06em}
+.pick{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:18px}
+@media(max-width:820px){.pick{grid-template-columns:1fr}}
+.choice{text-align:left;border:2px solid var(--line);background:var(--card);border-radius:var(--r);padding:16px;display:flex;gap:12px;align-items:center}
+.choice:hover{border-color:var(--navy)}
+.choice.here{border-color:var(--red)}
+.choice .ic{width:48px;height:48px;border-radius:12px;display:grid;place-items:center;font-weight:900;color:#fff;background:var(--navy);flex:none;font-size:1.2rem}
+.choice.here .ic{background:var(--red)}
+.choice b{display:block;font-size:1.05rem}
+.subjects{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-top:14px}
+.subj{text-align:left;border:1px solid var(--line);background:var(--card);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:10px;border-top:5px solid var(--c,var(--navy));transition:transform .12s,box-shadow .12s}
+.subj:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(11,33,73,.12)}
+.subj .top2{display:flex;gap:10px;align-items:center}
+.subj .ic{width:42px;height:42px;border-radius:10px;display:grid;place-items:center;color:#fff;font-weight:900;background:var(--c,var(--navy));flex:none}
+.subj b{font-size:1.05rem}
+.bar{height:7px;background:var(--soft);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ok);width:0;transition:width .4s}
+/* topics */
+.topics{display:grid;gap:10px;margin-top:14px}
+.topic{display:flex;gap:12px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:14px}
+.topic:hover{border-color:var(--navy)}
+.topic .n{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:900;background:var(--soft);flex:none}
+.topic.done .n{background:var(--ok);color:#fff}
+.topic .meta{margin-left:auto;text-align:right;font-size:.85rem;color:var(--muted);white-space:nowrap}
+.pill{display:inline-block;border-radius:999px;padding:2px 9px;font-size:.78rem;font-weight:800;background:var(--soft)}
+.pill.ok{background:var(--okbg);color:var(--ok)} .pill.warn{background:var(--warnbg);color:var(--warn)} .pill.bad{background:var(--badbg);color:var(--bad)}
+select.big{border:2px solid var(--line);background:var(--card);border-radius:10px;padding:10px 12px;width:100%;max-width:520px;font-weight:700}
+/* task */
+.qhead{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}
+.dots{display:flex;gap:5px;flex-wrap:wrap}
+.dots i{width:22px;height:8px;border-radius:9px;background:var(--soft);border:1px solid var(--line)}
+.dots i.cur{border-color:var(--navy);background:var(--line)}
+.dots i.r{background:var(--ok);border-color:var(--ok)} .dots i.w{background:var(--red);border-color:var(--red)}
+.q{font-size:1.2rem;font-weight:800;line-height:1.4;white-space:pre-line}
+.opts{display:grid;gap:8px}
+.opt{text-align:left;border:2px solid var(--line);background:var(--card);border-radius:10px;padding:12px 14px;font-size:1.05rem}
+.opt:hover:not(:disabled){border-color:var(--navy)}
+.opt[aria-pressed=true]{border-color:var(--navy);background:var(--soft)}
+.opt.right{border-color:var(--ok);background:var(--okbg)} .opt.wrong{border-color:var(--bad);background:var(--badbg)}
+.opt:disabled{cursor:default}
+.ans{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ans .pre{font-weight:800;font-size:1.1rem}
+.ans input{border:2px solid var(--line);background:var(--card);border-radius:10px;padding:11px 12px;font-size:1.1rem;width:min(320px,100%)}
+.ans input.right{border-color:var(--ok)} .ans input.wrong{border-color:var(--bad)}
+.verdict{border-radius:12px;padding:12px 14px;font-weight:700}
+.verdict.ok{background:var(--okbg);color:var(--ok)} .verdict.bad{background:var(--badbg);color:var(--bad)}
+.rate{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media(max-width:520px){.rate{grid-template-columns:1fr}}
+.rate button{border:2px solid var(--line);background:var(--card);border-radius:10px;padding:10px;font-weight:800}
+.rate button[aria-pressed=true]{border-color:var(--navy);background:var(--navy);color:#fff}
+.rtl{direction:rtl;unicode-bidi:plaintext}
+[dir=auto]{unicode-bidi:plaintext}
+/* knowledge + modal */
+.ideas{margin:10px 0 0 20px;display:grid;gap:6px}
+.example{background:var(--soft);border-left:4px solid var(--red);border-radius:0 10px 10px 0;padding:12px 14px;white-space:pre-line;font-family:inherit;margin-top:12px}
+.modal-bg{position:fixed;inset:0;background:rgba(8,15,30,.6);display:grid;place-items:center;padding:16px;z-index:60}
+.modal{background:var(--card);border-radius:var(--r);max-width:620px;width:100%;max-height:88vh;overflow:auto;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,.35)}
+.modal h3{font-size:1.2rem;font-weight:900}
+.modal{position:relative}
+.xclose{position:sticky;top:0;float:right;margin:-8px -8px 6px 10px;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:1.15rem;font-weight:900;display:grid;place-items:center;z-index:2;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.xclose:hover{background:var(--soft)}
+.lvl{display:inline-block;border-radius:999px;padding:2px 10px;font-size:.75rem;font-weight:900;letter-spacing:.03em;margin-left:6px;vertical-align:middle}
+.lvl.l1{background:var(--okbg);color:var(--ok)} .lvl.l2{background:var(--warnbg);color:var(--warn)} .lvl.l3{background:var(--badbg);color:var(--bad)}
+.dots i.c3{outline:2px solid var(--red);outline-offset:1px}
+.agree{display:flex;gap:10px;align-items:flex-start;font-weight:700;cursor:pointer;margin-top:14px}
+.agree input{width:20px;height:20px;accent-color:var(--red);flex:none;margin-top:2px}
+/* summary */
+.sumgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media(max-width:700px){.sumgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.sum{background:var(--soft);border-radius:12px;padding:12px;text-align:center}
+.sum b{display:block;font-size:1.6rem;font-variant-numeric:tabular-nums}
+.sum span{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:700px){.two{grid-template-columns:1fr}}
+.list{margin:8px 0 0 18px;display:grid;gap:6px}
+.fix{border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:6px}
+.fix .q{font-size:1rem}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;z-index:70;font-weight:700;max-width:calc(100% - 32px)}
+.pill.new{background:var(--red);color:#fff}
+.lvl.rv{background:var(--soft);color:var(--ink);border:1px dashed var(--muted)}
+.newsets{border-left:6px solid var(--red)}
+.next-set{background:var(--soft);border-radius:12px;padding:12px 14px;border-left:4px solid var(--ok)}
+.setrow{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+#sync{font-family:inherit;font-size:.8rem}
+.yearhead{display:flex;align-items:center;gap:10px;margin-top:4px}
+.yearhead .yr{background:var(--navy);color:#fff;border-radius:10px;padding:6px 12px;font-weight:900}
+.login{max-width:520px;margin:30px auto}
+.login label{display:block;font-weight:800;margin-top:12px}
+.login input{width:100%;border:2px solid var(--line);background:var(--card);border-radius:10px;padding:11px 12px;font-size:1.05rem;margin-top:6px}
+.login .err{color:var(--bad);font-weight:700;margin-top:10px;min-height:1.2em}
+.login h3{margin-top:18px;font-size:1rem;text-transform:none}
+.foot{text-align:center;color:var(--muted);font-size:.82rem;margin-top:30px}
+</style>
+</head>
+<body>
+<header class="top"><div class="in">
+  <span class="logo">SISD</span><span class="brand">Study Plus UK<small id="whoLine">Year 8 and Year 10</small></span>
+  <span class="sp"></span>
+  <span class="clock hidden" id="sync" aria-live="polite"></span>
+  <span class="clock hidden" id="clock" title="Active work time on this topic">⏱ 00:00</span>
+  <select id="switcher" aria-label="Switch course"></select>
+  <button class="ghost" id="outBtn">Sign out</button>
+</div></header>
+<main id="app"></main>
+<p class="foot">Swiss International Scientific School Dubai · Study Plus UK · National Curriculum in England: Year 8 (KS3) and Year 10 (GCSE)</p>
+<div id="modalRoot"></div>
+
+<script>
+/* ---------- sign-in: the shared class login, then each student's own name and PIN (keeps their progress separate) ---------- */
+(function(){
+"use strict";
+const AUTH = "uk_auth", LOGIN_HASH = "755ccb1541fd4f6f2eefd7ba703d45bba156e836aaaa96d72f0b6a2bb26136fd";
+const $ = id => document.getElementById(id), TE = new TextEncoder();
+const hex = async t => [...new Uint8Array(await crypto.subtle.digest("SHA-256", TE.encode(t)))].map(v => v.toString(16).padStart(2, "0")).join("");
+let a = null; try { a = JSON.parse(sessionStorage.getItem(AUTH) || "null"); } catch(e){}
+if (a && a.key && a.pin){ window.UK_AUTH = a; return; }
+window.UK_AUTH = null;
+$("switcher").classList.add("hidden"); $("outBtn").classList.add("hidden");
+let last = ""; try { last = (JSON.parse(localStorage.getItem("uk_last") || "{}").name) || ""; } catch(e){}
+$("app").innerHTML = `<div class="card login">
+  <div class="eyebrow">Study Plus UK · Year 8 and Year 10</div><h1 style="margin-top:4px">Sign in</h1>
+  <p class="muted small" style="margin-top:6px">Maths, Biology, Chemistry and Physics practice following the National Curriculum in England. Your progress is saved, so you can carry on from any computer.</p>
+  <form id="lf" autocomplete="off">
+    <h3>1. Class login</h3>
+    <label>Username<input id="lu" autocapitalize="off" spellcheck="false" placeholder="Username"></label>
+    <label>Password<input id="lp" type="password" placeholder="Password"></label>
+    <h3>2. About you</h3>
+    <label>Your first name<input id="ln" maxlength="30" value="${last.replace(/"/g, "")}" placeholder="e.g. Aisha"></label>
+    <label>Your 4-digit PIN<input id="lk" type="password" inputmode="numeric" maxlength="4" placeholder="••••"></label>
+    <p class="muted small" style="margin-top:6px">First time? Make up a 4-digit PIN and remember it. Use the same first name and PIN every time to get your saved work back.</p>
+    <div class="err" id="le" role="alert"></div>
+    <button class="btn red" id="loginBtn" type="submit" style="margin-top:8px;width:100%;justify-content:center">Start studying →</button>
+  </form></div>`;
+const err = m => { $("le").textContent = m; const b = $("loginBtn"); b.disabled = false; b.textContent = "Start studying →"; };
+$("lf").onsubmit = async e => {
+  e.preventDefault(); $("le").textContent = "";
+  const u = $("lu").value.toLowerCase().replace(/\s+/g, ""), p = $("lp").value.toLowerCase().replace(/\s+/g, "");
+  const name = $("ln").value.trim().replace(/\s+/g, " "), pin = $("lk").value.trim();
+  if (!(window.crypto && crypto.subtle)) return err("Open this page from its https:// link to sign in.");
+  if ((await hex("uk-login|" + u + "|" + p)) !== LOGIN_HASH) return err("That username or password isn't right. Check with your teacher.");
+  if (!/^[\p{L}' -]{2,30}$/u.test(name)) return err("Type your first name (letters only).");
+  if (!/^\d{4}$/.test(pin)) return err("Your PIN must be exactly 4 digits.");
+  const b = $("loginBtn"); b.disabled = true; b.textContent = "Checking…";
+  const key = name.toLowerCase(), pid = (await hex("uk-profile|" + key)).slice(0, 32), ph = (await hex("uk-pin|" + key + "|" + pin)).slice(0, 40);
+  /* a name already in use must come with its own PIN, so students can't open each other's work */
+  let known = null; try { known = JSON.parse(localStorage.getItem("uk_pins") || "{}"); } catch(e){ known = {}; }
+  let rows = null;
+  try { if (window.SDC && SDC.rows) rows = await Promise.race([SDC.rows("Z", pid, 10), new Promise(r => setTimeout(() => r(null), 9000))]); } catch(e){ rows = null; }
+  const hashes = (rows || []).map(r => String(r.text)).concat(known[key] ? [known[key]] : []);
+  if (hashes.length && hashes.indexOf(ph) < 0) return err("That PIN doesn't match the name " + name + ". Check both, or ask your teacher.");
+  if (!hashes.length && window.SDC && SDC.sendRow){ try { SDC.sendRow("Z", pid, ph); SDC.flush(); } catch(e){} }
+  known[key] = ph; try { localStorage.setItem("uk_pins", JSON.stringify(known)); localStorage.setItem("uk_last", JSON.stringify({ name })); } catch(e){}
+  sessionStorage.setItem(AUTH, JSON.stringify({ name, key, pin, at: Date.now() }));
+  try { sessionStorage.removeItem("uk_study_sess"); } catch(e){}
+  location.reload();
+};
+setTimeout(() => { try { (last ? $("lu") : $("lu")).focus(); } catch(e){} }, 50);
+})();
+</script>
+<script>
+(function(){
+"use strict";
+const $ = id => document.getElementById(id), esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const S = window.UK || {}, ORDER = ["y8maths","y8biology","y8chemistry","y8physics","y10maths","y10biology","y10chemistry","y10physics"].filter(k => S[k]);
+const YEARS = [8, 10], STAGE = { 8:"Key Stage 3", 10:"GCSE (Key Stage 4)" }, subjLabel = s => S[s].name;
+ORDER.forEach(k => { if (!S[k].short){ S[k].short = S[k].name; S[k].name = "Year " + S[k].year + " " + S[k].name; } });
+const IDLE_MS = 60000, FOCUS_SEC_PER_TASK = 40, SET_SIZE = 8;
+const GEN = window.UK_GEN || { make(){ return null; }, has(){ return false; } };
+
+/* ---------- who is signed in (the sign-in script above set UK_AUTH) ---------- */
+const AUTHD = window.UK_AUTH; if (!AUTHD) return;
+const G = null;
+const ACCT = { course:"uk", name: "Mahaira20 · " + AUTHD.name, email:"" };
+const FIRST = AUTHD.name.split(/\s+/)[0];
+$("whoLine").textContent = AUTHD.name + " · Year 8 and Year 10";
+
+/* ---------- a "session" = one sign-in. Coming back after signing out (or after 4 hours away) starts a new one,
+   and every new session sets up the next challenge set for each finished topic. ---------- */
+const SESS_KEY = "uk_study_sess", SESS_GAP = 4 * 3600000;
+const SESS = (() => { let o = null; try { o = JSON.parse(sessionStorage.getItem(SESS_KEY) || "null"); } catch(e){}
+  if (!o || !o.id || Date.now() - (o.at || 0) > SESS_GAP) o = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7), at: Date.now(), fresh: true };
+  try { sessionStorage.setItem(SESS_KEY, JSON.stringify({ id:o.id, at:Date.now() })); } catch(e){} return o; })();
+const touchSess = () => { try { sessionStorage.setItem(SESS_KEY, JSON.stringify({ id:SESS.id, at:Date.now() })); } catch(e){} };
+
+/* ---------- saved progress: on this device, and a private locked copy online so it follows the student to any computer ---------- */
+const KEY = "uk_study_" + AUTHD.key.replace(/[^\w:@.-]/g, "_");
+let DB = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e){ return {}; } })();
+DB.topics = DB.topics || {}; DB.reports = DB.reports || [];
+const SNAP = {};   // last saved copy of each topic, to know which topics changed (each topic carries its own "u" = last changed)
+const isEmpty = o => !o.read && !o.ms && !Object.keys(o.ans || {}).length && !(o.rounds && o.rounds.length);
+function topicJSON(o){ const u = o.u; delete o.u; const j = JSON.stringify(o); if (u != null) o.u = u; return j; }
+function snapAll(){ Object.keys(DB.topics).forEach(k => SNAP[k] = topicJSON(DB.topics[k])); }
+function stamp(){ const now = Date.now();
+  Object.keys(DB.topics).forEach(k => { const o = DB.topics[k], j = topicJSON(o); if (SNAP[k] !== j){ if (!isEmpty(o)) o.u = now; SNAP[k] = j; } }); }
+snapAll();
+function save(){ try { stamp(); DB.updatedAt = Date.now(); touchSess(); localStorage.setItem(KEY, JSON.stringify(DB)); } catch(e){} Cloud.later(); }
+const tkey = (s, t) => s + "/" + t;
+function tstate(s, t){ const k = tkey(s, t); return DB.topics[k] = DB.topics[k] || { i:0, ans:{}, ms:0, read:false, done:false, runs:0 }; }
+function topicOf(s, t){ return (S[s].topics || []).find(x => x.id === t); }
+
+/* ---------- the online copy: locked (AES-256) with a key made from the class login and the student's own name and PIN.
+   Only a scrambled ID and locked text reach the sync sheet: no names, emails or answers can be read there. ---------- */
+const Cloud = (() => {
+  const TE = new TextEncoder(), C = { on:false, ids:[], pushedAt:0, first:0, timer:null, state:"local", busy:null };
+  const hex = u8 => [...u8].map(v => v.toString(16).padStart(2, "0")).join("");
+  const sha = async t => new Uint8Array(await crypto.subtle.digest("SHA-256", TE.encode(t)));
+  const b64 = u8 => { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+  const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  const pipe = async (u8, st) => new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(st)).arrayBuffer());
+  const canZip = typeof CompressionStream === "function" && typeof DecompressionStream === "function";
+  async function secrets(){ return ["uk|mahaira20|" + AUTHD.key + "|" + AUTHD.pin]; }
+  async function idFor(sec){ const raw = await sha("sdc-study-key|" + sec);
+    return { id: hex(await sha("sdc-study-id|" + sec)).slice(0, 32), key: await crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]) }; }
+  async function seal(k, text){ let body = TE.encode(text), flag = 0; if (canZip){ body = await pipe(body, new CompressionStream("gzip")); flag = 1; }
+    const iv = crypto.getRandomValues(new Uint8Array(12)), ct = new Uint8Array(await crypto.subtle.encrypt({ name:"AES-GCM", iv }, k, body));
+    const out = new Uint8Array(13 + ct.length); out[0] = flag; out.set(iv, 1); out.set(ct, 13); return b64(out); }
+  async function open(k, s){ const u = unb64(s), iv = u.slice(1, 13); let body = new Uint8Array(await crypto.subtle.decrypt({ name:"AES-GCM", iv }, k, u.slice(13)));
+    if (u[0] === 1) body = await pipe(body, new DecompressionStream("gzip")); return JSON.parse(new TextDecoder().decode(body)); }
+  function show(state){ C.state = state; const el = $("sync"); if (!el) return;
+    const T = { local:["💾 Saved on this computer", "Your progress is saved on this computer."],
+      loading:["☁ Loading your progress…", "Getting your saved progress"], saving:["☁ Saving…", "Saving your progress online"],
+      saved:["☁ Saved", "Your progress is saved online: sign in on any computer to carry on"], offline:["☁ Will save when online", "No connection: your work is kept here and saved online as soon as you're back online"] }[state] || ["", ""];
+    el.textContent = T[0]; el.title = T[1]; el.classList.remove("hidden"); }
+  async function init(){ if (!(window.crypto && crypto.subtle) || !SDC.sendRow || !SDC.rows) { show("local"); return false; }
+    try { const L = await secrets(); for (const s of L) C.ids.push(await idFor(s)); } catch(e){}
+    C.on = C.ids.length > 0; show(C.on ? "loading" : "local"); return C.on; }
+  /* newest complete copy under each ID (big copies are split into parts) */
+  async function pull(){ const got = [];
+    for (const c of C.ids){ let rows = []; try { rows = await SDC.rows("Y", c.id, 40); } catch(e){ continue; }
+      const sets = {}; rows.forEach(r => { const p = String(r.text).split("."); if (p.length !== 5 || p[0] !== "s1") return; const v = p[1], g = sets[v] = sets[v] || { n:+p[3], parts:{} }; g.parts[+p[2]] = p[4]; });
+      const vers = Object.keys(sets).sort((a, b) => +b - +a);
+      for (const v of vers){ const g = sets[v]; if (Object.keys(g.parts).length !== g.n) continue;
+        try { got.push(await open(c.key, Array.from({ length:g.n }, (_, i) => g.parts[i]).join(""))); break; } catch(e){} } }
+    return got; }
+  async function push(){ if (!C.on || C.busy) return C.busy; clearTimeout(C.timer); C.timer = null; C.first = 0;
+    if ((DB.updatedAt || 0) <= C.pushedAt) { show(navigator.onLine === false ? "offline" : "saved"); return; }
+    const at = DB.updatedAt;
+    C.busy = (async () => { try { show("saving");
+      const text = await seal(C.ids[0].key, JSON.stringify({ v:1, updatedAt:at, topics:DB.topics, reports:DB.reports.slice(-60) }));
+      const ver = String(Date.now()), parts = []; for (let i = 0; i < text.length; i += 30000) parts.push(text.slice(i, i + 30000));
+      parts.forEach((p, i) => SDC.sendRow("Y", C.ids[0].id, ["s1", ver, i, parts.length, p].join(".")));
+      try { SDC.flush(); } catch(e){}
+      C.pushedAt = at; show(navigator.onLine === false ? "offline" : "saved");
+    } catch(e){ show("offline"); } finally { C.busy = null; } })();
+    return C.busy; }
+  /* save online a little after a change (at most every 90 seconds while working), so the sheet isn't flooded */
+  function later(){ if (!C.on) return; const now = Date.now(); if (!C.first) C.first = now;
+    if (now - C.first > 90000) return push();
+    clearTimeout(C.timer); C.timer = setTimeout(push, 15000); }
+  return { init, pull, push, later, show, get on(){ return C.on; } };
+})();
+/* bring in a copy from another computer: each topic keeps whichever copy was changed most recently */
+function mergeIn(R){
+  if (!R || !R.topics) return 0; let n = 0;
+  Object.keys(R.topics).forEach(k => { const a = DB.topics[k], b = R.topics[k]; if (!b) return;
+    if (!a || isEmpty(a) || (b.u || 0) > (a.u || 0)){ if (JSON.stringify(a) !== JSON.stringify(b)){ DB.topics[k] = b; SNAP[k] = topicJSON(b); n++; } } });
+  const have = new Set(DB.reports.map(r => r.at + "|" + r.tid + "|" + (r.round || 1)));
+  (R.reports || []).forEach(r => { const k = r.at + "|" + r.tid + "|" + (r.round || 1); if (!have.has(k)){ have.add(k); DB.reports.push(r); } });
+  DB.reports.sort((a, b) => a.at - b.at); while (DB.reports.length > 300) DB.reports.shift();
+  DB.updatedAt = Math.max(DB.updatedAt || 0, R.updatedAt || 0);
+  if (n) Object.keys(TC).forEach(k => delete TC[k]);
+  return n;
+}
+
+/* ---------- sets: Set 1 is the topic's own tasks. Sets 2, 3, 4 … are built automatically from the question bank
+   and the question generators, levelled up or down from how the student did in the set before. ---------- */
+const TC = {};   // built tasks for each set (not saved: rebuilt from the set's recipe)
+function runsOf(s, t){ const st = tstate(s, t); return 1 + ((st.rounds && st.rounds.length) || 0); }
+function run(s, t, r){
+  const st = tstate(s, t), T = topicOf(s, t); r = r || runsOf(s, t);
+  if (r <= 1 || !st.rounds || !st.rounds[r - 2]) return { r:1, o:st, tasks:T.tasks, refs:T.tasks.map((_, i) => ({ s:"b", i })) };
+  const o = st.rounds[r - 2], ck = s + "/" + t + "/" + r + "/" + o.seed;
+  return { r, o, tasks: TC[ck] = TC[ck] || o.refs.map(ref => resolve(s, t, ref)), refs:o.refs };
+}
+function resolve(s, t, ref){
+  const T = topicOf(s, t); let b = null;
+  if (ref.s === "g") b = GEN.make(s + "/" + t, ref.d || 1, ref.g);
+  else b = ((ref.s === "p" ? T.pool : T.tasks) || [])[ref.i];
+  if (!b) b = T.tasks[ref.i % T.tasks.length] || T.tasks[0];
+  if (ref.v && b.k === "mcq" && b.o){
+    const j = ref.v === 1 ? b.a : (ref.j != null && ref.j !== b.a && b.o[ref.j] != null ? ref.j : (b.a + 1) % b.o.length), yes = j === b.a;
+    return { d: b.d || 1, k:"tf", q:`True or false?\n${b.q}\nAnswer: ${b.o[j]}`, a: yes, x: (yes ? "True. " : "False. The right answer is: " + b.o[b.a] + ". ") + b.x, review: !!ref.rv };
+  }
+  return ref.rv ? Object.assign({}, b, { review:true }) : b;
+}
+function rnd(seed){ let a = seed >>> 0 || 1; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+/* how many Core / Extended / Challenge questions for a target level between 1 and 3 */
+const MIX = { "1":[5,3,0], "1.25":[4,3,1], "1.5":[3,4,1], "1.75":[2,4,2], "2":[2,3,3], "2.25":[1,3,4], "2.5":[1,2,5], "2.75":[0,3,5], "3":[0,2,6] };
+function mixFor(lv, n){ const m = MIX[String(Math.round(lv * 4) / 4)] || MIX["1.5"]; const c = m.map(v => Math.round(v * n / 8)); let d = n - c.reduce((a, b) => a + b, 0); c[1] += d; if (c[1] < 0){ c[2] += c[1]; c[1] = 0; } return c; }
+const LVL_NAME = lv => lv < 1.5 ? "Core" : lv < 2.25 ? "Extended" : "Challenge";
+function buildRound(s, t){
+  const st = tstate(s, t), T = topicOf(s, t), pool = T.pool || [], gk = s + "/" + t, hasGen = GEN.has(gk);
+  st.rounds = st.rounds || [];
+  const last = run(s, t), sc = runScore(s, t, last.r).score, A = analysis(s, t, last.r);
+  const step = sc >= 85 ? .5 : sc >= 65 ? .25 : sc >= 50 ? 0 : -.5;
+  const lv = Math.max(1, Math.min(3, (st.lv != null ? st.lv : 1.5) + step)); st.lv = lv;
+  const seed = (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0, R = rnd(seed), shuffle = L => { const a = L.slice(); for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(R() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const usedP = new Set(), lastSeen = {}, lastOk = {};
+  for (let r = 1; r <= runsOf(s, t); r++){ const X = run(s, t, r); X.refs.forEach((ref, i) => { if (ref.s === "p") usedP.add(ref.i); if (ref.s !== "g"){ const k = ref.s + ref.i; lastSeen[k] = r; const a = X.o.ans[i]; if (a) lastOk[k] = !!a.ok; } }); }
+  const refs = [];
+  /* 1. review: up to two questions they got wrong or weren't sure about last time, asked a different way */
+  A.gaps.slice(0, 2).forEach(i => { const ref = last.refs[i], b = last.tasks[i]; if (!ref || !b) return;
+    if (ref.s === "g") refs.push({ s:"g", d: ref.d || b.d || 1, g:(seed + i * 7919) >>> 0, rv:1 });
+    else { const base = ((ref.s === "p" ? pool : T.tasks) || [])[ref.i] || b;
+      if (base.k === "mcq" && base.o) refs.push({ s:ref.s, i:ref.i, v: R() < .5 ? 1 : 2, j: Math.floor(R() * base.o.length), rv:1 });
+      else if (hasGen && (base.k === "num" || base.k === "text")) refs.push({ s:"g", d: base.d || 1, g:(seed + i * 7919) >>> 0, rv:1 });   // same skill, fresh numbers
+      else refs.push({ s:ref.s, i:ref.i, rv:1 }); } });
+  /* 2. new questions, levelled: unseen bank questions first, fresh generated ones, then older ones asked a new way */
+  const need = mixFor(lv, SET_SIZE - refs.length), lvOf = x => x.d || 1, taken = new Set();
+  [1, 2, 3].forEach(d => { let n = need[d - 1]; if (!n) return;
+    const fresh = shuffle(pool.map((x, i) => i).filter(i => !usedP.has(i) && !taken.has(i) && lvOf(pool[i]) === d));
+    const fromPool = hasGen ? Math.min(fresh.length, Math.ceil(n / 2)) : Math.min(fresh.length, n);
+    fresh.slice(0, fromPool).forEach(i => { taken.add(i); refs.push({ s:"p", i }); }); n -= fromPool;
+    if (n && hasGen) for (let k = 0; k < n; k++) refs.push({ s:"g", d, g:(seed + (d * 101 + k) * 2654435761) >>> 0 });
+    else if (n){
+      const near = shuffle(pool.map((x, i) => i).filter(i => !usedP.has(i) && !taken.has(i) && Math.abs(lvOf(pool[i]) - d) === 1));
+      near.slice(0, n).forEach(i => { taken.add(i); refs.push({ s:"p", i }); }); n -= Math.min(n, near.length);
+      if (n){ const old = shuffle(pool.map((x, i) => ({ s:"p", i, x })).concat(T.tasks.map((x, i) => ({ s:"b", i, x }))).filter(c => lvOf(c.x) === d || n > 0))
+          .filter(c => !refs.some(r => r.s === c.s && r.i === c.i))
+          .sort((a, b) => ((lastOk[a.s + a.i] ? 1 : 0) - (lastOk[b.s + b.i] ? 1 : 0)) || (Math.abs(lvOf(a.x) - d) - Math.abs(lvOf(b.x) - d)) || ((lastSeen[a.s + a.i] || 0) - (lastSeen[b.s + b.i] || 0)));
+        old.slice(0, n).forEach(c => refs.push(c.x.k === "mcq" && c.x.o ? { s:c.s, i:c.i, v: R() < .5 ? 1 : 2, j: Math.floor(R() * c.x.o.length) } : { s:c.s, i:c.i })); }
+    } });
+  /* easiest first, so each set climbs in challenge; review questions open the set */
+  const lvl = ref => ref.s === "g" ? ref.d : lvOf(((ref.s === "p" ? pool : T.tasks) || [])[ref.i] || {});
+  const ordered = refs.filter(r => r.rv).concat(refs.filter(r => !r.rv).sort((a, b) => lvl(a) - lvl(b)));
+  const o = { n: st.rounds.length + 2, seed, lv, refs: ordered, ans:{}, retry:{}, i:0, done:false, ms:0, at: Date.now(), sess: SESS.id, from: sc };
+  st.rounds.push(o); return o;
+}
+/* every time the student comes back: each finished topic gets its next set, ready and waiting */
+function ensureRounds(){
+  const made = [];
+  ORDER.forEach(s => S[s].topics.forEach(T => { const k = tkey(s, T.id), st = DB.topics[k]; if (!st || !st.done) return;
+    const X = run(s, T.id); if (!X.o.done || X.o.doneSess === SESS.id) return;
+    if (!X.tasks.every((_, i) => X.o.ans[i] && X.o.ans[i].rate)) return;
+    buildRound(s, T.id); made.push({ s, t:T.id }); }));
+  return made;
+}
+
+/* ---------- active work timer: counts only while the page is open, visible and being used ---------- */
+let lastAct = Date.now(), working = null;
+["keydown","pointerdown","input","change","wheel","touchstart"].forEach(ev => window.addEventListener(ev, () => lastAct = Date.now(), { capture:true, passive:true }));
+const fmt = ms => { const s = Math.floor(ms / 1000), m = Math.floor(s / 60); return (m >= 60 ? Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0") : String(m).padStart(2, "0")) + ":" + String(s % 60).padStart(2, "0"); };
+const mins = ms => Math.round(ms / 60000);
+setInterval(() => {
+  if (!working || document.hidden || Date.now() - lastAct > IDLE_MS) return;
+  const o = run(working.s, working.t, working.r).o; o.ms = (o.ms || 0) + 1000; $("clock").textContent = "⏱ " + fmt(o.ms);
+  if (o.ms % 5000 === 0) save();
+}, 1000);
+document.addEventListener("visibilitychange", () => { save(); if (document.hidden) Cloud.push(); });
+window.addEventListener("pagehide", () => { save(); Cloud.push(); });
+window.addEventListener("online", () => Cloud.push());
+async function saveNow(){ save(); try { await Promise.race([Cloud.push(), new Promise(r => setTimeout(r, 2500))]); } catch(e){} }
+
+/* ---------- switcher: home, Year 8, Year 10 ---------- */
+function paintSwitcher(){ $("switcher").innerHTML = `<option value="">Go to ▾</option><option value="home">Home</option><option value="8">Year 8 subjects</option><option value="10">Year 10 subjects</option>`; $("switcher").value = ""; }
+$("switcher").onchange = e => { const to = e.target.value; e.target.value = ""; if (!to) return; go({ v:"home" }); if (to !== "home") setTimeout(() => { const el = $("year" + to); if (el) el.scrollIntoView({ behavior:"smooth" }); }, 50); };
+$("outBtn").onclick = async () => { stopWork(); await saveNow(); try { sessionStorage.removeItem(SESS_KEY); sessionStorage.removeItem("uk_auth"); } catch(e){} location.reload(); };
+
+/* ---------- marking ---------- */
+const strip = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "");
+const clean = s => String(s || "").toLowerCase().replace(/[’`]/g, "'").replace(/[−–]/g, "-").replace(/\s+/g, " ").trim().replace(/[.!]$/, "").replace(/\s*([(),])\s*/g, "$1");
+function toNum(v){ const t = String(v || "").trim().replace(/[−–—]/g, "-").replace(/\s/g, "").replace(/,(\d{1,2})$/, ".$1").replace(/,/g, "").replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[a-z%°²³]+$/i, ""); if (!/^-?\d*\.?\d+$/.test(t)) return NaN; return parseFloat(t); }
+function mark(task, given){
+  if (task.k === "mcq") return { ok: given === task.a };
+  if (task.k === "tf") return { ok: given === task.a };
+  if (task.k === "num"){ const n = toNum(given); return { ok: !isNaN(n) && Math.abs(n - task.a) <= (task.tol || 1e-9), blank: String(given || "").trim() === "", bad: isNaN(n) }; }
+  if (task.k === "text"){
+    let g = clean(given); const pre = clean(task.prefix || ""); if (pre && g.startsWith(pre)) g = g.slice(pre.length).trim();
+    g = g.replace(/\s*\/\s*/g, "/");
+    const acc = task.a.map(clean);
+    if (acc.indexOf(g) >= 0) return { ok:true };
+    if (acc.map(strip).indexOf(strip(g)) >= 0) return { ok:true, accent:true };
+    return { ok:false, blank: g === "" };
+  }
+  return { ok:false };
+}
+function rightText(task){
+  if (task.k === "mcq") return task.o[task.a];
+  if (task.k === "tf") return task.a ? "True" : "False";
+  if (task.k === "num") return String(task.a);
+  if (task.k === "text") return (task.prefix || "") + (task.best || task.a[0]);
+  return "";
+}
+function givenText(task, g){
+  if (task.k === "mcq") return g == null ? "" : task.o[g];
+  if (task.k === "tf") return g == null ? "" : g ? "True" : "False";
+  return String(g == null ? "" : g);
+}
+
+/* ---------- scores (per set) ---------- */
+function runScore(s, t, r){
+  const X = run(s, t, r), o = X.o, n = X.tasks.length;
+  let right = 0, answered = 0, need = 0, unsure = 0, got = 0;
+  X.tasks.forEach((_, i) => { const a = o.ans[i]; if (!a) return; answered++; if (a.ok) right++; if (a.rate === 3) need++; if (a.rate === 2) unsure++; if (a.rate === 1) got++; });
+  const score = n ? Math.round(right / n * 100) : 0, completion = n ? answered / n : 0, ms = o.ms || 0;
+  const focus = Math.min(1, (ms / 1000) / (Math.max(1, answered) * FOCUS_SEC_PER_TASK));
+  const effort = Math.round(100 * (0.6 * (score / 100) + 0.2 * completion + 0.2 * focus));
+  const lv = {}; X.tasks.forEach((tk, i) => { const d = lvlOf(tk), q = lv[d] = lv[d] || { n:0, right:0 }; q.n++; if (o.ans[i] && o.ans[i].ok) q.right++; });
+  return { n, right, answered, score, effort, focus: Math.round(focus * 100), need, unsure, got, ms, lv, r: X.r };
+}
+const topicScore = (s, t) => runScore(s, t, 1);
+function topicMs(s, t){ const st = tstate(s, t); return (st.ms || 0) + (st.rounds || []).reduce((a, o) => a + (o.ms || 0), 0); }
+function subjectProgress(s){ const T = S[s].topics; const done = T.filter(t => tstate(s, t.id).done).length; return { done, total: T.length, pct: Math.round(done / T.length * 100) }; }
+function totals(){
+  let ms = 0, done = 0, sets = 0, sc = 0, n = 0, waiting = [];
+  Object.keys(DB.topics).forEach(k => { const [s, t] = k.split("/"); if (!S[s] || !topicOf(s, t)) return; const st = DB.topics[k];
+    ms += topicMs(s, t); if (st.done) done++;
+    for (let r = 1; r <= runsOf(s, t); r++){ const X = run(s, t, r); if (X.o.done){ sets++; sc += runScore(s, t, r).score; n++; } }
+    const X = run(s, t); if (X.r > 1 && !X.o.done && !Object.keys(X.o.ans).length) waiting.push({ s, t, r:X.r }); });
+  return { ms, done, sets, avg: n ? Math.round(sc / n) : 0, waiting };
+}
+
+/* ---------- views ---------- */
+let VIEW = { v:"home" };
+function go(v){ VIEW = v; stopWork(); render(); window.scrollTo(0, 0); }
+function stopWork(){ working = null; $("clock").classList.add("hidden"); }
+function startWork(s, t, r){ working = { s, t, r }; lastAct = Date.now(); $("clock").classList.remove("hidden"); $("clock").textContent = "⏱ " + fmt(run(s, t, r).o.ms || 0); }
+function render(){
+  if (VIEW.v === "home") return renderHome();
+  if (VIEW.v === "subject") return renderSubject();
+  if (VIEW.v === "topic") return renderTopic();
+  if (VIEW.v === "summary") return renderSummary();
+  if (VIEW.v === "sets") return renderSets();
+  if (VIEW.v === "review") return renderReview();
+}
+
+function renderHome(){
+  const T = totals();
+  $("app").innerHTML = `
+  <section class="hero">
+    <div><div class="eyebrow" style="color:#FFB3BC">National Curriculum in England</div><h1>Hi ${esc(FIRST)}, what will you work on?</h1>
+      <p>Practise <b>Maths, Biology, Chemistry and Physics</b> for <b>Year 8</b> (Key Stage 3) and <b>Year 10</b> (GCSE). Each topic starts with the key knowledge, then questions you check and rate yourself on. Every time you come back, finished topics get a new set of questions: harder when you're ready, and focused on what you got wrong.</p></div>
+    <div class="stats"><div class="stat"><b>${fmt(T.ms)}</b><span>Work time</span></div><div class="stat"><b>${T.done}</b><span>Topics done</span></div><div class="stat"><b>${T.sets}</b><span>Sets done</span></div></div>
+  </section>
+  ${T.waiting.length ? `<div class="card newsets" style="margin-top:14px"><h2>✦ ${T.waiting.length} new challenge set${T.waiting.length > 1 ? "s are" : " is"} ready</h2>
+    <p class="muted small" style="margin-top:2px">New questions on topics you've finished, set at the right level for you. Your earlier sets are saved and you can review them any time.</p>
+    <div class="row" style="margin-top:10px">${T.waiting.slice(0, 12).map(w => `<button class="btn sm ghost" data-w="${w.s}|${w.t}" style="border-left:5px solid ${S[w.s].colour}">${esc(S[w.s].icon)} ${esc(S[w.s].name)}: ${esc(topicOf(w.s, w.t).title)} · Set ${w.r}</button>`).join("")}${T.waiting.length > 12 ? `<span class="muted small">and ${T.waiting.length - 12} more in your subjects</span>` : ""}</div></div>` : ""}
+  ${YEARS.map(y => `<div class="card" style="margin-top:18px" id="year${y}">
+    <div class="yearhead"><span class="yr">Year ${y}</span><div><h2>${esc(STAGE[y])}</h2><p class="muted small">${y === 8 ? "KS3 programmes of study for mathematics and science" : "GCSE Mathematics and GCSE Combined Science (AQA Trilogy, Paper 1 topics)"}</p></div></div>
+    <div class="subjects">${ORDER.filter(s => S[s].year === y).map(s => { const P = subjectProgress(s), w = T.waiting.filter(x => x.s === s).length; return `<button class="subj" data-s="${s}" style="--c:${S[s].colour}">
+      <span class="top2"><span class="ic">${esc(S[s].icon)}</span><span><b>${esc(S[s].short)}</b><br><span class="muted small">${P.done} of ${P.total} topics done</span></span></span>
+      <span class="muted small">${esc(S[s].blurb)}</span>${w ? `<span class="pill new">✦ ${w} new set${w > 1 ? "s" : ""}</span>` : ""}<span class="bar"><i style="width:${P.pct}%"></i></span></button>`; }).join("")}</div>
+  </div>`).join("")}`;
+  $("app").querySelectorAll("[data-s]").forEach(b => b.onclick = () => go({ v:"subject", s:b.dataset.s }));
+  $("app").querySelectorAll("[data-w]").forEach(b => b.onclick = () => { const [s, t] = b.dataset.w.split("|"); openTopic(s, t); });
+}
+
+function renderSubject(){
+  const s = VIEW.s, SUB = S[s];
+  $("app").innerHTML = `<button class="back" id="bk">← All subjects</button>
+  <div class="card stack" style="border-top:6px solid ${SUB.colour}">
+    <div><div class="eyebrow">Year ${SUB.year} · ${esc(STAGE[SUB.year])}</div><h1>${esc(SUB.name)}</h1><p class="muted">${esc(SUB.blurb)}</p></div>
+    <label class="small" style="font-weight:800">Jump to a topic
+      <select class="big" id="topicSel" style="margin-top:6px"><option value="">Choose a topic…</option>${SUB.topics.map((t, i) => `<option value="${t.id}">${i + 1}. ${esc(t.title)}${tstate(s, t.id).done ? " ✓" : ""}</option>`).join("")}</select></label>
+    <div class="topics">${SUB.topics.map((t, i) => { const st = tstate(s, t.id), X = run(s, t.id), sc = runScore(s, t.id, X.r);
+      let meta;
+      if (X.r > 1 && !X.o.done) meta = sc.answered ? `<span class="pill warn">Set ${X.r} · ${sc.answered}/${sc.n}</span><br>${esc(LVL_NAME(X.o.lv))}` : `<span class="pill new">✦ Set ${X.r} ready</span><br>${esc(LVL_NAME(X.o.lv))} level`;
+      else if (X.o.done) meta = `<span class="pill ${sc.score >= 70 ? "ok" : sc.score >= 50 ? "warn" : "bad"}">${X.r > 1 ? "Set " + X.r + ": " : ""}${sc.score}%</span><br>${fmt(topicMs(s, t.id))}`;
+      else meta = sc.answered ? `<span class="pill warn">In progress</span><br>${sc.answered}/${sc.n}` : `${t.tasks.length} tasks`;
+      return `<button class="topic ${st.done ? "done" : ""}" data-t="${t.id}"><span class="n">${st.done ? "✓" : i + 1}</span><span><b>${esc(t.title)}</b><br><span class="muted small">${esc(t.strand)}${runsOf(s, t.id) > 1 ? " · " + runsOf(s, t.id) + " sets" : ""}</span></span><span class="meta">${meta}</span></button>`; }).join("")}</div>
+  </div>`;
+  $("bk").onclick = () => go({ v:"home" });
+  $("topicSel").onchange = e => { if (e.target.value) openTopic(s, e.target.value); };
+  $("app").querySelectorAll("[data-t]").forEach(b => b.onclick = () => openTopic(s, b.dataset.t));
+}
+function allRated(X){ return X.tasks.every((_, i) => X.o.ans[i] && X.o.ans[i].rate); }
+function openTopic(s, t){
+  const st = tstate(s, t), X = run(s, t);
+  if (X.o.done && allRated(X)) return go({ v:"summary", s, t, r:X.r });   // new tasks added to a finished topic open straight at the first new one
+  go({ v:"topic", s, t, r:X.r });
+  if (!st.read) return showKnowledge(s, t, true);
+  if (X.r > 1 && !Object.keys(X.o.ans).length) setIntro(s, t, X);
+}
+/* a short welcome to a new set: what level it is and why */
+function setIntro(s, t, X){
+  const rev = X.tasks.filter(k => k.review).length, c = [1, 2, 3].map(d => X.tasks.filter(k => !k.review && lvlOf(k) === d).length);
+  const why = X.o.from >= 85 ? "You did really well last time, so this set steps up the challenge." : X.o.from >= 65 ? "Good work last time: this set climbs a little higher." : X.o.from >= 50 ? "This set keeps you at the same level so you can lock it in." : "This set goes back over the key ideas so you can build your confidence.";
+  modal(`<div class="eyebrow">${esc(S[s].name)} · ${esc(topicOf(s, t).title)}</div><h3 style="margin-top:4px">✦ Set ${X.r}: ${esc(LVL_NAME(X.o.lv))} level</h3>
+    <p style="margin-top:8px">${why}</p>
+    <ul class="ideas">${rev ? `<li><b>${rev}</b> review question${rev > 1 ? "s" : ""} on something to fix from last time</li>` : ""}${c.map((n, i) => n ? `<li><b>${n}</b> ${LVL[i + 1]} question${n > 1 ? "s" : ""}</li>` : "").join("")}</ul>
+    <p class="muted small" style="margin-top:8px">The questions get harder as you go. Your earlier sets are saved: tap 📚 My sets to look back at them.</p>
+    <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn ghost sm" id="iK">📘 Key knowledge</button><button class="btn" id="iGo">Let's go →</button></div>`);
+  $("iGo").onclick = closeModal; $("iK").onclick = () => showKnowledge(s, t, false);
+}
+
+/* ---------- key knowledge pop-up (must be read before the tasks unlock) ---------- */
+function showKnowledge(s, t, gate){
+  const T = topicOf(s, t), rtl = S[s].rtl;
+  modal(`<div class="eyebrow">${esc(S[s].name)} · Key knowledge</div><h3 style="margin-top:4px">${esc(T.title)}</h3>
+    <ul class="ideas">${T.learn.ideas.map(x => `<li dir="auto">${esc(x)}</li>`).join("")}</ul>
+    <div class="example" dir="auto"><b>Worked example</b>\n${esc(T.learn.example)}</div>
+    ${gate ? `<label class="agree"><input type="checkbox" id="kRead"> I have read the key knowledge and the worked example.</label>` : ""}
+    <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn sm ghost" id="kSay">🔊 Read aloud</button><button class="btn" id="kGo" ${gate ? "disabled" : ""}>${gate ? "Start the tasks →" : "Close"}</button></div>`);
+  if (gate) $("kRead").onchange = e => $("kGo").disabled = !e.target.checked;
+  $("kSay").onclick = () => say(T.title + ". " + T.learn.ideas.join(" ") + " Worked example. " + T.learn.example, rtl);
+  $("kGo").onclick = () => { hush(); closeModal(); if (gate){ tstate(s, t).read = true; save(); render(); const X = run(s, t); if (X.r > 1 && !Object.keys(X.o.ans).length) setIntro(s, t, X); } };
+}
+function say(text, rtl){ try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(String(text).replace(/[→←✓]/g, " ")); u.lang = rtl ? "en-GB" : "en-GB"; u.rate = .95; speechSynthesis.speak(u); } catch(e){} }
+function hush(){ try { speechSynthesis.cancel(); } catch(e){} }
+
+/* ---------- one task at a time ---------- */
+let pick = null;
+function renderTopic(){
+  const s = VIEW.s, t = VIEW.t, SUB = S[s], T = topicOf(s, t), st = tstate(s, t), X = run(s, t, VIEW.r), r = X.r, o = X.o, tasks = X.tasks;
+  VIEW.r = r;
+  if (!st.read){ $("app").innerHTML = `<button class="back" id="bk">← ${esc(SUB.name)}</button><div class="card"><h2>${esc(T.title)}</h2><p class="muted" style="margin-top:6px">Read the key knowledge first to unlock the tasks.</p><button class="btn" id="kOpen" style="margin-top:12px">Open key knowledge</button></div>`;
+    $("bk").onclick = () => go({ v:"subject", s }); $("kOpen").onclick = () => showKnowledge(s, t, true); return; }
+  const retry = VIEW.retry || null, list = retry || tasks.map((_, i) => i);
+  let pos = VIEW.pos != null ? VIEW.pos : retry ? 0 : Math.min(o.i || 0, tasks.length - 1);
+  if (!retry){ const firstOpen = tasks.findIndex((_, i) => !o.ans[i] || !o.ans[i].rate); if (firstOpen < 0){ return finishTopic(s, t, r); } if (VIEW.pos == null) pos = firstOpen; }
+  VIEW.pos = pos;
+  const i = list[pos], task = tasks[i], prev = retry ? (o.retry || {})[i] : o.ans[i];
+  startWork(s, t, r); pick = prev ? prev.g : null;
+  const dots = tasks.map((_, j) => { const a = o.ans[j]; return `<i class="${j === i ? "cur" : ""} ${a ? (a.ok ? "r" : "w") : ""} ${lvlOf(tasks[j]) === 3 ? "c3" : ""}"></i>`; }).join("");
+  $("app").innerHTML = `<button class="back" id="bk">← ${esc(SUB.name)}</button>
+  <div class="card stack" style="border-top:6px solid ${SUB.colour}">
+    <div class="qhead"><div><div class="eyebrow">${esc(SUB.name)} · ${esc(T.title)}${r > 1 ? " · Set " + r : ""}${retry ? " · Fix my mistakes" : ""}</div><div class="muted small">Task ${pos + 1} of ${list.length}${r > 1 ? " · " + esc(LVL_NAME(o.lv)) + " level" : ""}</div></div>
+      <div class="row">${runsOf(s, t) > 1 ? `<button class="btn sm ghost" id="mySets">📚 My sets</button>` : ""}<button class="btn sm ghost" id="kAgain">📘 Key knowledge</button></div></div>
+    <div class="dots" aria-hidden="true">${dots}</div>
+    <div class="q" dir="auto">${lvlTag(task)} ${esc(task.q)}</div>
+    <div id="answerBox">${answerUI(task, SUB.rtl, r)}</div>
+    <div id="after"></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn red" id="checkBtn">Check my answer</button></div>
+  </div>`;
+  $("bk").onclick = () => { save(); go({ v:"subject", s }); };
+  $("kAgain").onclick = () => showKnowledge(s, t, false);
+  if ($("mySets")) $("mySets").onclick = () => { save(); go({ v:"sets", s, t }); };
+  wireAnswer(task);
+  if (prev && prev.checked !== false) showAfter(s, t, r, i, task, prev, !!retry, list, pos);
+  else $("checkBtn").onclick = () => check(s, t, r, i, task, !!retry, list, pos);
+}
+/* options appear in a shuffled order that stays the same for this student and task (the right answer isn't always first);
+   each new set shuffles them differently */
+function order(task, r){ let h = 2166136261; for (const ch of KEY + "|" + task.q + (r > 1 ? "|" + r : "")) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+  const ix = task.o.map((_, j) => j); for (let j = ix.length - 1; j > 0; j--){ h = Math.imul(h ^ (h >>> 15), 2246822519) >>> 0; const q = h % (j + 1); [ix[j], ix[q]] = [ix[q], ix[j]]; } return ix; }
+const LVL = { 1:"Core", 2:"Extended", 3:"Challenge" };
+const lvlOf = t => t.d || 1;
+const lvlTag = t => (t.review ? `<span class="lvl rv" style="margin:0 6px 0 0">↺ Review</span>` : "") + `<span class="lvl l${lvlOf(t)}" style="margin:0 6px 0 0">${"●".repeat(lvlOf(t))} ${LVL[lvlOf(t)]}</span>`;
+function answerUI(task, rtl, r){
+  if (task.k === "mcq") return `<div class="opts">${order(task, r).map(j => `<button class="opt" data-o="${j}" aria-pressed="false" dir="auto">${esc(task.o[j])}</button>`).join("")}</div>`;
+  if (task.k === "tf") return `<div class="opts" style="grid-template-columns:1fr 1fr"><button class="opt" data-o="t" aria-pressed="false">True</button><button class="opt" data-o="f" aria-pressed="false">False</button></div>`;
+  const ph = task.k === "num" ? "Type a number" : "Type your answer";
+  return `<div class="ans">${task.prefix ? `<span class="pre">${esc(task.prefix)}</span>` : ""}<input id="inp" ${task.k === "num" ? 'inputmode="decimal"' : 'autocapitalize="off"'} autocomplete="off" spellcheck="false" placeholder="${ph}" dir="auto"></div>`;
+}
+function wireAnswer(task){
+  const opts = $("answerBox").querySelectorAll(".opt");
+  opts.forEach(b => b.onclick = () => { pick = task.k === "tf" ? b.dataset.o === "t" : +b.dataset.o; opts.forEach(x => x.setAttribute("aria-pressed", x === b)); });
+  const inp = $("inp"); if (inp){ inp.oninput = () => pick = inp.value; inp.onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); $("checkBtn").click(); } }; setTimeout(() => { try { inp.focus(); } catch(e){} }, 50); }
+  if (pick != null){ if (inp) inp.value = pick; else opts.forEach(b => { const v = task.k === "tf" ? b.dataset.o === "t" : +b.dataset.o; b.setAttribute("aria-pressed", v === pick); }); }
+}
+function check(s, t, r, i, task, isRetry, list, pos){
+  if (pick == null || (typeof pick === "string" && !pick.trim())) return toast("Answer the task first.");
+  const m = mark(task, pick);
+  if (task.k === "num" && m.bad) return toast("Type a number only, for example 12 or -3.5");
+  const o = run(s, t, r).o, rec = { g: pick, ok: m.ok, accent: !!m.accent, at: Date.now() };
+  if (isRetry){ o.retry = o.retry || {}; o.retry[i] = rec; } else { o.ans[i] = rec; o.i = i; }
+  save(); showAfter(s, t, r, i, task, rec, isRetry, list, pos); explain(task, rec, S[s].rtl);
+}
+function showAfter(s, t, r, i, task, rec, isRetry, list, pos){
+  // lock the answer
+  $("answerBox").querySelectorAll(".opt").forEach(b => { b.disabled = true; const v = task.k === "tf" ? b.dataset.o === "t" : +b.dataset.o; if (v === task.a) b.classList.add("right"); else if (v === rec.g) b.classList.add("wrong"); });
+  const inp = $("inp"); if (inp){ inp.value = rec.g; inp.disabled = true; inp.classList.add(rec.ok ? "right" : "wrong"); }
+  const rate = rec.rate || 0;
+  $("after").innerHTML = `<div class="verdict ${rec.ok ? "ok" : "bad"}">${rec.ok ? "✓ Correct!" + (rec.accent ? " Watch the accent: " + esc(rightText(task)) : "") : "✗ Not quite. The answer is: <span dir='auto'>" + esc(rightText(task)) + "</span>"} <button class="btn sm ghost" id="whyBtn" style="margin-left:8px">💡 Why?</button></div>
+    <div style="margin-top:12px"><b>Rate your answer</b> <span class="muted small">How well do you understand this now?</span>
+      <div class="rate" style="margin-top:8px"><button data-r="1" aria-pressed="${rate === 1}">😀 I've got it</button><button data-r="2" aria-pressed="${rate === 2}">🤔 Partly</button><button data-r="3" aria-pressed="${rate === 3}">😟 I need help</button></div></div>`;
+  $("whyBtn").onclick = () => explain(task, rec, S[s].rtl);
+  const last = pos >= list.length - 1;
+  $("checkBtn").textContent = last ? (isRetry ? "Finish fixing →" : r > 1 ? "Finish set →" : "Finish topic →") : "Next task →";
+  $("checkBtn").disabled = !rate;
+  $("after").querySelectorAll("[data-r]").forEach(b => b.onclick = () => {
+    rec.rate = +b.dataset.r; save();
+    $("after").querySelectorAll("[data-r]").forEach(x => x.setAttribute("aria-pressed", x === b)); $("checkBtn").disabled = false;
+  });
+  $("checkBtn").onclick = () => {
+    if (!rec.rate) return toast("Rate your answer first.");
+    if (last){ if (isRetry) return finishRetry(s, t, r); return finishTopic(s, t, r); }
+    VIEW.pos = pos + 1; render(); window.scrollTo(0, 0);
+  };
+}
+/* explanation pop-up: shown after every check, right or wrong, to reinforce the knowledge */
+function explain(task, rec, rtl){
+  modal(`<div class="eyebrow">${rec.ok ? "Well done — here's why it's right" : "Let's fix this"}</div>
+    <h3 style="margin-top:4px" dir="auto">${esc(task.q)}</h3>
+    ${rec.ok ? "" : `<p style="margin-top:8px"><span class="pill bad">Your answer</span> <span dir="auto">${esc(givenText(task, rec.g)) || "—"}</span></p>`}
+    <p style="margin-top:8px"><span class="pill ok">Correct answer</span> <span dir="auto">${esc(rightText(task))}</span></p>
+    <div class="example" dir="auto"><b>💡 Explanation and example</b>\n${esc(task.x)}</div>
+    <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn sm ghost" id="xSay">🔊 Read aloud</button><button class="btn" id="xOk">Got it</button></div>`);
+  $("xSay").onclick = () => say(task.x, rtl);
+  $("xOk").onclick = () => { hush(); closeModal(); };
+}
+
+/* ---------- finishing: summary, log for the super admin, email to the teacher ---------- */
+function finishTopic(s, t, r){
+  const st = tstate(s, t), X = run(s, t, r), o = X.o, n = Object.keys(o.ans).length, first = !o.done || (o.reportedN || 0) < n;
+  o.done = true; o.doneSess = SESS.id; o.finishedAt = Date.now(); o.reportedN = n;
+  if (X.r === 1){ st.runs = (st.runs || 0) + 1; }
+  save();
+  if (first) report(s, t, false, X.r);
+  Cloud.push();
+  go({ v:"summary", s, t, r:X.r });
+}
+function finishRetry(s, t, r){ const o = run(s, t, r).o; o.retriedAt = Date.now(); save(); report(s, t, true, r); Cloud.push(); go({ v:"summary", s, t, r }); }
+function analysis(s, t, r){
+  const X = run(s, t, r), o = X.o, well = [], improve = [], gaps = [];
+  X.tasks.forEach((task, i) => { const a = o.ans[i]; if (!a) return; const fixed = o.retry && o.retry[i] && o.retry[i].ok;
+    if (a.ok && a.rate === 1) well.push(task.q);
+    else if (!a.ok){ improve.push({ q: task.q, right: rightText(task), given: givenText(task, a.g), fixed }); gaps.push(i); }
+    else if (a.rate >= 2){ improve.push({ q: task.q, right: rightText(task), given: givenText(task, a.g), unsure: true }); gaps.push(i); } });
+  return { well, improve, gaps };
+}
+function report(s, t, isRetry, r){
+  const T = topicOf(s, t), X = run(s, t, r), sc = runScore(s, t, X.r), A = analysis(s, t, X.r), o = X.o;
+  const fixedNow = isRetry ? Object.values(o.retry || {}).filter(q => q.ok).length : 0;
+  const data = { course:"uk", year: S[s].year, totalTopics: ORDER.reduce((a, k) => a + S[k].topics.length, 0), subjTopics: S[s].topics.length, subject: S[s].name, sid: s, topic: T.title + (X.r > 1 ? " · Set " + X.r + " (" + LVL_NAME(o.lv) + ")" : ""), tid: t, round: X.r, level: X.r > 1 ? LVL_NAME(o.lv) : "", strand: T.strand, score: sc.score, right: sc.right, n: sc.n, lv: sc.lv, effort: sc.effort, focus: sc.focus,
+    mins: Math.max(1, mins(sc.ms)), secs: Math.round(sc.ms / 1000), got: sc.got, unsure: sc.unsure, need: sc.need, retry: !!isRetry, fixed: fixedNow,
+    well: A.well.slice(0, 6).map(q => q.slice(0, 120)), improve: A.improve.slice(0, 8).map(x => ({ q: x.q.slice(0, 120), right: String(x.right).slice(0, 80), given: String(x.given).slice(0, 80), unsure: !!x.unsure, fixed: !!x.fixed })),
+    totalMs: totals().ms };
+  DB.reports.push(Object.assign({ at: Date.now() }, data)); if (DB.reports.length > 300) DB.reports.shift(); save();
+  try { SDC.log("studyplus", ACCT, { study: data }); } catch(e){}
+  try { SDC.studyReport(ACCT, data); } catch(e){}
+}
+function renderSummary(){
+  const s = VIEW.s, t = VIEW.t, SUB = S[s], T = topicOf(s, t), X = run(s, t, VIEW.r), r = X.r, o = X.o, tasks = X.tasks, sc = runScore(s, t, r), A = analysis(s, t, r);
+  const latest = r === runsOf(s, t);
+  const msg = sc.score >= 85 ? "Excellent work: you really know this topic." : sc.score >= 65 ? "Good work. Fix the few gaps below to master it." : sc.score >= 40 ? "A solid start. Use the corrections below, then try the mistakes again." : "This topic needs more practice. Re-read the key knowledge, then fix your mistakes.";
+  const gapsLeft = A.gaps.filter(i => !(o.retry && o.retry[i] && o.retry[i].ok));
+  $("app").innerHTML = `<button class="back" id="bk">← ${esc(SUB.name)}</button>
+  <div class="card stack" style="border-top:6px solid ${SUB.colour}">
+    <div><div class="eyebrow">${esc(SUB.name)} · ${r > 1 ? "Set " + r + " complete · " + esc(LVL_NAME(o.lv)) + " level" : "Topic complete"}</div><h1>${esc(T.title)}</h1><p class="muted" style="margin-top:4px">${msg}</p></div>
+    <div class="sumgrid"><div class="sum"><b>${sc.score}%</b><span>Score</span></div><div class="sum"><b>${sc.right}/${sc.n}</b><span>Right first time</span></div><div class="sum"><b>${fmt(sc.ms)}</b><span>Active work time</span></div><div class="sum"><b>${sc.effort}%</b><span>Effort</span></div></div>
+    <div class="row small">${[1,2,3].filter(d => sc.lv[d]).map(d => `<span class="lvl l${d}" style="margin:0">${"●".repeat(d)} ${LVL[d]}: ${sc.lv[d].right}/${sc.lv[d].n}</span>`).join("")}</div>
+    ${latest ? `<div class="next-set"><b>✦ What's next</b><br><span class="small">Next time you sign in, a new set of questions on this topic will be waiting${sc.score >= 85 ? ", one step more challenging" : sc.score >= 65 ? ", a little more challenging" : sc.score >= 50 ? ", at the same level" : ", focused on the key ideas"}. Want it now? Tap <b>New challenge set</b>.</span></div>` : ""}
+    <div class="two">
+      <div class="card" style="box-shadow:none"><h2>⭐ What you did well</h2>${A.well.length ? `<ul class="list">${A.well.map(q => `<li dir="auto">${esc(q)}</li>`).join("")}</ul>` : `<p class="muted small" style="margin-top:6px">Answer confidently and correctly to see your strengths here.</p>`}</div>
+      <div class="card" style="box-shadow:none"><h2>🎯 What to improve</h2>${A.improve.length ? `<ul class="list">${A.improve.map(x => `<li dir="auto">${esc(x.q)}${x.fixed ? ` <span class="pill ok">fixed</span>` : x.unsure ? ` <span class="pill warn">not sure yet</span>` : ""}</li>`).join("")}</ul>` : `<p class="muted small" style="margin-top:6px">No gaps found in this set. 🎉</p>`}</div>
+    </div>
+    ${A.improve.length ? `<div><h2>📝 Corrections</h2><p class="muted small" style="margin-top:2px">Read each correction carefully; these are your knowledge gaps.</p><div class="stack" style="margin-top:10px">${A.gaps.map(i => { const task = tasks[i], a = o.ans[i];
+      return `<div class="fix"><div class="q" dir="auto">${esc(task.q)}</div>${a.ok ? "" : `<div><span class="pill bad">You said</span> <span dir="auto">${esc(givenText(task, a.g))}</span></div>`}<div><span class="pill ok">Answer</span> <span dir="auto">${esc(rightText(task))}</span></div><div class="example" dir="auto" style="margin-top:4px">${esc(task.x)}</div></div>`; }).join("")}</div></div>` : ""}
+    <div class="row" style="justify-content:flex-end">
+      <button class="btn ghost" id="kAgain">📘 Key knowledge</button>
+      ${runsOf(s, t) > 1 ? `<button class="btn ghost" id="mySets">📚 My sets (${runsOf(s, t)})</button>` : ""}
+      ${gapsLeft.length ? `<button class="btn red" id="fixBtn">Fix my mistakes (${gapsLeft.length})</button>` : ""}
+      ${r === 1 && runsOf(s, t) === 1 ? `<button class="btn ghost" id="redo">Start this topic again</button>` : ""}
+      ${latest ? `<button class="btn ok" id="newSet">✦ New challenge set</button>` : `<button class="btn ok" id="toLatest">Go to my latest set →</button>`}
+      <button class="btn" id="nextT">${nextTopic(s, t) ? "Next topic →" : "Back to " + esc(SUB.name)}</button>
+    </div>
+    <p class="muted small">Effort combines your score (60%), how many tasks you finished (20%) and how much real work time you spent on them (20%).</p>
+  </div>`;
+  $("bk").onclick = () => go({ v:"subject", s });
+  $("kAgain").onclick = () => showKnowledge(s, t, false);
+  if ($("mySets")) $("mySets").onclick = () => go({ v:"sets", s, t });
+  if ($("fixBtn")) $("fixBtn").onclick = () => { const o2 = run(s, t, r).o; o2.retry = {}; save(); go({ v:"topic", s, t, r, retry: gapsLeft, pos: 0 }); };
+  if ($("redo")) $("redo").onclick = () => { if (!confirm("Start this topic again? Your previous result has already been sent to your teacher.")) return; const st2 = tstate(s, t); st2.ans = {}; st2.retry = {}; st2.i = 0; st2.done = false; save(); go({ v:"topic", s, t, r:1 }); };
+  if ($("newSet")) $("newSet").onclick = () => { buildRound(s, t); save(); Cloud.push(); openTopic(s, t); };
+  if ($("toLatest")) $("toLatest").onclick = () => openTopic(s, t);
+  $("nextT").onclick = () => { const n = nextTopic(s, t); if (n) openTopic(s, n); else go({ v:"subject", s }); };
+}
+function nextTopic(s, t){ const L = S[s].topics, i = L.findIndex(x => x.id === t); for (let j = i + 1; j < L.length; j++) if (!tstate(s, L[j].id).done) return L[j].id; return null; }
+
+/* ---------- all sets for a topic, and a read-only review of any set ---------- */
+function renderSets(){
+  const s = VIEW.s, t = VIEW.t, SUB = S[s], T = topicOf(s, t), n = runsOf(s, t);
+  const rows = Array.from({ length:n }, (_, k) => n - k).map(r => { const X = run(s, t, r), sc = runScore(s, t, r), o = X.o, started = Object.keys(o.ans).length;
+    const when = o.finishedAt || o.at, d = when ? new Date(when).toLocaleDateString("en-GB", { day:"numeric", month:"short" }) : "";
+    const state = o.done ? `<span class="pill ${sc.score >= 70 ? "ok" : sc.score >= 50 ? "warn" : "bad"}">${sc.score}%</span>` : started ? `<span class="pill warn">${sc.answered}/${sc.n} done</span>` : `<span class="pill new">✦ Ready</span>`;
+    return `<div class="setrow"><div><b>Set ${r}</b> <span class="muted small">· ${r === 1 ? "Starter set" : esc(LVL_NAME(o.lv)) + " level"}${d ? " · " + d : ""} · ${X.tasks.length} questions${o.ms ? " · " + fmt(o.ms) : ""}</span></div>
+      <div class="row">${state}${started ? `<button class="btn sm ghost" data-rv="${r}">Review</button>` : ""}${!o.done ? `<button class="btn sm" data-go="${r}">${started ? "Continue" : "Start"} →</button>` : ""}</div></div>`; }).join("");
+  $("app").innerHTML = `<button class="back" id="bk">← ${esc(SUB.name)}</button>
+  <div class="card stack" style="border-top:6px solid ${SUB.colour}">
+    <div><div class="eyebrow">${esc(SUB.name)} · My sets</div><h1>${esc(T.title)}</h1><p class="muted" style="margin-top:4px">Every set you've worked on is saved. Review any of them to see your answers, the right answers and the explanations.</p></div>
+    <div class="stack" style="gap:8px">${rows}</div>
+  </div>`;
+  $("bk").onclick = () => go({ v:"subject", s });
+  $("app").querySelectorAll("[data-rv]").forEach(b => b.onclick = () => go({ v:"review", s, t, r:+b.dataset.rv }));
+  $("app").querySelectorAll("[data-go]").forEach(b => b.onclick = () => openTopic(s, t));
+}
+function renderReview(){
+  const s = VIEW.s, t = VIEW.t, SUB = S[s], T = topicOf(s, t), X = run(s, t, VIEW.r), o = X.o, sc = runScore(s, t, X.r);
+  $("app").innerHTML = `<button class="back" id="bk">← My sets</button>
+  <div class="card stack" style="border-top:6px solid ${SUB.colour}">
+    <div><div class="eyebrow">${esc(SUB.name)} · Review · Set ${X.r}${X.r > 1 ? " · " + esc(LVL_NAME(o.lv)) + " level" : ""}</div><h1>${esc(T.title)}</h1>
+      <p class="muted" style="margin-top:4px">${o.done ? `Score ${sc.score}% · ${sc.right}/${sc.n} right first time` : `${sc.answered} of ${sc.n} answered so far`}</p></div>
+    <div class="stack">${X.tasks.map((task, i) => { const a = o.ans[i], f = o.retry && o.retry[i];
+      return `<div class="fix"><div class="q" dir="auto">${i + 1}. ${lvlTag(task)} ${esc(task.q)}</div>
+        ${a ? `<div><span class="pill ${a.ok ? "ok" : "bad"}">${a.ok ? "✓ You said" : "✗ You said"}</span> <span dir="auto">${esc(givenText(task, a.g))}</span>${a.rate ? ` <span class="muted small">· ${["", "😀 got it", "🤔 partly", "😟 need help"][a.rate]}</span>` : ""}${f ? ` <span class="pill ${f.ok ? "ok" : "warn"}">${f.ok ? "fixed" : "tried again"}</span>` : ""}</div>` : `<div class="muted small">Not answered yet</div>`}
+        ${a ? `<div><span class="pill ok">Answer</span> <span dir="auto">${esc(rightText(task))}</span></div><div class="example" dir="auto" style="margin-top:4px">${esc(task.x)}</div>` : ""}</div>`; }).join("")}</div>
+    <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="kAgain">📘 Key knowledge</button><button class="btn" id="bk2">← My sets</button></div>
+  </div>`;
+  $("bk").onclick = $("bk2").onclick = () => go({ v:"sets", s, t });
+  $("kAgain").onclick = () => showKnowledge(s, t, false);
+}
+
+/* ---------- small UI helpers ---------- */
+function modal(html){
+  $("modalRoot").innerHTML = `<div class="modal-bg" role="dialog" aria-modal="true"><div class="modal"><button class="xclose" id="mClose" aria-label="Close" title="Close">✕</button>${html}</div></div>`;
+  $("mClose").onclick = closeModal;
+  $("modalRoot").querySelector(".modal-bg").addEventListener("click", e => { if (e.target.classList.contains("modal-bg")) closeModal(); });
+}
+function closeModal(){ hush(); $("modalRoot").innerHTML = ""; }
+document.addEventListener("keydown", e => { if (e.key === "Escape" && $("modalRoot").innerHTML) closeModal(); });
+function toast(m){ const d = document.createElement("div"); d.className = "toast"; d.textContent = m; document.body.appendChild(d); setTimeout(() => d.remove(), 3200); }
+
+/* ---------- start: show this computer's copy straight away, then bring in the online copy and set up new sets ---------- */
+paintSwitcher();
+try { SDC.log("studyopen", ACCT, {}); } catch(e){}
+render();
+let READY = false;
+(async function boot(){
+  let pulled = 0;
+  try { if (await Cloud.init()){ const got = await Promise.race([Cloud.pull(), new Promise(r => setTimeout(() => r(null), 12000))]);
+      if (got) got.forEach(R => pulled += mergeIn(R)); else Cloud.show("offline"); } } catch(e){}
+  const made = ensureRounds();
+  if (pulled || made.length) save();
+  READY = true;
+  if (VIEW.v === "home" || VIEW.v === "subject" || (pulled && VIEW.v !== "topic")) render();
+  if (made.length) toast(`✦ ${made.length} new challenge set${made.length > 1 ? "s are" : " is"} ready for you`);
+  else if (pulled) toast("Your saved progress has been loaded");
+  if (Cloud.on) Cloud.push();
+})();
+window.__study = { mark, topicScore, runScore, run, buildRound, ensureRounds, mergeIn, DB: () => DB, SESS, ready: () => READY, Cloud };   // used by the self-test
+})();
+</script>
+</body>
+</html>

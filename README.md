@@ -23,3 +23,9 @@ One sign-in page for SISD's Computer Science (Python Pathways), Design and IT co
 - Question bank: `study/bank-*.js` adds 456 new questions (Core / Extended / Challenge) that are not in Set 1. `study/gen.js` makes brand-new questions with fresh numbers for every Maths topic and for Science (forces, matter, cells, energy), I&S (maps, population, economics) and French numbers. Banks are append-only: saved sets point at question positions.
 - Every new sign-in (or after 4 hours away), each finished topic gets its next set of 8: up to 2 review questions on last set's gaps (asked a different way), then new questions ordered Core → Challenge. The level moves up 0.5 (85%+), up 0.25 (65–84%), stays (50–64%) or drops 0.5 (under 50%). Students can also start a new set straight away.
 - All earlier sets stay reviewable under 📚 My sets. Reports show "Set N (level)" in the super admin tab and the Gmail report.
+
+## Study Plus UK (uk.html): Year 8 and Year 10, National Curriculum in England
+- Same engine as Study Plus: key knowledge, checked tasks with explanations, self-rating, corrections, saved progress online, a new levelled challenge set for every finished topic on each return, and "📚 My sets" review.
+- Subjects: Year 8 (KS3) Maths, Biology, Chemistry, Physics; Year 10 (GCSE Maths, AQA Combined Science Trilogy Paper 1 topics) Maths, Biology, Chemistry, Physics. 50 topics, 683 written questions in `uk/y8.js` and `uk/y10.js`, plus fresh generated questions (`uk/gen.js`) for every maths topic and the calculation topics in physics and chemistry.
+- Sign-in: shared class login (only its SHA-256 hash is in the page), then each student's first name + their own 4-digit PIN. A name already registered must use its PIN ("Z" rows: scrambled name → PIN hash). Progress is locked with a key made from the login, name and PIN ("Y" rows).
+- Reports go to the staff dashboard (✦ Study Plus tab, tagged Study Plus UK) and to the Gmail report, as "Mahaira20 · <name>".
