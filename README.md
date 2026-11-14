@@ -29,3 +29,8 @@ One sign-in page for SISD's Computer Science (Python Pathways), Design and IT co
 - Subjects: Year 8 (KS3) Maths, Biology, Chemistry, Physics; Year 10 (GCSE Maths, AQA Combined Science Trilogy Paper 1 topics) Maths, Biology, Chemistry, Physics. 50 topics, 683 written questions in `uk/y8.js` and `uk/y10.js`, plus fresh generated questions (`uk/gen.js`) for every maths topic and the calculation topics in physics and chemistry.
 - Sign-in: shared class login (only its SHA-256 hash is in the page), then each student's first name + their own 4-digit PIN. A name already registered must use its PIN ("Z" rows: scrambled name → PIN hash). Progress is locked with a key made from the login, name and PIN ("Y" rows).
 - Reports go to the staff dashboard (✦ Study Plus tab, tagged Study Plus UK) and to the Gmail report, as "Mahaira20 · <name>".
+
+### Update: more subjects, Learn pages and hints
+- Study Plus UK now has 16 subjects: Year 8 and Year 10 Maths, Biology, Chemistry, Physics, English, History, Geography and Computing (82 topics, 1,194 written questions plus generators). `uk/y8-more.js`, `uk/y10-more.js`; extra worked examples in `uk/learn-extra.js`.
+- Each topic opens a Learn page: 1. key ideas, 2. worked example with steps, 3. more worked examples ("how to work it out", including fresh generated ones), 4. practice.
+- Hints (Study Plus and Study Plus UK): after 35–60 s on a question a pop-up offers a hint; a 💡 Hint button is always there. 3 hints per question (key idea → method or ruling out options → nearly there / answer range), then the full solution. Using the solution counts the question as not correct. Hints used are saved and reported.

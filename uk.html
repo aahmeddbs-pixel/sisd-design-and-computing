@@ -9,10 +9,13 @@
 <meta name="robots" content="noindex,nofollow">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
 <script src="sdc.js?v=20261113ef"></script>
-<script src="study/gen.js?v=20261114b"></script>
-<script src="uk/gen.js?v=20261114b"></script>
-<script src="uk/y8.js?v=20261114b"></script>
-<script src="uk/y10.js?v=20261114b"></script>
+<script src="study/gen.js?v=20261114c"></script>
+<script src="uk/gen.js?v=20261114c"></script>
+<script src="uk/y8.js?v=20261114c"></script>
+<script src="uk/y10.js?v=20261114c"></script>
+<script src="uk/y8-more.js?v=20261114c"></script>
+<script src="uk/y10-more.js?v=20261114c"></script>
+<script src="uk/learn-extra.js?v=20261114c"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -152,6 +155,15 @@ select.big{border:2px solid var(--line);background:var(--card);border-radius:10p
 .login input{width:100%;border:2px solid var(--line);background:var(--card);border-radius:10px;padding:11px 12px;font-size:1.05rem;margin-top:6px}
 .login .err{color:var(--bad);font-weight:700;margin-top:10px;min-height:1.2em}
 .login h3{margin-top:18px;font-size:1rem;text-transform:none}
+.hint{background:var(--warnbg);color:var(--ink);border-left:4px solid var(--warn);border-radius:0 10px 10px 0;padding:10px 14px;margin-top:8px}
+.lsec{border-top:1px solid var(--line);padding-top:14px}
+.lsec h2{font-size:1.1rem;margin-bottom:8px}
+.ideas2{margin-left:22px;display:grid;gap:8px}
+.wex{background:var(--soft);border-radius:12px;padding:12px 14px;margin-top:8px;border-left:4px solid var(--red)}
+.wex summary{cursor:pointer;font-weight:800;list-style-position:outside}
+.wq{font-weight:800;white-space:pre-line}
+.steps{margin:6px 0 0 22px;display:grid;gap:4px}
+.wa{margin-top:8px;background:var(--okbg);color:var(--ink);border-radius:8px;padding:8px 10px}
 .foot{text-align:center;color:var(--muted);font-size:.82rem;margin-top:30px}
 </style>
 </head>
@@ -182,7 +194,7 @@ $("switcher").classList.add("hidden"); $("outBtn").classList.add("hidden");
 let last = ""; try { last = (JSON.parse(localStorage.getItem("uk_last") || "{}").name) || ""; } catch(e){}
 $("app").innerHTML = `<div class="card login">
   <div class="eyebrow">Study Plus UK · Year 8 and Year 10</div><h1 style="margin-top:4px">Sign in</h1>
-  <p class="muted small" style="margin-top:6px">Maths, Biology, Chemistry and Physics practice following the National Curriculum in England. Your progress is saved, so you can carry on from any computer.</p>
+  <p class="muted small" style="margin-top:6px">Maths, Science, English, History, Geography and Computing practice following the National Curriculum in England. Your progress is saved, so you can carry on from any computer.</p>
   <form id="lf" autocomplete="off">
     <h3>1. Class login</h3>
     <label>Username<input id="lu" autocapitalize="off" spellcheck="false" placeholder="Username"></label>
@@ -224,7 +236,7 @@ setTimeout(() => { try { (last ? $("lu") : $("lu")).focus(); } catch(e){} }, 50)
 (function(){
 "use strict";
 const $ = id => document.getElementById(id), esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const S = window.UK || {}, ORDER = ["y8maths","y8biology","y8chemistry","y8physics","y10maths","y10biology","y10chemistry","y10physics"].filter(k => S[k]);
+const S = window.UK || {}, ORDER = ["y8maths","y8biology","y8chemistry","y8physics","y8english","y8history","y8geography","y8computing","y10maths","y10biology","y10chemistry","y10physics","y10english","y10history","y10geography","y10computing"].filter(k => S[k]);
 const YEARS = [8, 10], STAGE = { 8:"Key Stage 3", 10:"GCSE (Key Stage 4)" }, subjLabel = s => S[s].name;
 ORDER.forEach(k => { if (!S[k].short){ S[k].short = S[k].name; S[k].name = "Year " + S[k].year + " " + S[k].name; } });
 const IDLE_MS = 60000, FOCUS_SEC_PER_TASK = 40, SET_SIZE = 8;
@@ -476,7 +488,7 @@ function totals(){
 /* ---------- views ---------- */
 let VIEW = { v:"home" };
 function go(v){ VIEW = v; stopWork(); render(); window.scrollTo(0, 0); }
-function stopWork(){ working = null; $("clock").classList.add("hidden"); }
+function stopWork(){ working = null; $("clock").classList.add("hidden"); try { stopHints(); } catch(e){} }
 function startWork(s, t, r){ working = { s, t, r }; lastAct = Date.now(); $("clock").classList.remove("hidden"); $("clock").textContent = "⏱ " + fmt(run(s, t, r).o.ms || 0); }
 function render(){
   if (VIEW.v === "home") return renderHome();
@@ -485,6 +497,7 @@ function render(){
   if (VIEW.v === "summary") return renderSummary();
   if (VIEW.v === "sets") return renderSets();
   if (VIEW.v === "review") return renderReview();
+  if (VIEW.v === "learn") return renderLearn();
 }
 
 function renderHome(){
@@ -492,14 +505,14 @@ function renderHome(){
   $("app").innerHTML = `
   <section class="hero">
     <div><div class="eyebrow" style="color:#FFB3BC">National Curriculum in England</div><h1>Hi ${esc(FIRST)}, what will you work on?</h1>
-      <p>Practise <b>Maths, Biology, Chemistry and Physics</b> for <b>Year 8</b> (Key Stage 3) and <b>Year 10</b> (GCSE). Each topic starts with the key knowledge, then questions you check and rate yourself on. Every time you come back, finished topics get a new set of questions: harder when you're ready, and focused on what you got wrong.</p></div>
+      <p>Choose a subject, then a topic. Each topic has a <b>Learn</b> page with the key ideas and worked examples showing how to work it out, then <b>practice questions</b> you check and rate yourself on. Stuck? Ask for a hint (3 per question). Every time you come back, finished topics get a new set of questions: harder when you're ready, and focused on what you got wrong.</p></div>
     <div class="stats"><div class="stat"><b>${fmt(T.ms)}</b><span>Work time</span></div><div class="stat"><b>${T.done}</b><span>Topics done</span></div><div class="stat"><b>${T.sets}</b><span>Sets done</span></div></div>
   </section>
   ${T.waiting.length ? `<div class="card newsets" style="margin-top:14px"><h2>✦ ${T.waiting.length} new challenge set${T.waiting.length > 1 ? "s are" : " is"} ready</h2>
     <p class="muted small" style="margin-top:2px">New questions on topics you've finished, set at the right level for you. Your earlier sets are saved and you can review them any time.</p>
     <div class="row" style="margin-top:10px">${T.waiting.slice(0, 12).map(w => `<button class="btn sm ghost" data-w="${w.s}|${w.t}" style="border-left:5px solid ${S[w.s].colour}">${esc(S[w.s].icon)} ${esc(S[w.s].name)}: ${esc(topicOf(w.s, w.t).title)} · Set ${w.r}</button>`).join("")}${T.waiting.length > 12 ? `<span class="muted small">and ${T.waiting.length - 12} more in your subjects</span>` : ""}</div></div>` : ""}
   ${YEARS.map(y => `<div class="card" style="margin-top:18px" id="year${y}">
-    <div class="yearhead"><span class="yr">Year ${y}</span><div><h2>${esc(STAGE[y])}</h2><p class="muted small">${y === 8 ? "KS3 programmes of study for mathematics and science" : "GCSE Mathematics and GCSE Combined Science (AQA Trilogy, Paper 1 topics)"}</p></div></div>
+    <div class="yearhead"><span class="yr">Year ${y}</span><div><h2>${esc(STAGE[y])}</h2><p class="muted small">${y === 8 ? "KS3 programmes of study: maths and science first, then English, history, geography and computing" : "GCSE Maths, Combined Science (AQA Trilogy Paper 1), English Language and Literature, History, Geography and Computer Science"}</p></div></div>
     <div class="subjects">${ORDER.filter(s => S[s].year === y).map(s => { const P = subjectProgress(s), w = T.waiting.filter(x => x.s === s).length; return `<button class="subj" data-s="${s}" style="--c:${S[s].colour}">
       <span class="top2"><span class="ic">${esc(S[s].icon)}</span><span><b>${esc(S[s].short)}</b><br><span class="muted small">${P.done} of ${P.total} topics done</span></span></span>
       <span class="muted small">${esc(S[s].blurb)}</span>${w ? `<span class="pill new">✦ ${w} new set${w > 1 ? "s" : ""}</span>` : ""}<span class="bar"><i style="width:${P.pct}%"></i></span></button>`; }).join("")}</div>
@@ -529,9 +542,9 @@ function renderSubject(){
 function allRated(X){ return X.tasks.every((_, i) => X.o.ans[i] && X.o.ans[i].rate); }
 function openTopic(s, t){
   const st = tstate(s, t), X = run(s, t);
-  if (X.o.done && allRated(X)) return go({ v:"summary", s, t, r:X.r });   // new tasks added to a finished topic open straight at the first new one
+  if (!st.read) return go({ v:"learn", s, t });   // first time: the Learn page, then practice
+  if (X.o.done && allRated(X)) return go({ v:"summary", s, t, r:X.r });
   go({ v:"topic", s, t, r:X.r });
-  if (!st.read) return showKnowledge(s, t, true);
   if (X.r > 1 && !Object.keys(X.o.ans).length) setIntro(s, t, X);
 }
 /* a short welcome to a new set: what level it is and why */
@@ -542,8 +555,41 @@ function setIntro(s, t, X){
     <p style="margin-top:8px">${why}</p>
     <ul class="ideas">${rev ? `<li><b>${rev}</b> review question${rev > 1 ? "s" : ""} on something to fix from last time</li>` : ""}${c.map((n, i) => n ? `<li><b>${n}</b> ${LVL[i + 1]} question${n > 1 ? "s" : ""}</li>` : "").join("")}</ul>
     <p class="muted small" style="margin-top:8px">The questions get harder as you go. Your earlier sets are saved: tap 📚 My sets to look back at them.</p>
-    <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn ghost sm" id="iK">📘 Key knowledge</button><button class="btn" id="iGo">Let's go →</button></div>`);
-  $("iGo").onclick = closeModal; $("iK").onclick = () => showKnowledge(s, t, false);
+    <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn ghost sm" id="iK">📘 Learn</button><button class="btn" id="iGo">Let's go →</button></div>`);
+  $("iGo").onclick = closeModal; $("iK").onclick = () => { closeModal(); go({ v:"learn", s, t }); };
+}
+
+/* ---------- the Learn page: key ideas, worked examples (how to work it out), then practice ---------- */
+function steps(L){ return `<ol class="steps">${L.map(x => `<li dir="auto">${esc(x)}</li>`).join("")}</ol>`; }
+function genExamples(s, t){
+  const key = s + "/" + t; if (!GEN.has(key)) return [];
+  let h = 7; for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return [1, 2, 3].map(d => GEN.make(key, d, (h + d * 104729 + 99991) >>> 0)).filter(Boolean).map(tk => ({
+    q: tk.q, steps: String(tk.x).split(/(?<=[.!?])\s+(?=[A-Z0-9(−-])/).filter(Boolean), a: rightText(tk), d: tk.d || 1 }));
+}
+function renderLearn(){
+  const s = VIEW.s, t = VIEW.t, SUB = S[s], T = topicOf(s, t), st = tstate(s, t), L = T.learn || {};
+  const ex = String(L.example || "").split("\n"), more = (L.more || []).concat(genExamples(s, t));
+  const X = run(s, t), started = Object.keys(X.o.ans).length;
+  $("app").innerHTML = `<button class="back" id="bk">← ${esc(SUB.name)}</button>
+  <div class="card stack" style="border-top:6px solid ${SUB.colour}">
+    <div class="qhead"><div><div class="eyebrow">${esc(SUB.name)} · Learn</div><h1>${esc(T.title)}</h1><p class="muted small">${esc(T.strand)}</p></div>
+      <button class="btn sm ghost" id="lSay">🔊 Read aloud</button></div>
+    <div class="lsec"><h2>1. Key ideas</h2><ol class="ideas2">${(L.ideas || []).map(x => `<li dir="auto">${esc(x)}</li>`).join("")}</ol></div>
+    <div class="lsec"><h2>2. Worked example</h2><div class="wex"><div class="wq" dir="auto">${esc(ex[0] || "")}</div><p class="small muted" style="margin-top:6px"><b>How to work it out</b></p>${steps(ex.slice(1))}</div></div>
+    ${more.length ? `<div class="lsec"><h2>3. More worked examples</h2><p class="muted small">Cover the steps and try each one first, then check.</p>
+      ${more.map((m, k) => `<details class="wex"${k === 0 ? " open" : ""}><summary><span class="wq" dir="auto">${m.d ? `<span class="lvl l${m.d}" style="margin:0 6px 0 0">${LVL[m.d]}</span>` : ""}${esc(m.q)}</span></summary>
+        <p class="small muted" style="margin-top:8px"><b>How to work it out</b></p>${steps(m.steps || [])}<div class="wa"><b>Answer:</b> <span dir="auto" style="white-space:pre-line">${esc(m.a)}</span></div></details>`).join("")}</div>` : ""}
+    <div class="lsec"><h2>${more.length ? "4" : "3"}. Practice</h2>
+      <p class="muted small">${X.tasks.length} questions${X.r > 1 ? " in Set " + X.r : ""}, from Core to Challenge. Stuck on a question? Ask for a hint: you get 3, then the solution.</p>
+      ${st.read ? "" : `<label class="agree"><input type="checkbox" id="kRead"> I have read the key ideas and worked examples.</label>`}
+      <div class="row" style="justify-content:flex-end;margin-top:10px">${runsOf(s, t) > 1 ? `<button class="btn ghost" id="mySets">📚 My sets</button>` : ""}<button class="btn red" id="kGo" ${st.read ? "" : "disabled"}>${X.o.done ? "See my results →" : started ? "Continue practice →" : "Start practice →"}</button></div></div>
+  </div>`;
+  $("bk").onclick = () => go({ v:"subject", s });
+  $("lSay").onclick = () => say(T.title + ". " + (L.ideas || []).join(" ") + " Worked example. " + (L.example || ""), SUB.rtl);
+  if ($("kRead")) $("kRead").onchange = e => $("kGo").disabled = !e.target.checked;
+  if ($("mySets")) $("mySets").onclick = () => go({ v:"sets", s, t });
+  $("kGo").onclick = () => { hush(); if (!st.read){ st.read = true; save(); } const R = run(s, t); if (R.o.done && allRated(R)) return go({ v:"summary", s, t, r:R.r }); go({ v:"topic", s, t, r:R.r }); if (R.r > 1 && !Object.keys(R.o.ans).length) setIntro(s, t, R); };
 }
 
 /* ---------- key knowledge pop-up (must be read before the tasks unlock) ---------- */
@@ -567,7 +613,7 @@ function renderTopic(){
   const s = VIEW.s, t = VIEW.t, SUB = S[s], T = topicOf(s, t), st = tstate(s, t), X = run(s, t, VIEW.r), r = X.r, o = X.o, tasks = X.tasks;
   VIEW.r = r;
   if (!st.read){ $("app").innerHTML = `<button class="back" id="bk">← ${esc(SUB.name)}</button><div class="card"><h2>${esc(T.title)}</h2><p class="muted" style="margin-top:6px">Read the key knowledge first to unlock the tasks.</p><button class="btn" id="kOpen" style="margin-top:12px">Open key knowledge</button></div>`;
-    $("bk").onclick = () => go({ v:"subject", s }); $("kOpen").onclick = () => showKnowledge(s, t, true); return; }
+    $("bk").onclick = () => go({ v:"subject", s }); $("kOpen").onclick = () => go({ v:"learn", s, t }); return; }
   const retry = VIEW.retry || null, list = retry || tasks.map((_, i) => i);
   let pos = VIEW.pos != null ? VIEW.pos : retry ? 0 : Math.min(o.i || 0, tasks.length - 1);
   if (!retry){ const firstOpen = tasks.findIndex((_, i) => !o.ans[i] || !o.ans[i].rate); if (firstOpen < 0){ return finishTopic(s, t, r); } if (VIEW.pos == null) pos = firstOpen; }
@@ -578,19 +624,21 @@ function renderTopic(){
   $("app").innerHTML = `<button class="back" id="bk">← ${esc(SUB.name)}</button>
   <div class="card stack" style="border-top:6px solid ${SUB.colour}">
     <div class="qhead"><div><div class="eyebrow">${esc(SUB.name)} · ${esc(T.title)}${r > 1 ? " · Set " + r : ""}${retry ? " · Fix my mistakes" : ""}</div><div class="muted small">Task ${pos + 1} of ${list.length}${r > 1 ? " · " + esc(LVL_NAME(o.lv)) + " level" : ""}</div></div>
-      <div class="row">${runsOf(s, t) > 1 ? `<button class="btn sm ghost" id="mySets">📚 My sets</button>` : ""}<button class="btn sm ghost" id="kAgain">📘 Key knowledge</button></div></div>
+      <div class="row">${runsOf(s, t) > 1 ? `<button class="btn sm ghost" id="mySets">📚 My sets</button>` : ""}<button class="btn sm ghost" id="kAgain">📘 Learn</button></div></div>
     <div class="dots" aria-hidden="true">${dots}</div>
     <div class="q" dir="auto">${lvlTag(task)} ${esc(task.q)}</div>
     <div id="answerBox">${answerUI(task, SUB.rtl, r)}</div>
     <div id="after"></div>
-    <div class="row" style="justify-content:flex-end"><button class="btn red" id="checkBtn">Check my answer</button></div>
+    <div id="hintBox"></div>
+    <div class="row" style="justify-content:flex-end">${prev && prev.checked !== false ? "" : `<button class="btn ghost" id="hintBtn">💡 Hint (3 left)</button>`}<button class="btn red" id="checkBtn">Check my answer</button></div>
   </div>`;
   $("bk").onclick = () => { save(); go({ v:"subject", s }); };
-  $("kAgain").onclick = () => showKnowledge(s, t, false);
+  $("kAgain").onclick = () => { save(); go({ v:"learn", s, t }); };
   if ($("mySets")) $("mySets").onclick = () => { save(); go({ v:"sets", s, t }); };
   wireAnswer(task);
   if (prev && prev.checked !== false) showAfter(s, t, r, i, task, prev, !!retry, list, pos);
-  else $("checkBtn").onclick = () => check(s, t, r, i, task, !!retry, list, pos);
+  else { $("checkBtn").onclick = () => check(s, t, r, i, task, !!retry, list, pos); armHints(s, t, r, i, task, !!retry, list, pos); }
+  if (prev && prev.checked !== false) paintHintsDone(o, i, s, t, task);
 }
 /* options appear in a shuffled order that stays the same for this student and task (the right answer isn't always first);
    each new set shuffles them differently */
@@ -615,7 +663,8 @@ function check(s, t, r, i, task, isRetry, list, pos){
   if (pick == null || (typeof pick === "string" && !pick.trim())) return toast("Answer the task first.");
   const m = mark(task, pick);
   if (task.k === "num" && m.bad) return toast("Type a number only, for example 12 or -3.5");
-  const o = run(s, t, r).o, rec = { g: pick, ok: m.ok, accent: !!m.accent, at: Date.now() };
+  stopHints(); if ($("hintBtn")) $("hintBtn").remove();
+  const o = run(s, t, r).o, rec = { g: pick, ok: m.ok, accent: !!m.accent, h: hintsUsed(o, i), at: Date.now() };
   if (isRetry){ o.retry = o.retry || {}; o.retry[i] = rec; } else { o.ans[i] = rec; o.i = i; }
   save(); showAfter(s, t, r, i, task, rec, isRetry, list, pos); explain(task, rec, S[s].rtl);
 }
@@ -624,7 +673,7 @@ function showAfter(s, t, r, i, task, rec, isRetry, list, pos){
   $("answerBox").querySelectorAll(".opt").forEach(b => { b.disabled = true; const v = task.k === "tf" ? b.dataset.o === "t" : +b.dataset.o; if (v === task.a) b.classList.add("right"); else if (v === rec.g) b.classList.add("wrong"); });
   const inp = $("inp"); if (inp){ inp.value = rec.g; inp.disabled = true; inp.classList.add(rec.ok ? "right" : "wrong"); }
   const rate = rec.rate || 0;
-  $("after").innerHTML = `<div class="verdict ${rec.ok ? "ok" : "bad"}">${rec.ok ? "✓ Correct!" + (rec.accent ? " Watch the accent: " + esc(rightText(task)) : "") : "✗ Not quite. The answer is: <span dir='auto'>" + esc(rightText(task)) + "</span>"} <button class="btn sm ghost" id="whyBtn" style="margin-left:8px">💡 Why?</button></div>
+  $("after").innerHTML = `<div class="verdict ${rec.ok ? "ok" : "bad"}">${rec.sol ? "📖 Solution shown. The answer is: <span dir='auto'>" + esc(rightText(task)) + "</span>" : rec.ok ? "✓ Correct!" + (rec.h ? " (with " + rec.h + " hint" + (rec.h > 1 ? "s" : "") + ")" : "") + (rec.accent ? " Watch the accent: " + esc(rightText(task)) : "") : "✗ Not quite. The answer is: <span dir='auto'>" + esc(rightText(task)) + "</span>"} <button class="btn sm ghost" id="whyBtn" style="margin-left:8px">💡 Why?</button></div>
     <div style="margin-top:12px"><b>Rate your answer</b> <span class="muted small">How well do you understand this now?</span>
       <div class="rate" style="margin-top:8px"><button data-r="1" aria-pressed="${rate === 1}">😀 I've got it</button><button data-r="2" aria-pressed="${rate === 2}">🤔 Partly</button><button data-r="3" aria-pressed="${rate === 3}">😟 I need help</button></div></div>`;
   $("whyBtn").onclick = () => explain(task, rec, S[s].rtl);
@@ -641,11 +690,102 @@ function showAfter(s, t, r, i, task, rec, isRetry, list, pos){
     VIEW.pos = pos + 1; render(); window.scrollTo(0, 0);
   };
 }
+/* ---------- hints: if a student is stuck, offer a hint. 3 hints per question, then the full solution. ---------- */
+const HINT_WAIT = { mcq:45000, tf:35000, num:60000, text:60000 }, HINTS_MAX = 3;
+let hintT = null, HS = null;   // HS = the question the hints are for
+const hwords = v => String(v || "").toLowerCase().match(/[a-zÀ-ɏ؀-ۿ]{4,}/g) || [];
+function answerForms(task){
+  if (task.k === "mcq") return [task.o[task.a]];
+  if (task.k === "tf") return [];
+  if (task.k === "num"){ const v = task.a, s = String(v), L = [s, v.toFixed(1), v.toFixed(2), Math.abs(v) >= 1000 ? v.toLocaleString("en-GB") : null].filter(Boolean); return L.concat(L.map(x => x.replace("-", "−"))).filter((x, i, a) => a.indexOf(x) === i); }
+  return (task.a || []).concat(task.best ? [task.best] : []).filter(a => a && a.length > 1);
+}
+function maskAns(task, str){
+  let out = String(str || "");
+  answerForms(task).sort((a, b) => b.length - a.length).forEach(a => {
+    const e = a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    out = task.k === "num" ? out.replace(new RegExp("(^|[^\\d.])" + e + "(?![\\d])", "g"), "$1…") : out.split(a).join("…");
+  });
+  return out;
+}
+function hintsFor(s, t, task){
+  const T = topicOf(s, t), L = (T && T.learn && T.learn.ideas) || [], key = new Set(hwords(task.q + " " + task.x));
+  let best = "", sc = -1; L.forEach(i => { const n = hwords(i).filter(w => key.has(w)).length - (maskAns(task, i) !== i ? 99 : 0); if (n > sc){ sc = n; best = i; } });
+  best = maskAns(task, best);
+  const sents = String(task.x || "").replace(/^(True|False)\.\s*/, "").split(/(?<=[.!?])\s+(?=[A-Z0-9(−-])/).filter(x => x && !/The right answer is/i.test(x));
+  const H = [best ? "Remember the key idea: " + best : "Re-read the question slowly and underline the key words."];
+  let h = [];
+  if (task.k === "mcq" && task.o && task.o.length > 2){
+    let x = 0; for (const ch of task.q) x = (x * 31 + ch.charCodeAt(0)) >>> 0;
+    const wrong = task.o.map((_, j) => j).filter(j => j !== task.a); const w1 = wrong[x % wrong.length], w2 = wrong.filter(j => j !== w1)[(x >> 3) % (wrong.length - 1)];
+    h = [`You can rule this one out: "${task.o[w1]}".`, `Rule this one out too: "${task.o[w2]}". Which of the others fits best?` + (sents[0] && maskAns(task, sents[0]) === sents[0] ? " " + sents[0] : "")];
+  } else if (task.k === "num"){
+    h = [sents.length ? "Here's how to start: " + maskAns(task, sents[0]) : "Write down what you know and which formula or method links it.",
+         sents.length > 1 ? "Nearly there: " + maskAns(task, sents.slice(0, -1).join(" ")) + " Now do the last step." : rangeHint(task)];
+    if (h[0] === h[1] || h[1].indexOf(h[0].replace("Here's how to start: ", "")) >= 0) h[1] = rangeHint(task);
+  } else if (task.k === "text"){
+    const ans = String(task.best || (task.a || [])[0] || "");
+    h = [sents.length ? "Think about this: " + maskAns(task, sents[0]) : "Look back at the key knowledge for this topic.",
+         ans ? `The answer has ${ans.replace(/\s/g, "").length} characters (not counting spaces) and starts with "${ans.trim()[0]}".` : "Check your spelling and format."];
+  } else {
+    h = [sents.length ? "Think about this: " + maskAns(task, sents[0]) : "Look at each word in the statement: one detail decides whether it's true.",
+         sents.length > 1 ? maskAns(task, sents.slice(1).join(" ")) : "Is EVERY part of the statement correct? If one part is wrong, the whole statement is false."];
+  }
+  return H.concat(h).filter((v, i, a) => v && a.indexOf(v) === i).concat(["Think about what the question is really asking, and try your best answer."]).slice(0, HINTS_MAX);
+}
+function rangeHint(task){ const v = +task.a, w = Math.max(1, Math.abs(v) * 0.25), nice = x => Math.abs(x) >= 10 ? Math.round(x) : Math.round(x * 10) / 10;
+  let lo = nice(v - w * (0.4 + (Math.abs(Math.round(v * 7)) % 5) / 10)), hi = nice(v + w * (0.4 + (Math.abs(Math.round(v * 3)) % 5) / 10)); if (lo === v) lo = nice(v - w); if (hi === v) hi = nice(v + w);
+  return `Check your working: the answer is between ${String(lo).replace("-", "−")} and ${String(hi).replace("-", "−")}.`; }
+function hintKey(s, t, r, i){ return s + "/" + t + "/" + r + "/" + i; }
+function hintsUsed(o, i){ return (o.hn && o.hn[i]) || 0; }
+function stopHints(){ clearTimeout(hintT); hintT = null; }
+function paintHints(s, t, r, i, task){
+  const o = run(s, t, r).o, n = hintsUsed(o, i), H = hintsFor(s, t, task), box = $("hintBox"), btn = $("hintBtn"); if (!box || !btn) return;
+  box.innerHTML = H.slice(0, n).map((h, k) => `<div class="hint"><b>💡 Hint ${k + 1} of ${HINTS_MAX}</b><br><span dir="auto">${esc(h)}</span></div>`).join("");
+  btn.textContent = n >= HINTS_MAX ? "📖 Show the solution" : `💡 Hint (${HINTS_MAX - n} left)`;
+}
+function armHints(s, t, r, i, task, isRetry, list, pos){
+  stopHints(); HS = { k: hintKey(s, t, r, i) };
+  const btn = $("hintBtn"); if (!btn) return;
+  paintHints(s, t, r, i, task);
+  btn.onclick = () => askHint(s, t, r, i, task, isRetry, list, pos, true);
+  const wait = HINT_WAIT[task.k] || 50000, mine = HS.k;
+  const tick = () => { hintT = setTimeout(() => {
+    if (!HS || HS.k !== mine || !$("hintBtn")) return;
+    if (document.hidden || $("modalRoot").innerHTML) return tick();   // wait until they're back and no pop-up is open
+    askHint(s, t, r, i, task, isRetry, list, pos, false);
+  }, wait); };
+  tick();
+}
+function askHint(s, t, r, i, task, isRetry, list, pos, asked){
+  stopHints();
+  const o = run(s, t, r).o, n = hintsUsed(o, i), sol = n >= HINTS_MAX;
+  const give = () => { closeModal();
+    if (sol) return showSolution(s, t, r, i, task, isRetry, list, pos);
+    o.hn = o.hn || {}; o.hn[i] = n + 1; save(); paintHints(s, t, r, i, task); try { $("hintBox").lastElementChild.scrollIntoView({ behavior:"smooth", block:"nearest" }); } catch(e){}
+    armHints(s, t, r, i, task, isRetry, list, pos); };
+  if (asked && !sol) return give();
+  modal(`<div class="eyebrow">${sol ? "Still stuck?" : "Taking a while?"}</div><h3 style="margin-top:4px">${sol ? "Would you like to see the solution?" : "Would you like a hint?"}</h3>
+    <p class="muted" style="margin-top:6px">${sol ? "You've used all 3 hints. The solution shows the answer and how to work it out. This question will count as not answered correctly, but you'll learn how to do it." : `You have ${HINTS_MAX - n} hint${HINTS_MAX - n > 1 ? "s" : ""} left for this question. After ${HINTS_MAX} hints you can see the full solution.`}</p>
+    <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn ghost" id="hNo">${sol ? "No, I'll keep trying" : "No thanks"}</button><button class="btn" id="hYes">${sol ? "Show the solution" : "Yes, give me a hint"}</button></div>`);
+  $("hYes").onclick = give;
+  $("hNo").onclick = () => { closeModal(); armHints(s, t, r, i, task, isRetry, list, pos); };
+}
+function showSolution(s, t, r, i, task, isRetry, list, pos){
+  stopHints();
+  const o = run(s, t, r).o, rec = { g: null, ok: false, sol: true, h: hintsUsed(o, i), at: Date.now() };
+  if (isRetry){ o.retry = o.retry || {}; o.retry[i] = rec; } else { o.ans[i] = rec; o.i = i; }
+  save(); if ($("hintBtn")) $("hintBtn").remove();
+  showAfter(s, t, r, i, task, rec, isRetry, list, pos); explain(task, rec, S[s].rtl);
+}
+function paintHintsDone(o, i, s, t, task){ const n = hintsUsed(o, i); if (!n || !$("hintBox")) return; const H = hintsFor(s, t, task);
+  $("hintBox").innerHTML = H.slice(0, n).map((h, k) => `<div class="hint"><b>💡 Hint ${k + 1} of ${HINTS_MAX}</b><br><span dir="auto">${esc(h)}</span></div>`).join(""); }
+
 /* explanation pop-up: shown after every check, right or wrong, to reinforce the knowledge */
 function explain(task, rec, rtl){
-  modal(`<div class="eyebrow">${rec.ok ? "Well done — here's why it's right" : "Let's fix this"}</div>
+  modal(`<div class="eyebrow">${rec.sol ? "Here's how to work it out" : rec.ok ? "Well done — here's why it's right" : "Let's fix this"}</div>
     <h3 style="margin-top:4px" dir="auto">${esc(task.q)}</h3>
-    ${rec.ok ? "" : `<p style="margin-top:8px"><span class="pill bad">Your answer</span> <span dir="auto">${esc(givenText(task, rec.g)) || "—"}</span></p>`}
+    ${rec.ok || rec.sol ? "" : `<p style="margin-top:8px"><span class="pill bad">Your answer</span> <span dir="auto">${esc(givenText(task, rec.g)) || "—"}</span></p>`}
     <p style="margin-top:8px"><span class="pill ok">Correct answer</span> <span dir="auto">${esc(rightText(task))}</span></p>
     <div class="example" dir="auto"><b>💡 Explanation and example</b>\n${esc(task.x)}</div>
     <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn sm ghost" id="xSay">🔊 Read aloud</button><button class="btn" id="xOk">Got it</button></div>`);
@@ -678,6 +818,7 @@ function report(s, t, isRetry, r){
   const data = { course:"uk", year: S[s].year, totalTopics: ORDER.reduce((a, k) => a + S[k].topics.length, 0), subjTopics: S[s].topics.length, subject: S[s].name, sid: s, topic: T.title + (X.r > 1 ? " · Set " + X.r + " (" + LVL_NAME(o.lv) + ")" : ""), tid: t, round: X.r, level: X.r > 1 ? LVL_NAME(o.lv) : "", strand: T.strand, score: sc.score, right: sc.right, n: sc.n, lv: sc.lv, effort: sc.effort, focus: sc.focus,
     mins: Math.max(1, mins(sc.ms)), secs: Math.round(sc.ms / 1000), got: sc.got, unsure: sc.unsure, need: sc.need, retry: !!isRetry, fixed: fixedNow,
     well: A.well.slice(0, 6).map(q => q.slice(0, 120)), improve: A.improve.slice(0, 8).map(x => ({ q: x.q.slice(0, 120), right: String(x.right).slice(0, 80), given: String(x.given).slice(0, 80), unsure: !!x.unsure, fixed: !!x.fixed })),
+    hints: Object.values(o.hn || {}).reduce((a, b) => a + b, 0), solutions: Object.values(o.ans || {}).filter(q => q.sol).length,
     totalMs: totals().ms };
   DB.reports.push(Object.assign({ at: Date.now() }, data)); if (DB.reports.length > 300) DB.reports.shift(); save();
   try { SDC.log("studyplus", ACCT, { study: data }); } catch(e){}
@@ -701,7 +842,7 @@ function renderSummary(){
     ${A.improve.length ? `<div><h2>📝 Corrections</h2><p class="muted small" style="margin-top:2px">Read each correction carefully; these are your knowledge gaps.</p><div class="stack" style="margin-top:10px">${A.gaps.map(i => { const task = tasks[i], a = o.ans[i];
       return `<div class="fix"><div class="q" dir="auto">${esc(task.q)}</div>${a.ok ? "" : `<div><span class="pill bad">You said</span> <span dir="auto">${esc(givenText(task, a.g))}</span></div>`}<div><span class="pill ok">Answer</span> <span dir="auto">${esc(rightText(task))}</span></div><div class="example" dir="auto" style="margin-top:4px">${esc(task.x)}</div></div>`; }).join("")}</div></div>` : ""}
     <div class="row" style="justify-content:flex-end">
-      <button class="btn ghost" id="kAgain">📘 Key knowledge</button>
+      <button class="btn ghost" id="kAgain">📘 Learn</button>
       ${runsOf(s, t) > 1 ? `<button class="btn ghost" id="mySets">📚 My sets (${runsOf(s, t)})</button>` : ""}
       ${gapsLeft.length ? `<button class="btn red" id="fixBtn">Fix my mistakes (${gapsLeft.length})</button>` : ""}
       ${r === 1 && runsOf(s, t) === 1 ? `<button class="btn ghost" id="redo">Start this topic again</button>` : ""}
@@ -711,7 +852,7 @@ function renderSummary(){
     <p class="muted small">Effort combines your score (60%), how many tasks you finished (20%) and how much real work time you spent on them (20%).</p>
   </div>`;
   $("bk").onclick = () => go({ v:"subject", s });
-  $("kAgain").onclick = () => showKnowledge(s, t, false);
+  $("kAgain").onclick = () => { save(); go({ v:"learn", s, t }); };
   if ($("mySets")) $("mySets").onclick = () => go({ v:"sets", s, t });
   if ($("fixBtn")) $("fixBtn").onclick = () => { const o2 = run(s, t, r).o; o2.retry = {}; save(); go({ v:"topic", s, t, r, retry: gapsLeft, pos: 0 }); };
   if ($("redo")) $("redo").onclick = () => { if (!confirm("Start this topic again? Your previous result has already been sent to your teacher.")) return; const st2 = tstate(s, t); st2.ans = {}; st2.retry = {}; st2.i = 0; st2.done = false; save(); go({ v:"topic", s, t, r:1 }); };
@@ -748,10 +889,10 @@ function renderReview(){
       return `<div class="fix"><div class="q" dir="auto">${i + 1}. ${lvlTag(task)} ${esc(task.q)}</div>
         ${a ? `<div><span class="pill ${a.ok ? "ok" : "bad"}">${a.ok ? "✓ You said" : "✗ You said"}</span> <span dir="auto">${esc(givenText(task, a.g))}</span>${a.rate ? ` <span class="muted small">· ${["", "😀 got it", "🤔 partly", "😟 need help"][a.rate]}</span>` : ""}${f ? ` <span class="pill ${f.ok ? "ok" : "warn"}">${f.ok ? "fixed" : "tried again"}</span>` : ""}</div>` : `<div class="muted small">Not answered yet</div>`}
         ${a ? `<div><span class="pill ok">Answer</span> <span dir="auto">${esc(rightText(task))}</span></div><div class="example" dir="auto" style="margin-top:4px">${esc(task.x)}</div>` : ""}</div>`; }).join("")}</div>
-    <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="kAgain">📘 Key knowledge</button><button class="btn" id="bk2">← My sets</button></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="kAgain">📘 Learn</button><button class="btn" id="bk2">← My sets</button></div>
   </div>`;
   $("bk").onclick = $("bk2").onclick = () => go({ v:"sets", s, t });
-  $("kAgain").onclick = () => showKnowledge(s, t, false);
+  $("kAgain").onclick = () => { save(); go({ v:"learn", s, t }); };
 }
 
 /* ---------- small UI helpers ---------- */
@@ -781,7 +922,7 @@ let READY = false;
   else if (pulled) toast("Your saved progress has been loaded");
   if (Cloud.on) Cloud.push();
 })();
-window.__study = { mark, topicScore, runScore, run, buildRound, ensureRounds, mergeIn, DB: () => DB, SESS, ready: () => READY, Cloud };   // used by the self-test
+window.__study = { hintsFor, mark, topicScore, runScore, run, buildRound, ensureRounds, mergeIn, DB: () => DB, SESS, ready: () => READY, Cloud };   // used by the self-test
 })();
 </script>
 </body>

@@ -228,5 +228,23 @@ G["y8chemistry/reactions"] = (d, r) => { const K = kit(r);
   return K.mcq(`Which equation is balanced?`, "2H₂ + O₂ → 2H₂O", ["H₂ + O₂ → H₂O", "H₂ + O₂ → 2H₂O", "2H₂ + 2O₂ → H₂O"], "Count atoms on each side: 2H₂ + O₂ → 2H₂O has 4 H and 2 O on both sides.", d);
 };
 
+/* ================= COMPUTING: data representation ================= */
+const bin = (n, w) => n.toString(2).padStart(w || 8, "0"), hexs = n => n.toString(16).toUpperCase();
+G["y8computing/data"] = (d, r) => { const K = kit(r);
+  if (d === 1){ const n = K.int(1, 31); return { d, k:"num", q:`Convert the binary number ${bin(n, 5)} to denary.`, a:n, x:`Place values 16, 8, 4, 2, 1. Add the columns with a 1: ${[16,8,4,2,1].filter(v => n & v).join(" + ")} = ${n}.` }; }
+  if (d === 2){ const n = K.int(20, 255); return { d, k:"text", q:`Convert ${n} to an 8-bit binary number.`, a:[bin(n)], x:`Use place values 128, 64, 32, 16, 8, 4, 2, 1 and subtract the biggest that fits each time: ${n} = ${[128,64,32,16,8,4,2,1].filter(v => n & v).join(" + ")} → ${bin(n)}.` }; }
+  if (r() < .5){ const a = K.int(10, 120), b = K.int(10, 120); return { d, k:"text", q:`Add the binary numbers ${bin(a)} + ${bin(b)}. Give the 8-bit (or 9-bit if it overflows) answer.`, a:[bin(a + b, a + b > 255 ? 9 : 8)], x:`${a} + ${b} = ${a + b} in denary, which is ${bin(a + b, a + b > 255 ? 9 : 8)}.${a + b > 255 ? " That needs 9 bits: an overflow error in an 8-bit register." : ""} Remember 1 + 1 = 10 (write 0, carry 1).` }; }
+  const bits = K.int(1, 8); return { d, k:"num", q:`How many different values can be stored using ${bits} bit${bits > 1 ? "s" : ""}?`, a:Math.pow(2, bits), x:`Each extra bit doubles the number of combinations: 2${sup(bits)} = ${Math.pow(2, bits)}.` };
+};
+G["y10computing/data"] = (d, r) => { const K = kit(r);
+  if (d === 1){ const n = K.int(16, 255); return K.mcq(`What is ${n} in hexadecimal?`, hexs(n), [hexs((n + 16) % 256 || 1), hexs(n ^ 1), hexs(Math.floor(n / 2) + 9), String(n).slice(0, 2)], `Divide by 16: ${n} = ${Math.floor(n / 16)} × 16 + ${n % 16}. ${Math.floor(n / 16)} → ${hexs(Math.floor(n / 16))}, ${n % 16} → ${hexs(n % 16)}. So ${hexs(n)}.`, d); }
+  if (d === 2){ if (r() < .5){ const n = K.int(16, 255); return { d, k:"num", q:`Convert hexadecimal ${hexs(n)} to denary.`, a:n, x:`${hexs(Math.floor(n / 16))} × 16 + ${hexs(n % 16)} = ${Math.floor(n / 16)} × 16 + ${n % 16} = ${n}.` }; }
+    const n = K.int(1, 60), s = K.int(1, 2), left = r() < .5, v = left ? (n << s) & 255 : n >> s; return { d, k:"text", q:`Apply a ${left ? "left" : "right"} logical shift of ${s} place${s > 1 ? "s" : ""} to ${bin(n)}. Give the 8-bit result.`, a:[bin(v)], x:`Move every bit ${s} place${s > 1 ? "s" : ""} ${left ? "left" : "right"} and fill with 0s: ${bin(v)}. A ${left ? "left" : "right"} shift ${left ? "multiplies" : "divides"} by ${Math.pow(2, s)} (${n} → ${v}).` }; }
+  if (r() < .5){ const w = K.pick([100, 200, 400, 800]), h = K.pick([100, 200, 300, 600]), cd = K.pick([1, 8, 16, 24]); const bytes = w * h * cd / 8;
+    return { d, k:"num", q:`An image is ${w} × ${h} pixels with a colour depth of ${cd} bit${cd > 1 ? "s" : ""}. What is its file size in kilobytes (1 KB = 1000 bytes)?`, a:bytes / 1000, tol:0.01, x:`Size = width × height × colour depth = ${w} × ${h} × ${cd} = ${w * h * cd} bits. ÷ 8 = ${bytes} bytes. ÷ 1000 = ${bytes / 1000} KB.` }; }
+  const sr = K.pick([8000, 16000, 44100]), bd = K.pick([8, 16]), t = K.int(2, 10); const bytes = sr * bd * t / 8;
+  return { d, k:"num", q:`Sound is sampled ${sr} times a second at a bit depth of ${bd} for ${t} seconds. What is the file size in kilobytes (1 KB = 1000 bytes)?`, a:bytes / 1000, tol:0.01, x:`Size = sample rate × bit depth × seconds = ${sr} × ${bd} × ${t} = ${sr * bd * t} bits = ${bytes} bytes = ${bytes / 1000} KB.` };
+};
+
 window.UK_GEN = { make(key, d, seed){ const g = G[key]; if (!g) return null; try { const t = g(d, rng(seed), seed); if (!t) return null; t.d = t.d || d; if (t.k === "mcq" && (t.a < 0 || !t.o || t.o.length < 2)) return null; return t; } catch(e){ return null; } }, has: key => !!G[key], keys: Object.keys(G), rng };
 })();

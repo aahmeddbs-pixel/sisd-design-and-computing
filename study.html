@@ -163,6 +163,7 @@ select.big{border:2px solid var(--line);background:var(--card);border-radius:10p
 .next-set{background:var(--soft);border-radius:12px;padding:12px 14px;border-left:4px solid var(--ok)}
 .setrow{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
 #sync{font-family:inherit;font-size:.8rem}
+.hint{background:var(--warnbg);color:var(--ink);border-left:4px solid var(--warn);border-radius:0 10px 10px 0;padding:10px 14px;margin-top:8px}
 .foot{text-align:center;color:var(--muted);font-size:.82rem;margin-top:30px}
 </style>
 </head>
@@ -452,7 +453,7 @@ function totals(){
 /* ---------- views ---------- */
 let VIEW = { v:"home" };
 function go(v){ VIEW = v; stopWork(); render(); window.scrollTo(0, 0); }
-function stopWork(){ working = null; $("clock").classList.add("hidden"); }
+function stopWork(){ working = null; $("clock").classList.add("hidden"); try { stopHints(); } catch(e){} }
 function startWork(s, t, r){ working = { s, t, r }; lastAct = Date.now(); $("clock").classList.remove("hidden"); $("clock").textContent = "⏱ " + fmt(run(s, t, r).o.ms || 0); }
 function render(){
   if (VIEW.v === "home") return renderHome();
@@ -566,14 +567,16 @@ function renderTopic(){
     <div class="q" dir="auto">${lvlTag(task)} ${esc(task.q)}</div>
     <div id="answerBox">${answerUI(task, SUB.rtl, r)}</div>
     <div id="after"></div>
-    <div class="row" style="justify-content:flex-end"><button class="btn red" id="checkBtn">Check my answer</button></div>
+    <div id="hintBox"></div>
+    <div class="row" style="justify-content:flex-end">${prev && prev.checked !== false ? "" : `<button class="btn ghost" id="hintBtn">💡 Hint (3 left)</button>`}<button class="btn red" id="checkBtn">Check my answer</button></div>
   </div>`;
   $("bk").onclick = () => { save(); go({ v:"subject", s }); };
   $("kAgain").onclick = () => showKnowledge(s, t, false);
   if ($("mySets")) $("mySets").onclick = () => { save(); go({ v:"sets", s, t }); };
   wireAnswer(task);
   if (prev && prev.checked !== false) showAfter(s, t, r, i, task, prev, !!retry, list, pos);
-  else $("checkBtn").onclick = () => check(s, t, r, i, task, !!retry, list, pos);
+  else { $("checkBtn").onclick = () => check(s, t, r, i, task, !!retry, list, pos); armHints(s, t, r, i, task, !!retry, list, pos); }
+  if (prev && prev.checked !== false) paintHintsDone(o, i, s, t, task);
 }
 /* options appear in a shuffled order that stays the same for this student and task (the right answer isn't always first);
    each new set shuffles them differently */
@@ -598,7 +601,8 @@ function check(s, t, r, i, task, isRetry, list, pos){
   if (pick == null || (typeof pick === "string" && !pick.trim())) return toast("Answer the task first.");
   const m = mark(task, pick);
   if (task.k === "num" && m.bad) return toast("Type a number only, for example 12 or -3.5");
-  const o = run(s, t, r).o, rec = { g: pick, ok: m.ok, accent: !!m.accent, at: Date.now() };
+  stopHints(); if ($("hintBtn")) $("hintBtn").remove();
+  const o = run(s, t, r).o, rec = { g: pick, ok: m.ok, accent: !!m.accent, h: hintsUsed(o, i), at: Date.now() };
   if (isRetry){ o.retry = o.retry || {}; o.retry[i] = rec; } else { o.ans[i] = rec; o.i = i; }
   save(); showAfter(s, t, r, i, task, rec, isRetry, list, pos); explain(task, rec, S[s].rtl);
 }
@@ -607,7 +611,7 @@ function showAfter(s, t, r, i, task, rec, isRetry, list, pos){
   $("answerBox").querySelectorAll(".opt").forEach(b => { b.disabled = true; const v = task.k === "tf" ? b.dataset.o === "t" : +b.dataset.o; if (v === task.a) b.classList.add("right"); else if (v === rec.g) b.classList.add("wrong"); });
   const inp = $("inp"); if (inp){ inp.value = rec.g; inp.disabled = true; inp.classList.add(rec.ok ? "right" : "wrong"); }
   const rate = rec.rate || 0;
-  $("after").innerHTML = `<div class="verdict ${rec.ok ? "ok" : "bad"}">${rec.ok ? "✓ Correct!" + (rec.accent ? " Watch the accent: " + esc(rightText(task)) : "") : "✗ Not quite. The answer is: <span dir='auto'>" + esc(rightText(task)) + "</span>"} <button class="btn sm ghost" id="whyBtn" style="margin-left:8px">💡 Why?</button></div>
+  $("after").innerHTML = `<div class="verdict ${rec.ok ? "ok" : "bad"}">${rec.sol ? "📖 Solution shown. The answer is: <span dir='auto'>" + esc(rightText(task)) + "</span>" : rec.ok ? "✓ Correct!" + (rec.h ? " (with " + rec.h + " hint" + (rec.h > 1 ? "s" : "") + ")" : "") + (rec.accent ? " Watch the accent: " + esc(rightText(task)) : "") : "✗ Not quite. The answer is: <span dir='auto'>" + esc(rightText(task)) + "</span>"} <button class="btn sm ghost" id="whyBtn" style="margin-left:8px">💡 Why?</button></div>
     <div style="margin-top:12px"><b>Rate your answer</b> <span class="muted small">How well do you understand this now?</span>
       <div class="rate" style="margin-top:8px"><button data-r="1" aria-pressed="${rate === 1}">😀 I've got it</button><button data-r="2" aria-pressed="${rate === 2}">🤔 Partly</button><button data-r="3" aria-pressed="${rate === 3}">😟 I need help</button></div></div>`;
   $("whyBtn").onclick = () => explain(task, rec, S[s].rtl);
@@ -624,11 +628,102 @@ function showAfter(s, t, r, i, task, rec, isRetry, list, pos){
     VIEW.pos = pos + 1; render(); window.scrollTo(0, 0);
   };
 }
+/* ---------- hints: if a student is stuck, offer a hint. 3 hints per question, then the full solution. ---------- */
+const HINT_WAIT = { mcq:45000, tf:35000, num:60000, text:60000 }, HINTS_MAX = 3;
+let hintT = null, HS = null;   // HS = the question the hints are for
+const hwords = v => String(v || "").toLowerCase().match(/[a-zÀ-ɏ؀-ۿ]{4,}/g) || [];
+function answerForms(task){
+  if (task.k === "mcq") return [task.o[task.a]];
+  if (task.k === "tf") return [];
+  if (task.k === "num"){ const v = task.a, s = String(v), L = [s, v.toFixed(1), v.toFixed(2), Math.abs(v) >= 1000 ? v.toLocaleString("en-GB") : null].filter(Boolean); return L.concat(L.map(x => x.replace("-", "−"))).filter((x, i, a) => a.indexOf(x) === i); }
+  return (task.a || []).concat(task.best ? [task.best] : []).filter(a => a && a.length > 1);
+}
+function maskAns(task, str){
+  let out = String(str || "");
+  answerForms(task).sort((a, b) => b.length - a.length).forEach(a => {
+    const e = a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    out = task.k === "num" ? out.replace(new RegExp("(^|[^\\d.])" + e + "(?![\\d])", "g"), "$1…") : out.split(a).join("…");
+  });
+  return out;
+}
+function hintsFor(s, t, task){
+  const T = topicOf(s, t), L = (T && T.learn && T.learn.ideas) || [], key = new Set(hwords(task.q + " " + task.x));
+  let best = "", sc = -1; L.forEach(i => { const n = hwords(i).filter(w => key.has(w)).length - (maskAns(task, i) !== i ? 99 : 0); if (n > sc){ sc = n; best = i; } });
+  best = maskAns(task, best);
+  const sents = String(task.x || "").replace(/^(True|False)\.\s*/, "").split(/(?<=[.!?])\s+(?=[A-Z0-9(−-])/).filter(x => x && !/The right answer is/i.test(x));
+  const H = [best ? "Remember the key idea: " + best : "Re-read the question slowly and underline the key words."];
+  let h = [];
+  if (task.k === "mcq" && task.o && task.o.length > 2){
+    let x = 0; for (const ch of task.q) x = (x * 31 + ch.charCodeAt(0)) >>> 0;
+    const wrong = task.o.map((_, j) => j).filter(j => j !== task.a); const w1 = wrong[x % wrong.length], w2 = wrong.filter(j => j !== w1)[(x >> 3) % (wrong.length - 1)];
+    h = [`You can rule this one out: "${task.o[w1]}".`, `Rule this one out too: "${task.o[w2]}". Which of the others fits best?` + (sents[0] && maskAns(task, sents[0]) === sents[0] ? " " + sents[0] : "")];
+  } else if (task.k === "num"){
+    h = [sents.length ? "Here's how to start: " + maskAns(task, sents[0]) : "Write down what you know and which formula or method links it.",
+         sents.length > 1 ? "Nearly there: " + maskAns(task, sents.slice(0, -1).join(" ")) + " Now do the last step." : rangeHint(task)];
+    if (h[0] === h[1] || h[1].indexOf(h[0].replace("Here's how to start: ", "")) >= 0) h[1] = rangeHint(task);
+  } else if (task.k === "text"){
+    const ans = String(task.best || (task.a || [])[0] || "");
+    h = [sents.length ? "Think about this: " + maskAns(task, sents[0]) : "Look back at the key knowledge for this topic.",
+         ans ? `The answer has ${ans.replace(/\s/g, "").length} characters (not counting spaces) and starts with "${ans.trim()[0]}".` : "Check your spelling and format."];
+  } else {
+    h = [sents.length ? "Think about this: " + maskAns(task, sents[0]) : "Look at each word in the statement: one detail decides whether it's true.",
+         sents.length > 1 ? maskAns(task, sents.slice(1).join(" ")) : "Is EVERY part of the statement correct? If one part is wrong, the whole statement is false."];
+  }
+  return H.concat(h).filter((v, i, a) => v && a.indexOf(v) === i).concat(["Think about what the question is really asking, and try your best answer."]).slice(0, HINTS_MAX);
+}
+function rangeHint(task){ const v = +task.a, w = Math.max(1, Math.abs(v) * 0.25), nice = x => Math.abs(x) >= 10 ? Math.round(x) : Math.round(x * 10) / 10;
+  let lo = nice(v - w * (0.4 + (Math.abs(Math.round(v * 7)) % 5) / 10)), hi = nice(v + w * (0.4 + (Math.abs(Math.round(v * 3)) % 5) / 10)); if (lo === v) lo = nice(v - w); if (hi === v) hi = nice(v + w);
+  return `Check your working: the answer is between ${String(lo).replace("-", "−")} and ${String(hi).replace("-", "−")}.`; }
+function hintKey(s, t, r, i){ return s + "/" + t + "/" + r + "/" + i; }
+function hintsUsed(o, i){ return (o.hn && o.hn[i]) || 0; }
+function stopHints(){ clearTimeout(hintT); hintT = null; }
+function paintHints(s, t, r, i, task){
+  const o = run(s, t, r).o, n = hintsUsed(o, i), H = hintsFor(s, t, task), box = $("hintBox"), btn = $("hintBtn"); if (!box || !btn) return;
+  box.innerHTML = H.slice(0, n).map((h, k) => `<div class="hint"><b>💡 Hint ${k + 1} of ${HINTS_MAX}</b><br><span dir="auto">${esc(h)}</span></div>`).join("");
+  btn.textContent = n >= HINTS_MAX ? "📖 Show the solution" : `💡 Hint (${HINTS_MAX - n} left)`;
+}
+function armHints(s, t, r, i, task, isRetry, list, pos){
+  stopHints(); HS = { k: hintKey(s, t, r, i) };
+  const btn = $("hintBtn"); if (!btn) return;
+  paintHints(s, t, r, i, task);
+  btn.onclick = () => askHint(s, t, r, i, task, isRetry, list, pos, true);
+  const wait = HINT_WAIT[task.k] || 50000, mine = HS.k;
+  const tick = () => { hintT = setTimeout(() => {
+    if (!HS || HS.k !== mine || !$("hintBtn")) return;
+    if (document.hidden || $("modalRoot").innerHTML) return tick();   // wait until they're back and no pop-up is open
+    askHint(s, t, r, i, task, isRetry, list, pos, false);
+  }, wait); };
+  tick();
+}
+function askHint(s, t, r, i, task, isRetry, list, pos, asked){
+  stopHints();
+  const o = run(s, t, r).o, n = hintsUsed(o, i), sol = n >= HINTS_MAX;
+  const give = () => { closeModal();
+    if (sol) return showSolution(s, t, r, i, task, isRetry, list, pos);
+    o.hn = o.hn || {}; o.hn[i] = n + 1; save(); paintHints(s, t, r, i, task); try { $("hintBox").lastElementChild.scrollIntoView({ behavior:"smooth", block:"nearest" }); } catch(e){}
+    armHints(s, t, r, i, task, isRetry, list, pos); };
+  if (asked && !sol) return give();
+  modal(`<div class="eyebrow">${sol ? "Still stuck?" : "Taking a while?"}</div><h3 style="margin-top:4px">${sol ? "Would you like to see the solution?" : "Would you like a hint?"}</h3>
+    <p class="muted" style="margin-top:6px">${sol ? "You've used all 3 hints. The solution shows the answer and how to work it out. This question will count as not answered correctly, but you'll learn how to do it." : `You have ${HINTS_MAX - n} hint${HINTS_MAX - n > 1 ? "s" : ""} left for this question. After ${HINTS_MAX} hints you can see the full solution.`}</p>
+    <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn ghost" id="hNo">${sol ? "No, I'll keep trying" : "No thanks"}</button><button class="btn" id="hYes">${sol ? "Show the solution" : "Yes, give me a hint"}</button></div>`);
+  $("hYes").onclick = give;
+  $("hNo").onclick = () => { closeModal(); armHints(s, t, r, i, task, isRetry, list, pos); };
+}
+function showSolution(s, t, r, i, task, isRetry, list, pos){
+  stopHints();
+  const o = run(s, t, r).o, rec = { g: null, ok: false, sol: true, h: hintsUsed(o, i), at: Date.now() };
+  if (isRetry){ o.retry = o.retry || {}; o.retry[i] = rec; } else { o.ans[i] = rec; o.i = i; }
+  save(); if ($("hintBtn")) $("hintBtn").remove();
+  showAfter(s, t, r, i, task, rec, isRetry, list, pos); explain(task, rec, S[s].rtl);
+}
+function paintHintsDone(o, i, s, t, task){ const n = hintsUsed(o, i); if (!n || !$("hintBox")) return; const H = hintsFor(s, t, task);
+  $("hintBox").innerHTML = H.slice(0, n).map((h, k) => `<div class="hint"><b>💡 Hint ${k + 1} of ${HINTS_MAX}</b><br><span dir="auto">${esc(h)}</span></div>`).join(""); }
+
 /* explanation pop-up: shown after every check, right or wrong, to reinforce the knowledge */
 function explain(task, rec, rtl){
-  modal(`<div class="eyebrow">${rec.ok ? "Well done — here's why it's right" : "Let's fix this"}</div>
+  modal(`<div class="eyebrow">${rec.sol ? "Here's how to work it out" : rec.ok ? "Well done — here's why it's right" : "Let's fix this"}</div>
     <h3 style="margin-top:4px" dir="auto">${esc(task.q)}</h3>
-    ${rec.ok ? "" : `<p style="margin-top:8px"><span class="pill bad">Your answer</span> <span dir="auto">${esc(givenText(task, rec.g)) || "—"}</span></p>`}
+    ${rec.ok || rec.sol ? "" : `<p style="margin-top:8px"><span class="pill bad">Your answer</span> <span dir="auto">${esc(givenText(task, rec.g)) || "—"}</span></p>`}
     <p style="margin-top:8px"><span class="pill ok">Correct answer</span> <span dir="auto">${esc(rightText(task))}</span></p>
     <div class="example" dir="auto"><b>💡 Explanation and example</b>\n${esc(task.x)}</div>
     <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn sm ghost" id="xSay">🔊 Read aloud</button><button class="btn" id="xOk">Got it</button></div>`);
@@ -661,6 +756,7 @@ function report(s, t, isRetry, r){
   const data = { subject: S[s].name, sid: s, topic: T.title + (X.r > 1 ? " · Set " + X.r + " (" + LVL_NAME(o.lv) + ")" : ""), tid: t, round: X.r, level: X.r > 1 ? LVL_NAME(o.lv) : "", strand: T.strand, score: sc.score, right: sc.right, n: sc.n, lv: sc.lv, effort: sc.effort, focus: sc.focus,
     mins: Math.max(1, mins(sc.ms)), secs: Math.round(sc.ms / 1000), got: sc.got, unsure: sc.unsure, need: sc.need, retry: !!isRetry, fixed: fixedNow,
     well: A.well.slice(0, 6).map(q => q.slice(0, 120)), improve: A.improve.slice(0, 8).map(x => ({ q: x.q.slice(0, 120), right: String(x.right).slice(0, 80), given: String(x.given).slice(0, 80), unsure: !!x.unsure, fixed: !!x.fixed })),
+    hints: Object.values(o.hn || {}).reduce((a, b) => a + b, 0), solutions: Object.values(o.ans || {}).filter(q => q.sol).length,
     totalMs: totals().ms };
   DB.reports.push(Object.assign({ at: Date.now() }, data)); if (DB.reports.length > 300) DB.reports.shift(); save();
   try { SDC.log("studyplus", ACCT, { study: data }); } catch(e){}
@@ -764,7 +860,7 @@ let READY = false;
   else if (pulled) toast("Your saved progress has been loaded");
   if (Cloud.on) Cloud.push();
 })();
-window.__study = { mark, topicScore, runScore, run, buildRound, ensureRounds, mergeIn, DB: () => DB, SESS, ready: () => READY, Cloud };   // used by the self-test
+window.__study = { hintsFor, mark, topicScore, runScore, run, buildRound, ensureRounds, mergeIn, DB: () => DB, SESS, ready: () => READY, Cloud };   // used by the self-test
 })();
 </script>
 </body>
