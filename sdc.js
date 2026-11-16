@@ -349,6 +349,17 @@ async function showFeedbackButton(){
   };
 }
 
+/* ---------- British English everywhere ----------
+   Every page and every box students write in is marked as British English (en-GB), so the browser's own spelling
+   check (red underlines) and the device keyboard suggest British spellings: colour, organise, centre. */
+(function(){
+  const GB = 'textarea:not([lang]),input:not([lang]):not([type]),input[type=text]:not([lang]),input[type=search]:not([lang]),[contenteditable="true"]:not([lang])';
+  const mark = root => { try { if (root.matches && root.matches(GB)) root.setAttribute("lang", "en-GB"); (root.querySelectorAll ? root.querySelectorAll(GB) : []).forEach(el => el.setAttribute("lang", "en-GB")); } catch(e){} };
+  const start = () => { try { const h = document.documentElement; if (!h.lang || h.lang === "en" || h.lang === "en-US") h.lang = "en-GB"; mark(document.body);
+    new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1) mark(n); }))).observe(document.body, { childList: true, subtree: true }); } catch(e){} };
+  if (document.body) start(); else document.addEventListener("DOMContentLoaded", start);
+})();
+
 /* ---------- active work time and effort ----------
    Effort = engaging with the work, not just looking at it. Time only counts while the student is working: in the
    last 2 minutes they typed, answered a question (a button, choice or checkbox), changed a field, or built/drew
