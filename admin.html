@@ -8,7 +8,7 @@
 <meta name="color-scheme" content="light dark">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261109f"></script>
+<script src="/python-pathways/pp-sync.js?v=20261116lg"></script>
 <script src="/python-pathways/answers-view.js?v=20261112all"></script>
 <script src="sdc.js?v=20261116gb"></script>
 <script src="study/maths.js?v=20261110a"></script>
@@ -168,6 +168,7 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
           <select class="t" id="stK" style="max-width:240px"><option value="">All classes</option></select>
           <select class="t" id="stCr" style="max-width:170px" title="Choose a class and a criterion to see the class's feedback"><option value="">Choose criterion</option><option>A</option><option>B</option><option>C</option><option>D</option></select>
           <button class="btn ghost sm" id="stPdf" title="One PDF with every listed student's feedback">📄 Class feedback (PDF)</button>
+          <button class="btn ghost sm" id="stLogins" title="Each student's username and password or PIN, class by class">🔐 Class logins</button>
           <button class="btn ghost sm" id="stAdd" data-super>＋ Set up a student by email</button></div>
         <div id="clsFb"></div>
         <div class="scroll" style="margin-top:12px"><table class="tbl" id="stTbl"></table></div>
@@ -940,7 +941,7 @@ function renderStudents(){
       <td>${pill(s.course)}${s.also && s.also.length ? `<div class="em" title="Also takes ${esc(s.also.map(x => C[x] ? C[x].name : x).join(", "))}">also ${esc(s.also.map(x => C[x] ? C[x].short : x).join(", "))}</div>` : ""}</td><td>${s.grade ? "G" + esc(s.grade) : ""}</td><td>${esc(s.course === "cs" ? levelName("cs", s.level) : s.cls || "")}</td><td>${esc(s.teacher || "")}</td>
       <td class="small">${progressCell(s)}</td>
       <td class="small">${s.active || s.last ? esc(fmtDT(s.active || s.last)) : "<span class='muted'>—</span>"}</td>
-      <td><div class="acts">${isSuper() || TKEY ? `<button class="btn sm" data-ed="${i}" title="Change course, grade, level or teacher">✏️ Change course</button>` : ""}<button class="btn ghost sm" data-pr="${i}">Progress &amp; feedback</button><button class="btn ghost sm" data-fp="${i}" title="Download this student's feedback as a PDF">📄 Feedback PDF</button>${s.course === "cs" ? `<button class="btn ghost sm" data-vp="${i}" title="Show or hide this student's PIN">👁 PIN</button>${PIN_DONE[s.key] ? `<button class="btn ok sm" data-pin="${i}" style="background:#1E8A55;color:#fff" title="PIN reset done. Press to reset it again">✓ Done</button>` : `<button class="btn ghost sm" data-pin="${i}">🔑 Reset PIN</button>`}` : RKEY ? (PIN_DONE[s.key + "#pw"] ? `<button class="btn ok sm" data-dpw="${i}" style="background:#1E8A55;color:#fff" title="Password reset done. Press to reset it again">✓ Done</button>` : `<button class="btn ghost sm" data-dpw="${i}">🔑 Reset password</button>`) : ""}${isSuper() ? delBtn(s, i) : ""}</div></td></tr>`).join("")
+      <td><div class="acts">${isSuper() || TKEY ? `<button class="btn sm" data-ed="${i}" title="Change course, grade, level or teacher">✏️ Change course</button>` : ""}<button class="btn ghost sm" data-pr="${i}">Progress &amp; feedback</button><button class="btn ghost sm" data-fp="${i}" title="Download this student's feedback as a PDF">📄 Feedback PDF</button>${s.course === "cs" ? `<button class="btn ghost sm" data-vp="${i}" title="Show or hide this student's PIN">👁 PIN</button>${PIN_DONE[s.key] ? `<button class="btn ok sm" data-pin="${i}" style="background:#1E8A55;color:#fff" title="PIN reset done. Press to reset it again">✓ Done</button>` : `<button class="btn ghost sm" data-pin="${i}">🔑 Reset PIN</button>`}` : (PIN_DONE[s.key + "#pw"] ? `<button class="btn ok sm" data-dpw="${i}" style="background:#1E8A55;color:#fff" title="Password reset done. Press to reset it again">✓ Done</button>` : `<button class="btn ghost sm" data-dpw="${i}">🔑 Reset password</button>`)}${isSuper() ? delBtn(s, i) : ""}</div></td></tr>`).join("")
       : `<tr><td colspan="8" class="muted">${isSuper() ? "No students yet. They appear here after signing in through the platform." : "No students have chosen you as their teacher yet."}</td></tr>`);
   $("stTbl").querySelectorAll("[data-ed]").forEach(b => b.onclick = () => editStudent(list[+b.dataset.ed]));
   $("stTbl").querySelectorAll("[data-pr]").forEach(b => b.onclick = () => openProgress(list[+b.dataset.pr]));
@@ -1440,6 +1441,45 @@ $("swGo").onclick = async () => { $("swGo").disabled = true;
   const ok = await publishCourseState(Object.assign({}, STATE, { unlocks: SW }));
   $("swMsg").innerHTML = `<div class="notice ${ok ? "ok" : "bad"}">${ok ? "Applied. Students see the change within about 5 minutes." : "Google Forms couldn't be reached. Try again."}</div>`; $("swGo").disabled = false; };
 
+/* ---- class logins: every student's username and password (Design / IT) or name and PIN (Computer Science) ----
+   Teachers see only their own classes. Design passwords are kept as a copy only the staff reset key can open. */
+function classLogins(){
+  const all = students().filter(s => canSee(s.teacher)), ks = {}; all.forEach(s => { ks[classKey(s)] = s; });
+  const keys = Object.keys(ks).sort((a, b) => classLabel(ks[a]).localeCompare(classLabel(ks[b]), undefined, { numeric:true }));
+  const bg = document.createElement("div"); bg.className = "modal-bg"; bg.style.zIndex = 70;
+  bg.innerHTML = `<div class="modal" role="dialog" aria-label="Class logins" style="max-width:860px;width:calc(100% - 24px)"><h2>🔐 Class logins</h2>
+    <p class="muted small" style="margin-top:4px">Choose a class to see how each student signs in. Keep this private: don't show it on the board. Grade 10 students sign in with a username; Grades 6–9 with their school email; Computer Science with their full name and PIN.</p>
+    <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><select class="t" id="clK" style="max-width:320px"><option value="">Choose a class…</option>${keys.map(k => `<option value="${esc(k)}"${k === $("stK").value ? " selected" : ""}>${esc(classLabel(ks[k]))}</option>`).join("")}</select>
+      <button class="btn ghost sm" id="clShow">👁 Show passwords</button><button class="btn ghost sm" id="clPrint">🖨 Print</button><button class="btn ghost sm" id="clX">Close</button></div>
+    ${RKEY ? "" : `<div class="notice warn" style="margin-top:10px">Design and IT passwords can't be shown on this computer yet: ${isSuper() ? "lock and sign in again as super admin." : "ask the super admin to sign in to the dashboard and press Save setup once, then sign in again."} Computer Science PINs still show.</div>`}
+    <div id="clOut" style="margin-top:12px"></div></div>`;
+  document.body.appendChild(bg);
+  const q = x => bg.querySelector(x); let shown = false, cache = {};
+  const paint = async () => {
+    const k = q("#clK").value, out = q("#clOut"); if (!k){ out.innerHTML = `<p class="muted">Choose a class above.</p>`; return; }
+    const list = all.filter(s => classKey(s) === k).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    const ds = list.filter(s => s.course !== "cs" && s.email).map(s => String(s.email).toLowerCase()).filter(e => !(e in cache));
+    if (ds.length && RKEY && PPSync.design && PPSync.design.enabled()){ out.innerHTML = `<div class="notice">Looking up passwords…</div>`;
+      try { const got = await PPSync.design.readSecrets(ds, RKEY); ds.forEach(e => cache[e] = got[e] || null); } catch(e){ ds.forEach(x => cache[x] = undefined); } }
+    const mask = v => shown ? `<b style="font-family:Consolas,Menlo,monospace;font-size:1.05em">${esc(v)}</b>` : `<span class="muted">••••••</span>`;
+    const rows = list.map((s, i) => {
+      const cs = s.course === "cs", em = String(s.email || "").toLowerCase(), user = cs ? s.name : (em && !em.includes("@") ? (s.uname || em) : em);
+      const sec = cs ? s.pin : (cache[em] && cache[em].pw), at = cs ? "" : (cache[em] && cache[em].at ? fmtD(+cache[em].at) : "");
+      const how = cs ? "Full name + PIN" : (em && !em.includes("@") ? "Username + password" : "School email + password");
+      const val = sec ? mask(sec) + (at ? `<div class="muted small">set ${esc(at)}${/^TEMP-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(sec) ? " · temporary" : ""}</div>` : "") : `<span class="muted small">${cs ? "No PIN on record" : !RKEY ? "Not available here" : "Not on record yet"}</span>`;
+      return `<tr><td>${i + 1}</td><td><b>${esc(s.name)}</b></td><td>${pill(s.course)}</td><td style="font-family:Consolas,Menlo,monospace">${esc(user || "—")}</td><td>${val}</td><td class="small muted">${how}</td>
+        <td><button class="btn ghost sm" data-rs="${i}">🔑 ${cs ? "Reset PIN" : "Reset password"}</button></td></tr>`; }).join("");
+    out.innerHTML = `<div class="scroll"><table class="tbl" id="clTbl"><tr><th>#</th><th>Student</th><th>Course</th><th>Signs in with</th><th>${list.some(s => s.course === "cs") ? "Password / PIN" : "Password"}</th><th>How</th><th></th></tr>${rows}</table></div>
+      <p class="muted small" style="margin-top:8px">"Not on record yet": the student chose their password before copies were kept, or hasn't signed in since. Use <b>Reset password</b> to give them a new one (they choose their own at the next sign-in).</p>`;
+    out.querySelectorAll("[data-rs]").forEach(b => b.onclick = () => { const s = list[+b.dataset.rs]; if (s.course === "cs") resetPin(s); else resetDesignPw(s); delete cache[String(s.email || "").toLowerCase()]; });
+  };
+  q("#clK").onchange = paint; q("#clX").onclick = () => bg.remove(); bg.onclick = e => { if (e.target === bg) bg.remove(); };
+  q("#clShow").onclick = () => { shown = !shown; q("#clShow").textContent = shown ? "🙈 Hide passwords" : "👁 Show passwords"; paint(); };
+  q("#clPrint").onclick = () => { const t = q("#clTbl"); if (!t) return; const w = window.open("", "_blank"); if (!w) return toast("Allow pop-ups to print.");
+    w.document.write(`<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><title>Class logins</title><style>body{font-family:Arial;padding:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:13px}button{display:none}</style></head><body><h2>${esc(q("#clK").selectedOptions[0].textContent)}: logins</h2>${t.outerHTML}<p style="font-size:12px;color:#666">Confidential: keep safe and destroy after use.</p></body></html>`); w.document.close(); w.print(); };
+  paint();
+}
+$("stLogins").onclick = classLogins;
 $("stQ").oninput = renderStudents; $("stC").onchange = renderStudents; $("stK").onchange = renderStudents; $("stCr").onchange = renderStudents;
 /* one student's feedback: Computer Science on one page, Design / IT one page per criterion they have work in */
 async function studentPdf(s0, b){
