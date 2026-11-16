@@ -34,3 +34,9 @@ One sign-in page for SISD's Computer Science (Python Pathways), Design and IT co
 - Study Plus UK now has 16 subjects: Year 8 and Year 10 Maths, Biology, Chemistry, Physics, English, History, Geography and Computing (82 topics, 1,194 written questions plus generators). `uk/y8-more.js`, `uk/y10-more.js`; extra worked examples in `uk/learn-extra.js`.
 - Each topic opens a Learn page: 1. key ideas, 2. worked example with steps, 3. more worked examples ("how to work it out", including fresh generated ones), 4. practice.
 - Hints (Study Plus and Study Plus UK): after 35–60 s on a question a pop-up offers a hint; a 💡 Hint button is always there. 3 hints per question (key idea → method or ruling out options → nearly there / answer range), then the full solution. Using the solution counts the question as not correct. Hints used are saved and reported.
+
+## Grade 7 Game Development unit (MakeCode Arcade)
+- A 9-week Computer Science unit (+ optional showcase week) in `/python-pathways/game-dev.html`, with its content in `/python-pathways/game-dev-data.js`.
+- Off by default. Super admin → 🔀 Switches → **Computer Science units**: switch on **Unit** (Grade 7 CS students then see a card above their Python lessons) and open each of the four stages when the class is ready. Stored in the signed switches state as `unlocks.cs7gd = { on, s1, s2, s3, s4 }`.
+- Stages: 1 Game Idea (research, proposal, pixel sprite, success criteria), 2 Level Design (a map and full write-up for every level, game flow, code plan, test plan), 3 Build & Test (share link, milestones, diary, test log), 4 Playtest & Evaluate. Submit unlocks only when every checklist item is complete.
+- Work saves on the computer and, locked with the student's Computer Science key, online ("W" rows). Submissions go to the teacher log (`gamedev`) and appear in the dashboard's **🎮 G7 Game Dev** tab with feedback and PDF.

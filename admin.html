@@ -11,6 +11,7 @@
 <script src="/python-pathways/pp-sync.js?v=20261116lv"></script>
 <script src="/python-pathways/answers-view.js?v=20261112all"></script>
 <script src="sdc.js?v=20261116lv"></script>
+<script src="/python-pathways/game-dev-data.js?v=20261116gd"></script>
 <script src="study/maths.js?v=20261110a"></script>
 <script src="study/english.js?v=20261110a"></script>
 <script src="study/science.js?v=20261110a"></script>
@@ -140,7 +141,7 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
   <div id="app" class="hidden">
     <div class="row" style="justify-content:space-between;margin-bottom:4px"><div><h1 id="whoTitle">Admin</h1><div class="muted small" id="whoSub"></div></div><div class="row"><span class="muted small" id="loadState"></span><button class="btn ghost sm" id="refresh">↻ Refresh</button></div></div>
     <div class="tabs" role="tablist">
-      <button data-t="students" aria-selected="true">👥 Students &amp; progress</button><button data-t="hp">🏠 House Points</button><button data-t="log">📋 Sign-in log</button><button data-t="answers">📘 CS answers</button><button data-t="teachers" data-super>🧑‍🏫 Teachers</button><button data-t="switches" data-super>🔀 Criteria switches</button><button data-t="study" data-super>✦ Study Plus</button><button data-t="setup" data-super>⚙️ Setup</button>
+      <button data-t="students" aria-selected="true">👥 Students &amp; progress</button><button data-t="hp">🏠 House Points</button><button data-t="log">📋 Sign-in log</button><button data-t="answers">📘 CS answers</button><button data-t="teachers" data-super>🧑‍🏫 Teachers</button><button data-t="gamedev">🎮 G7 Game Dev</button><button data-t="switches" data-super>🔀 Switches</button><button data-t="study" data-super>✦ Study Plus</button><button data-t="setup" data-super>⚙️ Setup</button>
     </div>
 
     <section id="t-hp" class="hidden">
@@ -222,8 +223,22 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
         <h2>Criteria switches (Design and IT)</h2>
         <p class="muted small" style="margin-top:4px">Switch a criterion on and it opens for every student in that unit. Changes reach every computer within about 5 minutes.</p>
         <div class="scroll" style="margin-top:10px"><table class="tbl" id="swTbl"></table></div>
+        <h2 style="margin-top:22px">Computer Science units</h2>
+        <p class="muted small" style="margin-top:4px">Switch on <b>Unit</b> to show the unit to Grade 7 Computer Science students (a card appears above their Python lessons). Then open each stage when the class is ready. A stage only opens if the unit is on.</p>
+        <div class="scroll" style="margin-top:10px"><table class="tbl" id="swCs"></table></div>
+        <div class="row" style="margin-top:8px"><button class="btn ghost sm" id="gdPreview">👁 Preview the Game Dev unit as a student</button></div>
         <div class="row" style="margin-top:14px"><button class="btn" id="swGo">Apply switches</button></div>
         <div id="swMsg"></div>
+      </div>
+    </section>
+
+    <section id="t-gamedev" class="hidden">
+      <div class="card">
+        <div class="row" style="justify-content:space-between"><h2>🎮 G7 Game Development <span class="n" id="gdCount">0</span></h2><button class="btn ghost sm" id="gdPreview2">👁 Preview as a student</button></div>
+        <p class="muted small" style="margin-top:4px">Grade 7 Computer Science · MakeCode Arcade unit (9 weeks + optional showcase week). Students submit four stages: <b>1 Game Idea</b> (Criteria A, B), <b>2 Level Design</b> (B), <b>3 Build &amp; Test</b> (C), <b>4 Playtest &amp; Evaluate</b> (D). Open a student to read their work, play their game, send feedback or save it as a PDF. Teachers see their own classes; the super admin sees everyone.</p>
+        <div id="gdState" style="margin-top:8px"></div>
+        <div class="row" style="margin-top:10px"><input class="t" id="gdQ" placeholder="Search name" style="max-width:240px"><select class="t" id="gdT" style="max-width:220px"><option value="">All teachers</option></select><button class="btn ghost sm" id="gdPdf">📄 Class PDF (all submitted work)</button></div>
+        <div class="scroll" style="margin-top:12px"><table class="tbl" id="gdTbl"></table></div>
       </div>
     </section>
 
@@ -522,7 +537,7 @@ function enter(){
 $("outBtn").onclick = () => location.reload();
 
 /* ---------------- tabs ---------------- */
-const TABS = ["hp","students","log","answers","teachers","switches","setup","study"];
+const TABS = ["hp","students","log","answers","teachers","switches","setup","study","gamedev"];
 document.querySelectorAll("#app .tabs button").forEach(b => b.onclick = () => {
   if (b.hasAttribute("data-super") && !isSuper()) return;
   document.querySelectorAll("#app .tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
@@ -531,6 +546,7 @@ document.querySelectorAll("#app .tabs button").forEach(b => b.onclick = () => {
   if (b.dataset.t === "switches") renderSwitches();
   if (b.dataset.t === "study") renderStudy();
   if (b.dataset.t === "answers") renderAnswers();
+  if (b.dataset.t === "gamedev") renderGameDev();
 });
 /* ---------------- CS answers: any task, not tied to a student (teachers and super admin) ---------------- */
 function fillAnLessons(){
@@ -562,6 +578,101 @@ document.addEventListener("click", e => { if (e.target && e.target.id === "spPre
   SDC.setGate({ mode:"study", course:"cs", who:{ email:SDC.TESTERS[0], name:"Test Student" }, acct:{ name:"Test Student", email:SDC.TESTERS[0], grade:"7", teacher:"Mr. Ahmed", course:"study" } });
   window.open("study.html", "_blank");
   if (keep) SDC.setGate(keep); else SDC.clearGate(); } });
+/* ---------------- G7 Game Development (MakeCode Arcade): submissions, feedback and PDFs ---------------- */
+function gdPreview(){
+  if (!isSuper() && !ME) return;
+  const keep = SDC.gate();   // the preview tab gets a copy of this tab's session; this tab keeps its own
+  SDC.setGate({ mode:"link", course:"cs", gdPreview:true, who:{ email:SDC.TESTERS[0], name:"Test Student" }, link:{ cs:{ name:"Test Student", email:SDC.TESTERS[0], grade:"7", teacher:"Mr. Ahmed" } } });
+  window.open("/python-pathways/game-dev.html", "_blank");
+  if (keep) SDC.setGate(keep); else SDC.clearGate();
+}
+document.addEventListener("click", e => { if (e.target && (e.target.id === "gdPreview" || e.target.id === "gdPreview2")) gdPreview(); });
+function gdStudents(){
+  const by = {};
+  ROWS.filter(r => r.type === "gamedev" && r.gd && r.acct && canSee(r.acct.teacher)).forEach(r => {
+    const k = SDC.keyOf(r.acct.email, r.acct.name), p = by[k] = by[k] || { key:k, acct:r.acct, st:{}, n:0 };
+    if (!p.when || r.when >= p.when){ p.acct = r.acct; p.when = r.when; }
+    const sk = r.gd.key || ("s" + r.gd.stage), cur = p.st[sk]; p.n++;
+    if (!cur || r.when >= cur.when) p.st[sk] = { when:r.when, data:r.gd.data || {}, ctx:r.gd.ctx || {}, first: cur ? Math.min(cur.first, r.when) : r.when, times:(cur ? cur.times : 0) + 1 };
+    else cur.times++;
+  });
+  return Object.values(by).sort((a, b) => String(a.acct.name).localeCompare(String(b.acct.name)));
+}
+function gdAll(p, k){ const s = p.st[k]; if (!s) return null; const all = { s1: Object.assign({}, (p.st.s1 && p.st.s1.data) || {}, { levelCount: s.ctx.levelCount || ((p.st.s1 && p.st.s1.data.levelCount) || "3"), criteria: s.ctx.criteria || ((p.st.s1 && p.st.s1.data.criteria) || []) }) };
+  all[k] = k === "s1" ? Object.assign({}, s.data) : s.data; return all; }
+function gdTitle(p){ for (const k of ["s4","s3","s2","s1"]) if (p.st[k] && p.st[k].ctx && p.st[k].ctx.title) return p.st[k].ctx.title; return (p.st.s1 && p.st.s1.data.title) || ""; }
+function gdLink(p){ const a = p.st.s4 && p.st.s4.data.finalLink, b = p.st.s3 && p.st.s3.data.link; return (window.GD7 && GD7.linkOK(a) ? a : "") || (window.GD7 && GD7.linkOK(b) ? b : "") || ""; }
+async function gdSwitchNote(){
+  try { await loadCourseState(); const g = (STATE.unlocks || {}).cs7gd || {};
+    $("gdState").innerHTML = `<div class="notice ${g.on ? "ok" : "warn"} small">${g.on ? "<b>Unit is ON</b> for Grade 7 students." : "<b>Unit is OFF</b>: students can't see it yet."} Stages open: ${["s1","s2","s3","s4"].filter(k => g[k]).map(k => k.slice(1)).join(", ") || "none"}.${isSuper() ? " Change this in 🔀 Switches." : " The super admin opens and closes stages."}</div>`; } catch(e){}
+}
+function renderGameDev(){
+  if (!$("gdTbl")) return;
+  if (!window.GD7){ $("gdTbl").innerHTML = `<tr><td class="muted">The Game Development unit file couldn't load. Refresh the page.</td></tr>`; return; }
+  const all = gdStudents(), q = ($("gdQ").value || "").toLowerCase(), t = $("gdT").value;
+  const teachers = [...new Set(all.map(p => p.acct.teacher || ""))].filter(Boolean).sort(), was = t;
+  $("gdT").innerHTML = `<option value="">All teachers</option>` + teachers.map(x => `<option${x === was ? " selected" : ""}>${esc(x)}</option>`).join("");
+  const list = all.filter(p => (!q || String(p.acct.name).toLowerCase().includes(q)) && (!t || p.acct.teacher === t));
+  $("gdCount").textContent = list.length;
+  const cell = (p, k) => { const s = p.st[k]; return s ? `<span style="color:var(--ok);font-weight:800">✓</span> <span class="small">${esc(fmtD(s.when))}</span>${s.times > 1 ? `<div class="muted small">${s.times} submissions</div>` : ""}` : `<span class="muted">—</span>`; };
+  $("gdTbl").innerHTML = list.length ? `<tr><th>Student</th><th>Teacher</th><th>Game</th>${GD7.STAGES.map(s => `<th>${s.icon} ${s.n}. ${esc(s.name)}</th>`).join("")}<th>Game link</th><th></th></tr>` + list.map((p, i) => { const L = gdLink(p);
+    return `<tr><td><b>${esc(p.acct.name)}</b><div class="muted small">G${esc(p.acct.grade || "7")}${p.acct.cls ? " · " + esc(p.acct.cls) : ""}</div></td><td class="small">${esc(p.acct.teacher || "")}</td><td>${esc(gdTitle(p))}</td>${GD7.STAGES.map(s => `<td>${cell(p, s.key)}</td>`).join("")}<td>${L ? `<a href="${esc(L)}" target="_blank" rel="noopener">▶ Play</a>` : `<span class="muted small">not yet</span>`}</td><td><button class="btn sm" data-gdo="${i}">Open</button></td></tr>`; }).join("")
+    : `<tr><td class="muted">No Game Development submissions yet${all.length ? " match the search" : ""}. Students' work appears here when they submit a stage.</td></tr>`;
+  $("gdTbl").querySelectorAll("[data-gdo]").forEach(b => b.onclick = () => gdOpen(list[+b.dataset.gdo]));
+  $("gdPdf").onclick = () => gdPrint(list);
+  gdSwitchNote();
+}
+$("gdQ").oninput = renderGameDev; $("gdT").onchange = renderGameDev;
+function gdDoc(list, title){
+  return `<!DOCTYPE html><html lang="en-GB"><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font:13px/1.45 Arial,Helvetica,sans-serif;color:#16223A;margin:22px}h1{font-size:19px;margin:0}h2{font-size:16px;margin:16px 0 4px;background:#1B2D4E;color:#fff;padding:5px 9px;border-radius:6px}.stu{page-break-after:always}.stu:last-child{page-break-after:auto}a{color:#1B2D4E}</style></head><body>
+    ${list.map(p => `<div class="stu"><div style="border-bottom:4px solid #DC2B3E;padding-bottom:6px;margin-bottom:8px"><b style="background:#DC2B3E;color:#fff;padding:2px 7px;border-radius:5px">SISD</b> Grade 7 Computer Science · Game Development (MakeCode Arcade)</div>
+      <h1>${esc(p.acct.name)} · ${esc(gdTitle(p) || "Untitled game")}</h1><p>${esc(p.acct.teacher || "")}${gdLink(p) ? ` · Game: <a href="${esc(gdLink(p))}">${esc(gdLink(p))}</a>` : ""}</p>
+      ${GD7.STAGES.map(s => { const st = p.st[s.key]; return st ? `<h2>Stage ${s.n}: ${esc(s.name)} · Criterion ${esc(s.crit)} · submitted ${esc(fmtDT(st.when))}</h2>${GD7.render(s.key, gdAll(p, s.key))}` : `<h2 style="background:#9aa7c2">Stage ${s.n}: ${esc(s.name)} · not submitted</h2>`; }).join("")}</div>`).join("")}</body></html>`;
+}
+function gdPrint(list){ if (!list.length) return toast("Nothing to print yet.");
+  const w = window.open("", "_blank"); if (!w) return toast("Allow pop-ups to save the PDF.");
+  w.document.write(gdDoc(list, list.length === 1 ? list[0].acct.name + " · Game Dev" : "G7 Game Dev · class work")); w.document.close(); setTimeout(() => w.print(), 500); }
+function gdOpen(p){
+  const have = GD7.STAGES.filter(s => p.st[s.key]); let cur = (have[have.length - 1] || GD7.STAGES[0]).key;
+  const bg = document.createElement("div"); bg.className = "modal-bg"; bg.style.zIndex = 70; bg.style.alignItems = "flex-start"; bg.style.overflow = "auto";
+  const L = gdLink(p);
+  bg.innerHTML = `<div class="modal" role="dialog" aria-label="Game Development work" style="max-width:980px;width:calc(100% - 24px);margin:30px auto">
+    <div class="row" style="justify-content:space-between"><div><h2>🎮 ${esc(p.acct.name)} · ${esc(gdTitle(p) || "Untitled game")}</h2><div class="muted small">${esc(p.acct.teacher || "")} · G${esc(p.acct.grade || "7")}</div></div>
+      <div class="row">${L ? `<a class="btn sm" href="${esc(L)}" target="_blank" rel="noopener">▶ Play the game</a>` : ""}<button class="btn ghost sm" id="gdP1">📄 PDF</button><button class="btn ghost sm" data-x>✕ Close</button></div></div>
+    <div class="row" style="margin-top:12px;gap:6px" id="gdTabs"></div>
+    <div id="gdBody" style="margin-top:10px;max-height:62vh;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--card)"></div>
+    <div class="card" style="margin-top:12px;border-left:6px solid var(--red)"><h3>📝 Feedback to ${esc(p.acct.name.split(" ")[0])}</h3>
+      <p class="muted small">The student sees this under "📝 Feedback from your teacher" at their next sign-in.</p>
+      <label class="small"><b>About</b><br><select class="t" id="gdAbout">${GD7.STAGES.map(s => `<option value="G7 Game Dev · Stage ${s.n}: ${esc(s.name)}">Stage ${s.n}: ${esc(s.name)} (Criterion ${esc(s.crit)})</option>`).join("")}</select></label>
+      <label class="small" style="display:block;margin-top:8px"><b>Strengths</b><textarea class="t" id="gdS" rows="3"></textarea></label>
+      <label class="small" style="display:block;margin-top:8px"><b>Improvements</b><textarea class="t" id="gdI" rows="3"></textarea></label>
+      <label class="small" style="display:block;margin-top:8px"><b>Student developments</b><textarea class="t" id="gdN" rows="2"></textarea></label>
+      <div class="row" style="margin-top:10px"><button class="btn" id="gdSend">Send feedback</button></div><div id="gdMsg"></div></div></div>`;
+  document.body.appendChild(bg);
+  const q = x => bg.querySelector(x);
+  const paint = () => {
+    q("#gdTabs").innerHTML = GD7.STAGES.map(s => `<button class="btn sm ${s.key === cur ? "" : "ghost"}" data-st="${s.key}">${s.icon} ${s.n}. ${esc(s.name)}${p.st[s.key] ? " ✓" : ""}</button>`).join("");
+    q("#gdTabs").querySelectorAll("[data-st]").forEach(b => b.onclick = () => { cur = b.dataset.st; q("#gdAbout").selectedIndex = +cur.slice(1) - 1; paint(); });
+    const st = p.st[cur], s = GD7.STAGES.find(x => x.key === cur);
+    if (!st){ q("#gdBody").innerHTML = `<p class="muted">Stage ${s.n} hasn't been submitted yet.</p>`; return; }
+    const all = gdAll(p, cur), ck = GD7.checks(cur, all), miss = ck.filter(x => !x.ok);
+    q("#gdBody").innerHTML = `<div class="muted small" style="margin-bottom:6px">Submitted ${esc(fmtDT(st.when))}${st.times > 1 ? ` · ${st.times} submissions (showing the latest; first ${esc(fmtDT(st.first))})` : ""} · MYP Criterion ${esc(s.crit)}${miss.length ? ` · <span style="color:var(--bad)">${miss.length} checklist item(s) now incomplete</span>` : ""}</div>` + GD7.render(cur, all);
+  };
+  q("#gdAbout").selectedIndex = +cur.slice(1) - 1; paint();
+  q("#gdP1").onclick = () => gdPrint([p]);
+  const close = () => { bg.remove(); document.removeEventListener("keydown", esc1); }; const esc1 = e => { if (e.key === "Escape") close(); }; document.addEventListener("keydown", esc1);
+  bg.onclick = e => { if (e.target === bg || e.target.hasAttribute("data-x")) close(); };
+  q("#gdSend").onclick = async () => {
+    const fb = { course:"cs", about:q("#gdAbout").value, s:q("#gdS").value.trim(), i:q("#gdI").value.trim(), n:q("#gdN").value.trim(), from:(isSuper() ? "Mr. Ahmed" : ((ME && ME.name) || "Your teacher")).slice(0, 60) };
+    if (!fb.s && !fb.i && !fb.n){ q("#gdMsg").innerHTML = `<div class="notice bad">Write at least one section first.</div>`; return; }
+    q("#gdSend").disabled = true;
+    try { await SDC.sendFeedback({ email:p.acct.email, name:p.acct.name }, fb);
+      SDC.log("feedback", { name:p.acct.name, email:p.acct.email, course:"cs", grade:p.acct.grade, teacher:p.acct.teacher }, { about:fb.about, by:(ME && ME.name) || "super admin" });
+      q("#gdMsg").innerHTML = `<div class="notice ok">Sent. ${esc(p.acct.name.split(" ")[0])} will see it at their next sign-in.</div>`; ["#gdS","#gdI","#gdN"].forEach(x => q(x).value = "");
+    } catch(e){ q("#gdMsg").innerHTML = `<div class="notice bad">Couldn't send. Check the connection and try again.</div>`; }
+    q("#gdSend").disabled = false;
+  };
+}
 /* ---------------- setup ---------------- */
 const SHEET_KEY = "sdc_admin_sheet", NOTIFY_KEY = "sdc_admin_notify", DS_KEY = "sdc_admin_ds";
 function sheetLink(){ return load(SHEET_KEY, "") || load("pyl_admin_sheet", ""); }   // falls back to the Python admin's saved link
@@ -1439,6 +1550,10 @@ async function renderSwitches(){
   await loadCourseState(); SW = JSON.parse(JSON.stringify(STATE.unlocks || {}));
   $("swTbl").innerHTML = `<tr><th>Unit</th>${["A","B","C","D"].map(c => `<th>Criterion ${c}</th>`).join("")}</tr>` + UNITS.map(([g, l]) => `<tr><td><b>${esc(l)}</b></td>${["A","B","C","D"].map(c => `<td><button class="sw" role="switch" aria-label="${esc(l)} Criterion ${c}" aria-checked="${!!(SW[g] && SW[g][c])}" data-g="${g}" data-c="${c}"></button></td>`).join("")}</tr>`).join("");
   $("swTbl").querySelectorAll(".sw").forEach(b => b.onclick = () => { const on = b.getAttribute("aria-checked") !== "true"; b.setAttribute("aria-checked", on); SW[b.dataset.g] = SW[b.dataset.g] || {}; SW[b.dataset.g][b.dataset.c] = on; });
+  const GK = "cs7gd", gs = SW[GK] || {}, cols = [["on","Unit"],["s1","Stage 1: Game Idea<br><span class='muted small'>Weeks 1–2</span>"],["s2","Stage 2: Level Design<br><span class='muted small'>Weeks 3–4</span>"],["s3","Stage 3: Build &amp; Test<br><span class='muted small'>Weeks 5–8</span>"],["s4","Stage 4: Evaluate<br><span class='muted small'>Weeks 9–10</span>"]];
+  $("swCs").innerHTML = `<tr><th>Unit</th>${cols.map(c => `<th>${c[1]}</th>`).join("")}</tr><tr><td><b>G7 CS · Game Development</b><div class="muted small">MakeCode Arcade</div></td>${cols.map(c => `<td><button class="sw" role="switch" aria-label="Game Development ${c[0]}" aria-checked="${!!gs[c[0]]}" data-gk="${c[0]}"></button></td>`).join("")}</tr>`;
+  $("swCs").querySelectorAll(".sw").forEach(b => b.onclick = () => { const on = b.getAttribute("aria-checked") !== "true"; b.setAttribute("aria-checked", on); SW[GK] = SW[GK] || {}; SW[GK][b.dataset.gk] = on;
+    if (b.dataset.gk === "on" && on && !["s1","s2","s3","s4"].some(k => SW[GK][k])){ SW[GK].s1 = true; const s1 = $("swCs").querySelector('[data-gk="s1"]'); if (s1) s1.setAttribute("aria-checked", true); } });
 }
 $("swGo").onclick = async () => { $("swGo").disabled = true;
   const ok = await publishCourseState(Object.assign({}, STATE, { unlocks: SW }));
@@ -1642,7 +1757,7 @@ function renderStudy(){
       <div class="scroll" style="margin-top:6px"><table class="tbl"><tr><th>When</th><th>Topic</th><th>Score</th><th>Effort</th><th>Work time</th><th>Strengths and gaps</th></tr>${recent || `<tr><td colspan="6" class="muted">No finished topics yet.</td></tr>`}</table></div>
     </div>`; }).join("");
 }
-function renderAll(){ setTimeout(lessonPopups, 800); renderHP(); renderResets(); renderSlow(); renderVerifyWaiting(); renderDesignRequests(); renderStudents(); renderLog(); try { renderStudy(); } catch(e){} setTimeout(healDeletes, 1500); }
+function renderAll(){ setTimeout(lessonPopups, 800); renderHP(); renderResets(); renderSlow(); renderVerifyWaiting(); renderDesignRequests(); renderStudents(); renderLog(); try { renderStudy(); } catch(e){} try { renderGameDev(); } catch(e){} setTimeout(healDeletes, 1500); }
 /* ---------- students who signed up but can't get in because they haven't verified their email ---------- */
 /* ---------- students who've been stuck on one task for a long time (after two reminders on their screen) ---------- */
 function renderSlow(){
