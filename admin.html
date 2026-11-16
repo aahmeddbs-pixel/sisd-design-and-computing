@@ -8,9 +8,9 @@
 <meta name="color-scheme" content="light dark">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261116lg"></script>
+<script src="/python-pathways/pp-sync.js?v=20261116lv"></script>
 <script src="/python-pathways/answers-view.js?v=20261112all"></script>
-<script src="sdc.js?v=20261116gb"></script>
+<script src="sdc.js?v=20261116lv"></script>
 <script src="study/maths.js?v=20261110a"></script>
 <script src="study/english.js?v=20261110a"></script>
 <script src="study/science.js?v=20261110a"></script>
@@ -667,7 +667,7 @@ async function loadDesign(){
   const seenDs = new Set();
   R.slice(1).forEach(r => {
     { const sig = r.slice(1).join("\u0001"); if (seenDs.has(sig)) return; seenDs.add(sig); }   // the same save delivered twice
-    const email = String(r[ci.email] || "").trim().toLowerCase(); if (!/@/.test(email) || /^staff$/i.test(r[ci.grade] || "") || /teacher/i.test(r[ci.role] || "")) return;
+    const email = String(r[ci.email] || "").trim().toLowerCase(); if (!email || email === "-" || !(/@/.test(email) || SDC.isUsername(email)) || /^staff$/i.test(r[ci.grade] || "") || /teacher/i.test(r[ci.role] || "")) return;   // Grade 10 sign in with a username (no @)
     const st = DS[email] = DS[email] || { email, name:"", grade:"", teacher:"", events:[], work:{}, last:0 };
     st.name = r[ci.name] || st.name; st.grade = r[ci.grade] || st.grade; st.teacher = r[ci.teacher] || st.teacher;
     let det = String(r[ci.det] || ""); const tm = det.match(/\s\|\s(\d{4}-\d\d-\d\dT[\d:.]+Z)\s*$/); const when = tm ? Date.parse(tm[1]) : 0; if (tm) det = det.slice(0, tm.index);
@@ -894,6 +894,7 @@ function students(){
   });
   Object.values(S).forEach(s => { if (s.course === "cs" && PINS[s.key]) s.pin = PINS[s.key].pin; const ps = s.course === "cs" ? PYSNAP[s.key] : null; s.py = ps ? ps.snap : null; s.ds = s.course !== "cs" ? DS[(s.email || "").toLowerCase()] || null : null;
     s.active = Math.max(s.active || 0, ps ? ps.when : 0, s.ds ? s.ds.last : 0);
+    s.live = LIVE[s.key] || null; if (s.live) s.active = Math.max(s.active, s.live.act || 0, s.live.at || 0);
     s.also = Object.values(S).filter(x => x !== s && x.key === s.key && x.course && x.course !== s.course).map(x => x.course); s.both = s.also.length > 0;
     if (s.both && s.course !== "cs"){ s.dcls = s.cls; } else if (s.both){ const d = Object.values(S).find(x => x.key === s.key && x.course === "design"); s.dcls = d && d.cls; } });
   const gone = {};   // accounts the super admin deleted: hidden unless the student has been active since (a new account)
@@ -933,18 +934,20 @@ function renderStudents(){
     sel.innerHTML = `<option value="">All classes</option>` + Object.entries(ks).sort((a, b) => classLabel(a[1]).localeCompare(classLabel(b[1]), undefined, { numeric:true })).map(([k, c]) => `<option value="${esc(k)}">${esc(classLabel(c))}</option>`).join("");
     sel.value = ks[cur] ? cur : ""; }
   const list = all0.filter(s => !$("stK").value || classKey(s) === $("stK").value);
-  $("stCount").textContent = list.length;
+  $("stCount").textContent = list.length; if (!$("liveCount")){ const sp = document.createElement("span"); sp.id = "liveCount"; sp.style.marginLeft = "8px"; $("stCount").after(sp); }
   $("stWarn").innerHTML = !isSuper() && !sheetId(pyLink()) ? `<div class="notice warn">Your dashboard isn't connected to the class data yet. Ask the super admin to open <b>Setup</b> and press <b>Save setup</b>.</div>`
-    : isSuper() && !sheetId(pyLink()) && !sheetId(dsLink()) ? `<div class="notice warn"><b>This computer isn't connected to the class data yet</b>, so no students show. Open <b>⚙️ Setup</b>, paste the two sheet links and press <b>Save setup</b> once: after that every computer you sign in on connects by itself.</div>` : "";
-  $("stTbl").innerHTML = `<tr><th>Student</th><th>Course</th><th>Grade</th><th>Level / class</th><th>Teacher</th><th>Progress</th><th>Last active</th><th></th></tr>` +
+    : isSuper() && !sheetId(pyLink()) && !sheetId(dsLink()) ? `<div class="notice warn"><b>This computer isn't connected to the class data yet</b>, so no students show. Open <b>⚙️ Setup</b>, paste the two sheet links and press <b>Save setup</b> once: after that every computer you sign in on connects by itself.</div>` : "" + (RKEY ? "" : `<div class="notice warn small">👁 Live view and 🙋 help requests aren't set up on this computer yet: ${isSuper() ? "lock and sign in again as super admin." : "ask the super admin to sign in to the dashboard and press <b>Save setup</b> once, then sign in again."}</div>`);
+  $("stTbl").innerHTML = `<tr><th>Student</th><th>Course</th><th>Grade</th><th>Level / class</th><th>Teacher</th><th>Progress</th><th>Online / last active</th><th></th></tr>` +
     (list.length ? list.map((s, i) => `<tr><td><b>${esc(s.name)}</b><div class="em">${esc(s.email || "no email on record")}</div>${s.wrong ? `<span class="pill bad">${s.wrong} wrong-course</span>` : ""}${s.unv && s.unv > (s.last || 0) ? ` <span class="pill warn" title="Signed up, waiting for a teacher to approve the account">⏳ waiting for approval</span>` : ""}</td>
       <td>${pill(s.course)}${s.also && s.also.length ? `<div class="em" title="Also takes ${esc(s.also.map(x => C[x] ? C[x].name : x).join(", "))}">also ${esc(s.also.map(x => C[x] ? C[x].short : x).join(", "))}</div>` : ""}</td><td>${s.grade ? "G" + esc(s.grade) : ""}</td><td>${esc(s.course === "cs" ? levelName("cs", s.level) : s.cls || "")}</td><td>${esc(s.teacher || "")}</td>
       <td class="small">${progressCell(s)}</td>
-      <td class="small">${s.active || s.last ? esc(fmtDT(s.active || s.last)) : "<span class='muted'>—</span>"}</td>
-      <td><div class="acts">${isSuper() || TKEY ? `<button class="btn sm" data-ed="${i}" title="Change course, grade, level or teacher">✏️ Change course</button>` : ""}<button class="btn ghost sm" data-pr="${i}">Progress &amp; feedback</button><button class="btn ghost sm" data-fp="${i}" title="Download this student's feedback as a PDF">📄 Feedback PDF</button>${s.course === "cs" ? `<button class="btn ghost sm" data-vp="${i}" title="Show or hide this student's PIN">👁 PIN</button>${PIN_DONE[s.key] ? `<button class="btn ok sm" data-pin="${i}" style="background:#1E8A55;color:#fff" title="PIN reset done. Press to reset it again">✓ Done</button>` : `<button class="btn ghost sm" data-pin="${i}">🔑 Reset PIN</button>`}` : (PIN_DONE[s.key + "#pw"] ? `<button class="btn ok sm" data-dpw="${i}" style="background:#1E8A55;color:#fff" title="Password reset done. Press to reset it again">✓ Done</button>` : `<button class="btn ghost sm" data-dpw="${i}">🔑 Reset password</button>`)}${isSuper() ? delBtn(s, i) : ""}</div></td></tr>`).join("")
+      <td class="small" data-lc="${i}">${liveCell(s)}</td>
+      <td><div class="acts"><button class="btn sm" data-lv="${i}" style="background:#1E8A55;color:#fff;border-color:#1E8A55" title="See what this student is working on right now">👁 Live view</button>${isSuper() || TKEY ? `<button class="btn sm" data-ed="${i}" title="Change course, grade, level or teacher">✏️ Change course</button>` : ""}<button class="btn ghost sm" data-pr="${i}">Progress &amp; feedback</button><button class="btn ghost sm" data-fp="${i}" title="Download this student's feedback as a PDF">📄 Feedback PDF</button>${s.course === "cs" ? `<button class="btn ghost sm" data-vp="${i}" title="Show or hide this student's PIN">👁 PIN</button>${PIN_DONE[s.key] ? `<button class="btn ok sm" data-pin="${i}" style="background:#1E8A55;color:#fff" title="PIN reset done. Press to reset it again">✓ Done</button>` : `<button class="btn ghost sm" data-pin="${i}">🔑 Reset PIN</button>`}` : (PIN_DONE[s.key + "#pw"] ? `<button class="btn ok sm" data-dpw="${i}" style="background:#1E8A55;color:#fff" title="Password reset done. Press to reset it again">✓ Done</button>` : `<button class="btn ghost sm" data-dpw="${i}">🔑 Reset password</button>`)}${isSuper() ? delBtn(s, i) : ""}</div></td></tr>`).join("")
       : `<tr><td colspan="8" class="muted">${isSuper() ? "No students yet. They appear here after signing in through the platform." : "No students have chosen you as their teacher yet."}</td></tr>`);
   $("stTbl").querySelectorAll("[data-ed]").forEach(b => b.onclick = () => editStudent(list[+b.dataset.ed]));
   $("stTbl").querySelectorAll("[data-pr]").forEach(b => b.onclick = () => openProgress(list[+b.dataset.pr]));
+  $("stTbl").querySelectorAll("[data-lv]").forEach(b => b.onclick = () => openLive(list[+b.dataset.lv]));
+  ST_LIST = list; paintLiveCells();
   $("stTbl").querySelectorAll("[data-fp]").forEach(b => b.onclick = () => studentPdf(list[+b.dataset.fp], b));
   $("stTbl").querySelectorAll("[data-pin]").forEach(b => b.onclick = () => resetPin(list[+b.dataset.pin]));
   $("stTbl").querySelectorAll("[data-dpw]").forEach(b => b.onclick = () => resetDesignPw(list[+b.dataset.dpw]));
@@ -1758,7 +1761,137 @@ function lessonPopups(){
   bg.onclick = e => { if (e.target === bg) close(); };
 }
 setInterval(() => { try { lessonPopups(); } catch(e){} }, 60000);
-function start(){ paintSetup(); paintVerify(); renderAll(); refresh(); clearInterval(timer); timer = setInterval(refresh, POLL_MS); }
+/* ---------- Live view and "Need help" ----------
+   Each student's page sends a short locked note while they work (the task they're on and what they're typing).
+   Only this dashboard can open it, with the same key as password resets. Students press "Need help" on a task:
+   the request pops up here for their teacher, who answers "On my way" or "Helped" (the student sees the answer). */
+let LIVE = {}, HELP = [], HELP_DONE = {}, OPEN_CACHE = {};
+const liveOk = () => !!(RKEY && window.PPSync && PPSync.openForStaff && SDC.live);
+const myName = () => isSuper() ? "Mr. Ahmed" : (ME && ME.name) || "Your teacher";
+async function openNote(r){ const k = r.id + "|" + r.ver; if (!(k in OPEN_CACHE)) OPEN_CACHE[k] = await PPSync.openForStaff(r.text, RKEY); return OPEN_CACHE[k]; }
+async function loadLive(){
+  if (!liveOk() || document.hidden || !ROLE) return;
+  try { const rows = await SDC.live.recent("V", Date.now() - 3 * 3600000, 500), newest = {};
+    rows.forEach(r => { if (!newest[r.id] || newest[r.id].ver < r.ver) newest[r.id] = r; });
+    for (const r of Object.values(newest)){ const p = await openNote(r); if (p && p.k && (!LIVE[p.k] || LIVE[p.k].at <= p.at)) LIVE[p.k] = p; }
+    paintLiveCells();
+  } catch(e){}
+}
+const ago = ms => { const m = Math.floor((Date.now() - ms) / 60000); return m < 1 ? "just now" : m < 60 ? m + " min ago" : fmtT(ms); };
+function liveState(s){
+  const L = s.live || LIVE[s.key], now = Date.now(), typed = L && L.act > 0 ? L.act : 0;
+  if (L && typed && now - typed < 150000) return { k:"on", html:`<span class="pill ok" title="Typed or answered something in the last 2 minutes">🟢 Working now</span>` };
+  if (L && now - L.at < 12 * 60000) return { k:"open", html:`<span class="pill" style="background:#FFF4D6;color:#5A3D00" title="The course is open on their screen">🟡 Online${typed ? ", last typed " + esc(ago(typed)) : ", not typing"}</span>` };
+  const t = Math.max(s.active || 0, s.last || 0, L ? Math.max(L.act || 0, L.at || 0) : 0);
+  return { k:"off", html: t ? esc(fmtDT(t)) : "<span class='muted'>—</span>" };
+}
+function liveCell(s){
+  const h = HELP.find(x => x.k === s.key);
+  return liveState(s).html + (h ? ` <span class="pill bad" style="cursor:pointer" data-hpk="${esc(s.key)}">🙋 needs help</span>` : "") + (s.last ? `<div class="em">Last sign-in ${esc(fmtDT(s.last))}</div>` : "");
+}
+let ST_LIST = [];
+function paintLiveCells(){
+  document.querySelectorAll("#stTbl [data-lc]").forEach(td => { const s = ST_LIST[+td.dataset.lc]; if (s){ s.live = LIVE[s.key] || s.live; td.innerHTML = liveCell(s); } });
+  document.querySelectorAll("#stTbl [data-hpk]").forEach(b => b.onclick = () => { const h = HELP.find(x => x.k === b.dataset.hpk); if (h) helpPopup(h, true); });
+  const n = $("liveCount"); if (n){ const on = ST_LIST.filter(s => liveState(s).k !== "off").length; n.innerHTML = on ? `<span class="pill ok">🟢 ${on} online now</span>` : ""; }
+}
+function liveHtml(p, s){
+  const st = liveState(Object.assign({}, s, { live:p })), box = (t, code) => `<pre style="white-space:pre-wrap;word-break:break-word;margin:6px 0 0;padding:10px 12px;border-radius:10px;max-height:340px;overflow:auto;${code ? "background:#14213A;color:#F4F7FB;font:13.5px/1.55 Consolas,Menlo,monospace" : "background:#F6F8FC;color:#16223A;border:1px solid #DCE2EE;font:15px/1.55 Arial,Helvetica,sans-serif"}">${esc(t) || "<span style='opacity:.6'>(empty so far)</span>"}</pre>`;
+  const h = HELP.find(x => x.k === s.key);
+  return `<div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">${st.html}<span class="small muted">Course opened or saved ${esc(ago(p.at))}${p.act > 0 ? " · last typed " + esc(ago(p.act)) : ""}</span></div>
+    ${h ? `<div class="notice bad" style="margin-top:10px"><b>🙋 Asked for help ${esc(ago(h.at))}:</b> ${esc(h.kt || "")}${h.msg ? ` · “${esc(h.msg)}”` : ""}</div>` : ""}
+    <div class="card" style="margin:10px 0 0;padding:12px 14px;border-left:6px solid #1B2D4E"><div class="small muted">Working on</div><div style="font-weight:800;font-size:1.05rem">${esc(p.w || "—")}</div></div>
+    ${p.fl || p.fv ? `<div class="card" style="margin:10px 0 0;padding:12px 14px;border-left:6px solid #1E8A55"><div class="small muted">✍️ Typing in</div><b>${esc(p.fl || "a box on the page")}</b>${box(p.fv, p.code)}</div>` : `<p class="small muted" style="margin:10px 0 0">They haven't typed in a box on this page yet.</p>`}
+    <p class="small" style="margin:10px 0 0">Active work today: <b>${+p.mins || 0} min</b> · characters typed today: <b>${+p.ch || 0}</b></p>
+    ${(p.more || []).length ? `<details style="margin-top:10px"${p.fv ? "" : " open"}><summary style="cursor:pointer;font-weight:700">Everything else they've written on this screen (${p.more.length})</summary>${p.more.map(m => `<div style="margin-top:8px"><b class="small">${esc(m.l || "Box")}</b>${box(m.v, m.code)}</div>`).join("")}</details>` : ""}`;
+}
+function openLive(s){
+  const bg = document.createElement("div"); bg.className = "modal-bg"; bg.style.zIndex = 72;
+  bg.innerHTML = `<div class="modal" role="dialog" aria-label="Live view" style="max-width:900px;width:calc(100% - 24px)"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap"><div><h2 style="margin:0">👁 ${esc(s.name)}: live</h2><div class="muted small" style="margin-top:2px">${pill(s.course)} ${s.grade ? "G" + esc(s.grade) : ""}${s.cls ? " · " + esc(s.cls) : ""}${s.teacher ? " · " + esc(s.teacher) : ""}</div></div>
+    <div class="row" style="gap:6px"><button class="btn ghost sm" id="lvPr">Progress &amp; feedback</button><button class="btn ghost sm" id="lvX">Close</button></div></div>
+    <div class="small muted" id="lvAt" style="margin-top:6px"></div><div id="lvOut" style="margin-top:8px"></div></div>`;
+  document.body.appendChild(bg);
+  const out = bg.querySelector("#lvOut"), at = bg.querySelector("#lvAt"); let stop = false, id = null, iv = null;
+  const close = () => { stop = true; clearInterval(iv); bg.remove(); };
+  bg.querySelector("#lvX").onclick = close; bg.onclick = e => { if (e.target === bg) close(); };
+  bg.querySelector("#lvPr").onclick = () => { close(); openProgress(s); };
+  if (!liveOk()){ out.innerHTML = `<div class="notice warn">Live view isn't set up on this computer yet: ${isSuper() ? "lock and sign in again as super admin." : "ask the super admin to sign in to the dashboard and press Save setup once, then sign in again."}</div>`; return; }
+  if (LIVE[s.key]) out.innerHTML = liveHtml(LIVE[s.key], s); else out.innerHTML = `<p class="muted">Looking at ${esc(String(s.name).split(" ")[0])}'s screen…</p>`;
+  const paint = async () => { if (stop) return;
+    try { id = id || await SDC.idOf(s.email, s.name);
+      const r = await SDC.live.one("V", id, Date.now() - 14 * 86400000), p = r && await openNote(r);
+      if (stop) return;
+      if (p){ if (!LIVE[s.key] || LIVE[s.key].at <= p.at) LIVE[s.key] = p; out.innerHTML = liveHtml(LIVE[s.key], s); paintLiveCells(); }
+      else if (!LIVE[s.key]) out.innerHTML = `<div class="notice">Nothing to show yet. ${esc(String(s.name).split(" ")[0])} hasn't had the course open since live view started. It shows here as soon as they open it and start working.</div>`;
+      at.textContent = "Checked " + new Date().toLocaleTimeString("en-GB") + " · updates by itself every 10 seconds";
+    } catch(e){ at.textContent = "Couldn't check just now (" + e.message + "). Trying again…"; }
+  };
+  paint(); iv = setInterval(paint, 10000);
+}
+/* ---- Need help ---- */
+async function loadHelp(){
+  if (!liveOk() || !ROLE) return;
+  try {
+    const [hs, ks] = await Promise.all([SDC.live.recent("H", Date.now() - 4 * 3600000, 200), SDC.live.acks(400)]);
+    const ack = {}; ks.forEach(k => { const key = k.id + "|" + k.ver; if (!ack[key]) ack[key] = k; });
+    const by = {};
+    for (const r of hs){ const key = r.id + "|" + r.ver, a = ack[key]; if (HELP_DONE[key] || (a && (a.st === "done" || a.st === "cancel"))) continue;
+      const p = await openNote(r); if (!p || !canSee(p.t)) continue;
+      if (!by[p.k] || by[p.k].ver < r.ver) by[p.k] = Object.assign({}, p, { hid:r.id, ver:r.ver, key, at:r.ver, ack: HELP_DONE[key + "c"] ? { st:"coming", by:myName() } : a || null }); }
+    HELP = Object.values(by).sort((a, b) => a.ver - b.ver);
+    paintHelp(); paintLiveCells();
+    const seen = load("sdc_helpseen", {}), fresh = HELP.find(h => !seen[h.key] && !h.ack && myClass(h.t) && Date.now() - h.at < 30 * 60000);
+    if (fresh){ seen[fresh.key] = Date.now(); Object.keys(seen).forEach(k => { if (Date.now() - seen[k] > 2 * 86400000) delete seen[k]; }); store("sdc_helpseen", seen); helpPopup(fresh); }
+  } catch(e){}
+}
+function helpAck(h, st){
+  SDC.sendRow("K", h.hid, [h.ver, st, myName()].join("|"));
+  if (st === "done") HELP_DONE[h.key] = 1; else { HELP_DONE[h.key + "c"] = 1; h.ack = { st, by:myName() }; }
+  HELP = HELP.filter(x => !HELP_DONE[x.key]); paintHelp(); paintLiveCells();
+  toast(st === "done" ? "Marked as helped." : String(h.n).split(" ")[0] + " can see you're on your way.");
+}
+function beep(){ try { const A = new (window.AudioContext || window.webkitAudioContext)(), o = A.createOscillator(), g = A.createGain(); o.connect(g); g.connect(A.destination); o.type = "sine";
+  [[880, 0], [1175, .18]].forEach(([f, t]) => o.frequency.setValueAtTime(f, A.currentTime + t)); g.gain.setValueAtTime(.0001, A.currentTime); g.gain.exponentialRampToValueAtTime(.25, A.currentTime + .03); g.gain.exponentialRampToValueAtTime(.0001, A.currentTime + .45); o.start(); o.stop(A.currentTime + .5); } catch(e){} }
+let titleFlash = null;
+function helpPopup(h, quiet){
+  document.querySelectorAll(".helpPop").forEach(x => x.remove());
+  const s = students().find(x => x.key === h.k) || { key:h.k, name:h.n, email:h.e, course:h.c, grade:h.g, teacher:h.t, cls:h.cls };
+  const bg = document.createElement("div"); bg.className = "modal-bg helpPop"; bg.style.zIndex = 80;
+  bg.innerHTML = `<div class="modal" role="alertdialog" aria-label="A student needs help" style="max-width:520px;border-top:8px solid #E0A100"><div style="font-size:2.2rem">🙋</div>
+    <h2 style="margin:4px 0 2px">${esc(h.n)} needs help</h2><div class="muted small">${pill(h.c)} ${h.g ? "G" + esc(h.g) : ""}${h.cls ? " · " + esc(h.cls) : ""}${h.t ? " · " + esc(h.t) : ""} · asked ${esc(ago(h.at))}</div>
+    <div class="card" style="margin:12px 0 0;padding:10px 14px"><div class="small muted">Task</div><b>${esc(h.w || "—")}</b><div class="small muted" style="margin-top:8px">What they need</div><b>${esc(h.kt || "")}</b>${h.msg ? `<div style="margin-top:6px;font-style:italic">“${esc(h.msg)}”</div>` : ""}</div>
+    ${h.ack && h.ack.st === "coming" ? `<p class="small" style="margin:10px 0 0">🏃 ${esc(h.ack.by || "A teacher")} is already on the way.</p>` : ""}
+    <div class="row" style="margin-top:14px;gap:8px;flex-wrap:wrap"><button class="btn" id="hpCome">🏃 On my way</button><button class="btn ghost" id="hpLive">👁 See their screen</button><button class="btn ghost" id="hpDone">✓ Helped</button><button class="btn ghost" id="hpX">Later</button></div></div>`;
+  document.body.appendChild(bg);
+  const close = () => { bg.remove(); clearInterval(titleFlash); titleFlash = null; document.title = document.title.replace(/^🙋 Help! · /, ""); };
+  bg.querySelector("#hpX").onclick = close;
+  bg.querySelector("#hpCome").onclick = () => { helpAck(h, "coming"); close(); };
+  bg.querySelector("#hpDone").onclick = () => { helpAck(h, "done"); close(); };
+  bg.querySelector("#hpLive").onclick = () => { close(); openLive(s); };
+  if (!quiet){ beep(); clearInterval(titleFlash); const t0 = document.title.replace(/^🙋 Help! · /, ""); let on = false; titleFlash = setInterval(() => { on = !on; document.title = on ? "🙋 Help! · " + t0 : t0; }, 1000); }
+}
+function paintHelp(){
+  let d = $("helpDock");
+  if (!HELP.length){ if (d) d.remove(); return; }
+  if (!d){ d = document.createElement("div"); d.id = "helpDock"; document.body.appendChild(d); }
+  const min = load("sdc_helpmin", false);
+  d.style.cssText = "position:fixed;right:14px;bottom:14px;z-index:65;width:min(360px,calc(100% - 28px));background:var(--card,#fff);border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);border-top:6px solid #E0A100;font-size:14px";
+  d.innerHTML = `<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer" id="hdHead"><b style="flex:1">🙋 ${HELP.length} student${HELP.length === 1 ? "" : "s"} need${HELP.length === 1 ? "s" : ""} help</b><span class="small muted">${min ? "Show ▾" : "Hide ▴"}</span></div>
+    ${min ? "" : `<div style="max-height:60vh;overflow:auto;padding:0 12px 10px">${HELP.map((h, i) => `<div style="border:1px solid #DCE2EE;border-radius:10px;padding:8px 10px;margin-top:8px">
+      <div style="display:flex;justify-content:space-between;gap:6px"><b>${esc(h.n)}</b><span class="small muted">${esc(ago(h.at))}</span></div>
+      <div class="small muted">${h.g ? "G" + esc(h.g) : ""}${h.cls ? " · " + esc(h.cls) : ""}${h.t ? " · " + esc(h.t) : ""}</div>
+      <div class="small" style="margin-top:4px"><b>${esc(h.w || "")}</b></div><div class="small">${esc(h.kt || "")}${h.msg ? ` · “${esc(h.msg)}”` : ""}</div>
+      ${h.ack && h.ack.st === "coming" ? `<div class="small" style="color:#1E8A55;margin-top:2px">🏃 ${esc(h.ack.by || "")} on the way</div>` : ""}
+      <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap"><button class="btn sm" data-hc="${i}">🏃 On my way</button><button class="btn ghost sm" data-hl="${i}">👁 Screen</button><button class="btn ghost sm" data-hd="${i}">✓ Helped</button></div></div>`).join("")}</div>`}`;
+  d.querySelector("#hdHead").onclick = () => { store("sdc_helpmin", !min); paintHelp(); };
+  d.querySelectorAll("[data-hc]").forEach(b => b.onclick = () => helpAck(HELP[+b.dataset.hc], "coming"));
+  d.querySelectorAll("[data-hd]").forEach(b => b.onclick = () => helpAck(HELP[+b.dataset.hd], "done"));
+  d.querySelectorAll("[data-hl]").forEach(b => b.onclick = () => { const h = HELP[+b.dataset.hl]; openLive(students().find(x => x.key === h.k) || { key:h.k, name:h.n, email:h.e, course:h.c, grade:h.g, teacher:h.t, cls:h.cls }); });
+}
+setInterval(() => { try { loadHelp(); } catch(e){} }, 20000);
+setInterval(() => { try { loadLive(); } catch(e){} }, 30000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden){ loadLive(); loadHelp(); } });
+function start(){ paintSetup(); paintVerify(); renderAll(); refresh(); clearInterval(timer); timer = setInterval(refresh, POLL_MS); setTimeout(() => { loadLive(); loadHelp(); }, 2500); }
 })();
 </script>
 </body>

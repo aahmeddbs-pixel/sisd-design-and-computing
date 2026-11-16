@@ -1304,8 +1304,165 @@ ${all(".sdc-busy::after")}{content:"";width:16px;height:16px;border:3px solid rg
   document.addEventListener("click", e => { const b = e.target && e.target.closest && e.target.closest(SEL); if (b) press(b); }, true);
   document.addEventListener("keydown", e => { if (e.key === "Enter"){ const f = e.target && e.target.closest && e.target.closest("form"), b = f && f.querySelector(SEL); if (b) press(b); } }, true);
 })();
+/* ---------- Live view and "Need help" ----------
+   While a student works, their page sends a short locked note every so often (only when they have typed or answered
+   something since the last one): which task they're on, the box they're typing in and what's in it. Only the staff
+   dashboard can open it (the same key as password resets). A "Need help" button on every task lets the student ask
+   their teacher for help; the teacher sees a pop-up with the student's name, the task and what they need, and can
+   answer "On my way" or "Helped", which the student sees on their screen. */
+const live = (() => {
+  const EVERY = 40000, BEAT = 180000, IDLE_BEAT = 600000, HELP_KEY = "sdc_help";
+  let where = "", field = null, sentAt = 0, sentSig = "", first = false;
+  const student = () => { const g = gate(); return g && g.acct && g.acct.name && g.acct.name !== "(admin)" && /python-pathways|myp-design-curriculum-pathways/.test(location.pathname) && !/admin\.html/.test(location.pathname) ? g : null; };
+  const textOk = el => !!el && (el.isContentEditable || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || (el.tagName === "INPUT" && /^(text|search|url|number|email|)$/i.test(el.getAttribute("type") || ""))) && !(el.closest && el.closest(".sdcHelpBox"));
+  document.addEventListener("focusin", e => { if (textOk(e.target)) field = e.target; }, true);
+  window.addEventListener("input", e => { if (textOk(e.target)) field = e.target; }, true);
+  const tx = n => String((n && (n.innerText || n.textContent)) || "").replace(/\s+/g, " ").trim();
+  const shown = el => !!el && el.isConnected && !!(el.offsetParent || (el.getClientRects && el.getClientRects().length));
+  function labelOf(el){
+    if (!el) return "";
+    try { if (el.id){ const l = document.querySelector('label[for="' + CSS.escape(el.id) + '"]'); if (l && tx(l)) return tx(l).slice(0, 200); } } catch(e){}
+    const ed = el.closest(".ed-wrap"); if (ed){ const h = ed.querySelector(".ed-head span"); if (h) return tx(h).slice(0, 200); }
+    const al = el.getAttribute("aria-label"); if (al) return al.slice(0, 200);
+    const td = el.closest("td");
+    if (td){ const tr = td.parentElement, tb = td.closest("table"), i = [...tr.children].indexOf(td), th = tb && tb.querySelector("tr th:nth-child(" + (i + 1) + ")"), lab = tb && labelOf(tb);
+      return ((lab ? lab + " · " : "") + "row " + ([...tb.querySelectorAll("tr")].indexOf(tr)) + (th && tx(th) ? ", " + tx(th) : "")).slice(0, 200); }
+    let n = el;
+    for (let i = 0; i < 6 && n; i++){ n = n.parentElement; if (!n) break;
+      const l = [...n.children].find(c => !c.contains(el) && /^(LABEL|H2|H3|H4|H5|B|STRONG|LEGEND)$/.test(c.tagName) && tx(c)) || n.querySelector(":scope > .lbl, :scope > .q, :scope > .label, :scope > .flab");
+      if (l && !l.contains(el) && tx(l)) return tx(l).slice(0, 200); }
+    return String(el.placeholder || "").slice(0, 200);
+  }
+  const valOf = el => el.isContentEditable ? String(el.innerText || "") : el.tagName === "SELECT" ? tx(el.options[el.selectedIndex]) : String(el.value || "");
+  const isCode = el => !!(el.closest(".ed-wrap") || /mono|consolas|courier/i.test(getComputedStyle(el).fontFamily || ""));
+  function whereNow(){
+    const s = slow._state(); if (s && s.label) return s.label;
+    if (where) return where;
+    const h = [...document.querySelectorAll("main h1, main h2, h1, h2")].find(x => shown(x) && tx(x)); return h ? tx(h).slice(0, 160) : document.title;
+  }
+  function snapshot(g){
+    const a = g.acct, w = work() || { ms:0, chars:0 }, f = field && field.isConnected && shown(field) ? field : null, cut = (s, n) => s.length > n ? "…" + s.slice(-n) : s;
+    const more = [...document.querySelectorAll("textarea, input[type=text], input:not([type]), [contenteditable=true]")]
+      .filter(el => el !== f && textOk(el) && shown(el) && valOf(el).trim()).slice(0, 12).map(el => ({ l: labelOf(el), v: cut(valOf(el).trim(), 500), code: isCode(el) || undefined }));
+    return { k: keyOf(a.email, a.name), n: a.name, e: a.email || "", c: g.course || a.course || "", g: a.grade || "", t: a.teacher || "", cls: a.cls || "", at: Date.now(), act: lastAct,
+      w: whereNow(), fl: f ? labelOf(f) : "", fv: f ? cut(valOf(f), 4000) : "", code: f ? isCode(f) || undefined : undefined, more, mins: Math.floor((w.ms || 0) / 60000), ch: w.chars || 0 };
+  }
+  const canSend = () => !offline() && window.PPSync && PPSync.sealForStaff;
+  async function post(kind, p){
+    const id = await idOf(p.e, p.n), text = await PPSync.sealForStaff(p);
+    if (kind === "V"){ const q = getQ().filter((it, i) => !(i > 0 && String(Object.values(it.f || {})[0] || "").startsWith("PPS2|V|"))); setQ(q); }   // an older unsent live note is out of date: drop it
+    enqueue(SYNC.action, { [SYNC.entry]: ["PPS2", kind, String(p.at), id, 0, 1, text].join("|") });
+  }
+  async function send(force){
+    const g = student(); if (!g || !canSend()) return;
+    if (!force && document.hidden) return;
+    const now = Date.now(), engaged = now - lastAct < IDLE_MS, p = snapshot(g), sig = JSON.stringify([p.w, p.fl, p.fv, p.more]);
+    if (!force && !( !first || (engaged && sig !== sentSig && now - sentAt >= EVERY) || (engaged && now - sentAt >= BEAT) || now - sentAt >= IDLE_BEAT )) return;
+    first = true; sentAt = now; sentSig = sig;
+    try { await post("V", p); } catch(e){}
+  }
+  setInterval(() => send(false), 10000); setTimeout(() => send(false), 4000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) setTimeout(() => send(false), 1500); });
+
+  /* ---- Need help ---- */
+  const getHelp = () => { try { const h = JSON.parse(sessionStorage.getItem(HELP_KEY) || "null"); return h && Date.now() - h.at < 90 * 60000 ? h : null; } catch(e){ return null; } };
+  const setHelp = h => { try { h ? sessionStorage.setItem(HELP_KEY, JSON.stringify(h)) : sessionStorage.removeItem(HELP_KEY); } catch(e){} paintChip(); };
+  const KINDS = [["task", "I don't understand what the task is asking"], ["stuck", "I'm stuck on my answer"], ["check", "Please check my work"], ["tech", "Something isn't working on the page"], ["other", "Something else"]];
+  function css(){
+    if (document.getElementById("sdcHelpCss")) return;
+    const s = document.createElement("style"); s.id = "sdcHelpCss";
+    s.textContent = `.sdcHelpTab{position:fixed;right:0;top:46%;z-index:2147483000;background:#E0A100;color:#1B2D4E;border:0;border-radius:12px 0 0 12px;padding:10px 12px 10px 14px;font:800 15px/1.2 Arial,Helvetica,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.25);cursor:pointer;max-width:200px;text-align:left}
+.sdcHelpTab.wait{background:#1B2D4E;color:#fff}.sdcHelpTab.come{background:#1E8A55;color:#fff}.sdcHelpTab small{display:block;font-weight:600;font-size:12px;margin-top:3px;opacity:.9}
+.sdcHelpBtn{display:inline-flex;align-self:flex-start;width:auto;max-width:max-content;align-items:center;gap:6px;background:#FFF4D6;color:#5A3D00;border:2px solid #E0A100;border-radius:999px;padding:6px 14px;font:700 14px/1.2 Arial,Helvetica,sans-serif;cursor:pointer;margin:6px 0}
+.sdcHelpBtn:hover{background:#FFE8A3}
+.sdcHelpBox{position:fixed;inset:0;background:rgba(14,26,48,.6);z-index:2147483600;display:flex;align-items:center;justify-content:center;padding:16px;font:16px/1.5 Arial,Helvetica,sans-serif}
+.sdcHelpBox .in{background:#fff;color:#16223A;border-radius:16px;max-width:480px;width:100%;padding:20px 22px;border-top:8px solid #E0A100;box-shadow:0 10px 40px rgba(0,0,0,.3);max-height:92vh;overflow:auto}
+.sdcHelpBox label.k{display:flex;gap:10px;align-items:flex-start;border:2px solid #DCE2EE;border-radius:10px;padding:8px 10px;margin:6px 0;cursor:pointer}
+.sdcHelpBox label.k:has(input:checked){border-color:#E0A100;background:#FFF8E5}
+.sdcHelpBox textarea{width:100%;box-sizing:border-box;min-height:70px;border:2px solid #DCE2EE;border-radius:10px;padding:8px;font:inherit;margin-top:6px;color:#16223A;background:#fff}
+.sdcHelpBox .b{border:0;border-radius:10px;padding:10px 16px;font:700 15px Arial,Helvetica,sans-serif;cursor:pointer}
+@media print{.sdcHelpTab,.sdcHelpBtn{display:none!important}}`;
+    document.head.appendChild(s);
+  }
+  function ask(task){
+    const g = student(); if (!g) return;
+    css(); document.querySelectorAll(".sdcHelpBox").forEach(x => x.remove());
+    const on = task || whereNow(), bg = document.createElement("div"); bg.className = "sdcHelpBox notranslate-auto";
+    bg.innerHTML = `<div class="in" role="dialog" aria-label="Ask your teacher for help"><div style="font-size:2rem">🙋</div><h2 style="margin:4px 0 4px">Ask ${esc(g.acct.teacher || "your teacher")} for help</h2>
+      <p style="margin:0 0 8px;color:#4A5568;font-size:14px">Task: <b>${esc(on)}</b></p><div style="font-weight:700;margin-top:6px">What do you need?</div>
+      ${KINDS.map((k, i) => `<label class="k"><input type="radio" name="sdcHk" value="${k[0]}"${i ? "" : " checked"} style="margin-top:4px"><span>${esc(k[1])}</span></label>`).join("")}
+      <div style="font-weight:700;margin-top:10px">Tell your teacher more <span style="font-weight:400;color:#6B7486">(optional)</span></div><textarea id="sdcHm" maxlength="500" placeholder="For example: I don't know how to start question 2"></textarea>
+      <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><button type="button" class="b" id="sdcHgo" style="background:#E0A100;color:#1B2D4E">🙋 Send to my teacher</button><button type="button" class="b" id="sdcHx" style="background:#EEF0F4;color:#1B2D4E">Cancel</button></div></div>`;
+    document.body.appendChild(bg);
+    bg.querySelector("#sdcHx").onclick = () => bg.remove();
+    bg.querySelector("#sdcHgo").onclick = async () => {
+      const kind = (bg.querySelector("input[name=sdcHk]:checked") || {}).value || "other", msg = bg.querySelector("#sdcHm").value.trim().slice(0, 500);
+      const p = Object.assign(snapshot(g), { w: on, kind, kt: (KINDS.find(k => k[0] === kind) || KINDS[4])[1], msg });
+      bg.querySelector("#sdcHgo").disabled = true;
+      try { await post("H", p); } catch(e){}
+      log("helpask", Object.assign({ course: g.course }, g.acct), { task:{ t:String(on).slice(0, 120) }, kind, ver:p.at });
+      setHelp({ ver:p.at, at:Date.now(), on, st:"wait" }); send(true);
+      bg.querySelector(".in").innerHTML = `<div style="font-size:2rem">✅</div><h2 style="margin:4px 0 8px">Your teacher has been told</h2><p style="margin:0">${esc(g.acct.teacher || "Your teacher")} can see you need help with <b>${esc(on)}</b>. Keep trying while you wait: read the task again and look back at the example.</p><button type="button" class="b" style="margin-top:14px;background:#1B2D4E;color:#fff">OK</button>`;
+      bg.querySelector("button").onclick = () => bg.remove();
+    };
+  }
+  function cancel(){ const h = getHelp(), g = student(); if (h && g) idOf(g.acct.email, g.acct.name).then(id => sendRow("K", id, [h.ver, "cancel", g.acct.name].join("|"))).catch(() => {}); setHelp(null); }
+  function paintChip(){
+    const g = student(); let b = document.getElementById("sdcHelpTab");
+    if (!g || !document.body){ if (b) b.remove(); return; }
+    css(); if (!b){ b = document.createElement("button"); b.type = "button"; b.id = "sdcHelpTab"; b.className = "sdcHelpTab notranslate-auto"; document.body.appendChild(b); }
+    const h = getHelp();
+    if (!h){ b.className = "sdcHelpTab"; b.innerHTML = "🙋 Need help?"; b.title = "Ask your teacher for help with this task"; b.onclick = () => ask(); return; }
+    if (h.st === "coming"){ b.className = "sdcHelpTab come"; b.innerHTML = `🏃 ${esc(h.by || "Your teacher")} is coming<small>to help you. Press to cancel</small>`; }
+    else if (h.st === "done"){ b.className = "sdcHelpTab come"; b.innerHTML = `✅ Helped<small>Press to ask again</small>`; }
+    else { b.className = "sdcHelpTab wait"; b.innerHTML = `🙋 Help asked<small>Waiting for your teacher. Press to cancel</small>`; }
+    b.onclick = () => { if (getHelp() && getHelp().st === "done"){ setHelp(null); ask(); return; } if (window.confirm("Cancel your request for help?")) cancel(); };
+  }
+  async function poll(){
+    const h = getHelp(), g = student(); if (!h || !g || h.st === "done" || offline()) return;
+    try { const id = await idOf(g.acct.email, g.acct.name), list = await rows("K", id, 10);
+      for (const r of list){ const [ver, st, by] = String(r.text).split("|"); if (+ver !== +h.ver) continue;
+        if (st === "cancel"){ setHelp(null); return; }
+        if (st !== h.st){ setHelp(Object.assign({}, h, { st, by })); if (st === "done") setTimeout(() => { const x = getHelp(); if (x && x.st === "done") setHelp(null); }, 20000); }
+        return; } } catch(e){}
+  }
+  setInterval(poll, 20000); setInterval(paintChip, 5000);
+  if (document.body) setTimeout(paintChip, 1500); else document.addEventListener("DOMContentLoaded", () => setTimeout(paintChip, 1500));
+  /* an inline "Need help with this task?" button for a course page to put on each task */
+  function button(task){ css(); const b = document.createElement("button"); b.type = "button"; b.className = "sdcHelpBtn"; b.innerHTML = "🙋 Need help with this task?"; b.onclick = () => ask(task); return b; }
+  const buttonHtml = task => { css(); return `<button type="button" class="sdcHelpBtn" data-sdc-help="${esc(task || "")}">🙋 Need help with this task?</button>`; };
+  document.addEventListener("click", e => { const b = e.target && e.target.closest && e.target.closest("[data-sdc-help]"); if (b){ e.preventDefault(); ask(b.dataset.sdcHelp || ""); } });
+
+  /* ---- staff dashboard: reading the notes back ---- */
+  async function recent(kind, since, limit){
+    const out = [], seen = new Set();
+    for (const c of await column()){
+      let r; try { r = await gviz(`select ${c.col} where ${c.col} starts with 'PPS2|${kind}|' and ${c.col} > 'PPS2|${kind}|${Math.floor(since)}' order by ${c.time} desc limit ${limit || 400}`, c.sheet); } catch(e){ if (!c.sheet) throw e; continue; }
+      ((r.table && r.table.rows) || []).forEach(row => { const v = String(((row.c || [])[0] || {}).v || ""); if (seen.has(v)) return; seen.add(v);
+        const p = v.split("|"); if (p.length >= 7 && /^\d{13}$/.test(p[2])) out.push({ ver:+p[2], id:p[3], text:p.slice(6).join("|") }); });
+    }
+    return out.sort((a, b) => b.ver - a.ver);
+  }
+  async function one(kind, id, since){
+    for (const c of await column()){
+      let r; try { r = await gviz(`select ${c.col} where ${c.col} starts with 'PPS2|${kind}|' and ${c.col} > 'PPS2|${kind}|${Math.floor(since)}' and ${c.col} contains '|${id}|' order by ${c.time} desc limit 1`, c.sheet); } catch(e){ if (!c.sheet) throw e; continue; }
+      const v = String((((r.table && r.table.rows) || [])[0] || { c:[] }).c[0] ? r.table.rows[0].c[0].v : "");
+      const p = v.split("|"); if (p.length >= 7) return { ver:+p[2], id:p[3], text:p.slice(6).join("|") };
+    }
+    return null;
+  }
+  async function acks(limit){
+    const out = [];
+    for (const c of await column()){
+      let r; try { r = await gviz(`select ${c.col} where ${c.col} starts with 'PPS2|K|' order by ${c.time} desc limit ${limit || 400}`, c.sheet); } catch(e){ if (!c.sheet) throw e; continue; }
+      ((r.table && r.table.rows) || []).forEach(row => { const p = String(((row.c || [])[0] || {}).v || "").split("|"); if (p.length >= 9) out.push({ id:p[2], at:+p[3], ver:+p[6], st:p[7], by:p.slice(8).join("|") }); });
+    }
+    return out.sort((a, b) => b.at - a.at);
+  }
+  return { send, where: w => { where = String(w || "").slice(0, 160); }, ask, button, buttonHtml, recent, one, acks, _snap: () => { const g = student(); return g ? snapshot(g) : null; } };
+})();
 return { jsonp, PORTAL, COURSES, studyPlusOK, studyPlusEmail, studyReport, STUDY_PLUS, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
-  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, forgot, forgotDialog, resetDone, emailCode, checkCode, usernameOf, isUsername, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, gloss, listen, stopReading, speak, slow, rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
+  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, forgot, forgotDialog, resetDone, emailCode, checkCode, usernameOf, isUsername, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, gloss, listen, stopReading, speak, slow, live, rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();
 
 /* ---------- Readable everywhere: light mode, dark mode, any screen ----------
