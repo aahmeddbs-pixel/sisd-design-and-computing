@@ -314,10 +314,27 @@ function verify_(email, token){
    Goes only to STUDY_TO (fixed here, never taken from the page). Says how long the student actually worked
    (active time, not just signed in), the score, effort, what went well and what to improve. */
 const STUDY_TO = "aahmed.dbs@gmail.com";
+/* Study Plus UK: each year group's student also gets a copy of their own results (fixed here, never from the page). */
+const UK_STUDENT_TO = { 8: "maira.mo.ahmed@gmail.com", 10: "mahamohamed27.a@gmail.com" };
+/* written feedback and next steps from the score, effort, hints and gaps */
+function advice_(d){
+  const sc = Math.round(+d.score || 0), gaps = (d.improve || []).filter(x => !x.unsure).length, unsure = (d.improve || []).filter(x => x.unsure).length, hints = Math.round(+d.hints || 0), sol = Math.round(+d.solutions || 0);
+  const feedback = (sc >= 85 ? "Excellent: a secure understanding of this topic." : sc >= 65 ? "Good work: most of this topic is secure, with a few gaps to close." : sc >= 45 ? "A fair start: the basics are there, but several ideas need more practice." : "This topic is not secure yet: go back over the key ideas before trying again.") +
+    (d.revision ? " This is on the Term 1 Summative Assessment." : "") + (hints ? " " + hints + " hint" + (hints > 1 ? "s were" : " was") + " used" + (sol ? " and " + sol + " solution" + (sol > 1 ? "s" : "") + " shown" : "") + "." : "");
+  const next = [];
+  if (gaps) next.push("Use \"Fix my mistakes\" to redo the " + gaps + " question" + (gaps > 1 ? "s" : "") + " answered wrongly, then read the explanation for each.");
+  if (unsure) next.push("Re-read the Learn page for the " + unsure + " question" + (unsure > 1 ? "s" : "") + " answered correctly but not confidently, then try a new set.");
+  if (sc < 65) next.push("Re-read the key ideas and the worked examples, cover the steps and try each example on paper first.");
+  if (hints >= 3 || sol) next.push("Try each question for a few minutes before asking for a hint, and write down the working step by step.");
+  if (sc >= 85) next.push("Come back for the next set: it will be at a harder (Challenge) level.");
+  else next.push("Come back tomorrow: a new set will be ready, focused on what was missed.");
+  if (d.revision) next.push("Before the assessment, revisit any ⭐ highlighted topics and learn the memory tricks.");
+  return { feedback, next };
+}
 function study_(p){
   const d = p && p.d; if (!d || typeof d !== "object") return { ok: false, reason: "bad" };
   const cache = CacheService.getScriptCache(), n = +(cache.get("study-count") || 0);
-  if (n >= 30) return { ok: false, reason: "wait" };                         // at most 30 of these an hour
+  if (n >= 40) return { ok: false, reason: "wait" };                         // at most 40 reports an hour
   const once = "study:" + Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, String(p.e || p.n) + "|" + d.sid + "|" + d.tid + "|" + (d.retry ? "r" : "f") + "|" + d.score + "|" + d.secs));
   if (cache.get(once)) return { ok: true, already: true };                   // the same report twice (double click, retry)
   cache.put("study-count", String(n + 1), 3600); cache.put(once, "1", 21600);
@@ -329,16 +346,32 @@ function study_(p){
   const imp = li((d.improve || []).map(x => h(String(x.q || "").slice(0, 140)) + '<br><span style="color:#5B6782;font-size:13px">' +
     (x.unsure ? "Right, but not confident yet. " : "Answered: " + h(String(x.given || "—").slice(0, 80)) + ". ") + "Correct: <b>" + h(String(x.right || "").slice(0, 80)) + "</b>" + (x.fixed ? " · fixed on retry ✓" : "") + "</span>"));
   const cell = (label, value, c) => '<td style="padding:10px;text-align:center;background:#F3F5F9;border-radius:8px"><div style="font-size:22px;font-weight:bold;color:' + (c || "#16223A") + '">' + value + '</div><div style="font-size:11px;color:#5B6782;text-transform:uppercase;letter-spacing:.05em">' + label + '</div></td>';
-  const body = mailBox_("Study Plus report",
+  const uk = d.course === "uk" && (+d.year === 8 || +d.year === 10), yr = uk ? "Year " + (+d.year) + " · " : "";
+  const adv = uk ? advice_(d) : null;
+  const advHtml = adv ? '<h3 style="color:#1B2D4E;font-size:16px;margin:16px 0 6px">Feedback</h3><p>' + h(adv.feedback) + '</p><h3 style="color:#1B2D4E;font-size:16px;margin:16px 0 6px">How to improve</h3><ul style="padding-left:18px;margin:0">' + adv.next.map(x => '<li style="margin-bottom:4px">' + h(x) + '</li>').join("") + '</ul>' : "";
+  const body = mailBox_(uk ? "Study Plus UK report · Year " + (+d.year) : "Study Plus report",
     '<p><b>' + h(name) + '</b> ' + (d.retry ? 'fixed mistakes in' : 'finished') + ' <b>' + h(d.subject) + ': ' + h(d.topic) + '</b> <span style="color:#5B6782">(' + h(d.strand || "MYP 2") + ')</span>.</p>' +
     '<table style="width:100%;border-collapse:separate;border-spacing:6px"><tr>' + cell("Active work", mins + " min") + cell("Score", score + "%", col) + cell("Right first time", num(d.right) + "/" + num(d.n)) + cell("Effort", effort + "%") + '</tr></table>' +
     (d.retry ? '<p>On the retry they fixed <b>' + num(d.fixed) + '</b> of their mistakes.</p>' : '') +
     '<p style="color:#5B6782;font-size:13px">Self-rating: 😀 got it ' + num(d.got) + ' · 🤔 partly ' + num(d.unsure) + ' · 😟 need help ' + num(d.need) + '. Focus ' + num(d.focus) + '% (real working time compared with about 40 seconds a task). Total Study Plus work time so far: ' + num((+d.totalMs || 0) / 60000) + ' min.</p>' +
     '<h3 style="color:#1E8A55;font-size:16px;margin:16px 0 6px">What went well</h3>' + (well ? '<ul style="padding-left:18px;margin:0">' + well + '</ul>' : '<p style="color:#5B6782">No tasks were both correct and rated "I\'ve got it" this time.</p>') +
-    '<h3 style="color:#C0283A;font-size:16px;margin:16px 0 6px">What to improve</h3>' + (imp ? '<ul style="padding-left:18px;margin:0">' + imp + '</ul>' : '<p style="color:#5B6782">No knowledge gaps in this topic.</p>') +
+    '<h3 style="color:#C0283A;font-size:16px;margin:16px 0 6px">What to improve</h3>' + (imp ? '<ul style="padding-left:18px;margin:0">' + imp + '</ul>' : '<p style="color:#5B6782">No knowledge gaps in this topic.</p>') + advHtml +
     '<p style="color:#5B6782;font-size:13px;margin-top:16px">Effort = 60% score + 20% tasks finished + 20% focus. Full history: staff dashboard → ✦ Study Plus.</p>' +
     '<p><a href="' + SITE + 'admin.html" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Open the staff dashboard</a></p>');
-  MailApp.sendEmail({ to: STUDY_TO, name: "SISD Design and Computing", subject: "Study Plus: " + name + " · " + String(d.subject || "") + " · " + String(d.topic || "") + " · " + score + "%" + (d.retry ? " (retry)" : ""), htmlBody: body });
+  MailApp.sendEmail({ to: STUDY_TO, name: "SISD Design and Computing", subject: (uk ? "Study Plus UK · " + yr : "Study Plus: ") + name + " · " + String(d.subject || "") + " · " + String(d.topic || "") + " · " + score + "%" + (d.retry ? " (retry)" : ""), htmlBody: body });
+  /* the student's own copy: fixed address per year group, set here and never taken from the page */
+  const to = uk ? UK_STUDENT_TO[+d.year] : "";
+  if (to) {
+    const who = String(d.student || "").slice(0, 40) || "there";
+    const sbody = mailBox_("Your Study Plus results",
+      '<p>Hi ' + h(who) + ', well done for finishing <b>' + h(d.subject) + ': ' + h(d.topic) + '</b>.</p>' +
+      '<table style="width:100%;border-collapse:separate;border-spacing:6px"><tr>' + cell("Score", score + "%", col) + cell("Right first time", num(d.right) + "/" + num(d.n)) + cell("Work time", mins + " min") + cell("Hints used", num(d.hints)) + '</tr></table>' +
+      advHtml +
+      '<h3 style="color:#1E8A55;font-size:16px;margin:16px 0 6px">What went well</h3>' + (well ? '<ul style="padding-left:18px;margin:0">' + well + '</ul>' : '<p style="color:#5B6782">Keep going: next time aim to get some right and rate them "I\'ve got it".</p>') +
+      '<h3 style="color:#C0283A;font-size:16px;margin:16px 0 6px">Questions to look at again</h3>' + (imp ? '<ul style="padding-left:18px;margin:0">' + imp + '</ul>' : '<p style="color:#5B6782">None: brilliant!</p>') +
+      '<p><a href="' + SITE + 'uk.html" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Back to Study Plus</a></p>');
+    MailApp.sendEmail({ to: to, name: "Study Plus", subject: "Your Study Plus results · " + String(d.subject || "") + " · " + String(d.topic || "") + " · " + score + "%", htmlBody: sbody });
+  }
   return { ok: true, sent: true };
 }
 

@@ -10,12 +10,14 @@
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
 <script src="sdc.js?v=20261113ef"></script>
 <script src="study/gen.js?v=20261114c"></script>
-<script src="uk/gen.js?v=20261114c"></script>
+<script src="uk/gen.js?v=20261114d"></script>
 <script src="uk/y8.js?v=20261114c"></script>
 <script src="uk/y10.js?v=20261114c"></script>
 <script src="uk/y8-more.js?v=20261114c"></script>
 <script src="uk/y10-more.js?v=20261114c"></script>
-<script src="uk/learn-extra.js?v=20261114c"></script>
+<script src="uk/learn-extra.js?v=20261114d"></script>
+<script src="uk/y10-igcse.js?v=20261114d"></script>
+<script src="uk/y8-revision.js?v=20261114d"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -156,6 +158,12 @@ select.big{border:2px solid var(--line);background:var(--card);border-radius:10p
 .login .err{color:var(--bad);font-weight:700;margin-top:10px;min-height:1.2em}
 .login h3{margin-top:18px;font-size:1rem;text-transform:none}
 .hint{background:var(--warnbg);color:var(--ink);border-left:4px solid var(--warn);border-radius:0 10px 10px 0;padding:10px 14px;margin-top:8px}
+.revband{background:linear-gradient(135deg,#FFF4E0,#FFE3E7);border:2px solid #F5B942;border-radius:var(--r);padding:16px;margin-top:12px}
+.revband h2{font-size:1.15rem}
+.subj .board{font-size:.72rem;font-weight:800;color:var(--c,var(--navy));text-transform:uppercase;letter-spacing:.03em}
+.funbox{background:#FFF8E1;border-left:4px solid #F5B942;border-radius:0 12px 12px 0;padding:10px 14px;margin-top:10px}
+.trickbox{background:#E9F7EF;border-left:4px solid #1E8A55;border-radius:0 12px 12px 0;padding:10px 14px;margin-top:8px}
+.pill.star{background:#F5B942;color:#3A2A00}
 .lsec{border-top:1px solid var(--line);padding-top:14px}
 .lsec h2{font-size:1.1rem;margin-bottom:8px}
 .ideas2{margin-left:22px;display:grid;gap:8px}
@@ -236,8 +244,8 @@ setTimeout(() => { try { (last ? $("lu") : $("lu")).focus(); } catch(e){} }, 50)
 (function(){
 "use strict";
 const $ = id => document.getElementById(id), esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const S = window.UK || {}, ORDER = ["y8maths","y8biology","y8chemistry","y8physics","y8english","y8history","y8geography","y8computing","y10maths","y10biology","y10chemistry","y10physics","y10english","y10history","y10geography","y10computing"].filter(k => S[k]);
-const YEARS = [8, 10], STAGE = { 8:"Key Stage 3", 10:"GCSE (Key Stage 4)" }, subjLabel = s => S[s].name;
+const S = window.UK || {}, ORDER = ["y8revmaths","y8revscience","y8revenglish","y8revhistory","y8revgeography","y8maths","y8biology","y8chemistry","y8physics","y8english","y8history","y8geography","y8computing","y10maths","y10biology","y10chemistry","y10physics","y10english","y10history","y10geography","y10computing","y10ict","y10psychology"].filter(k => S[k]);
+const YEARS = [8, 10], STAGE = { 8:"Key Stage 3", 10:"IGCSE (Edexcel and Cambridge)" }, subjLabel = s => S[s].name;
 ORDER.forEach(k => { if (!S[k].short){ S[k].short = S[k].name; S[k].name = "Year " + S[k].year + " " + S[k].name; } });
 const IDLE_MS = 60000, FOCUS_SEC_PER_TASK = 40, SET_SIZE = 8;
 const GEN = window.UK_GEN || { make(){ return null; }, has(){ return false; } };
@@ -500,6 +508,9 @@ function render(){
   if (VIEW.v === "learn") return renderLearn();
 }
 
+function subjCard(s){ const P = subjectProgress(s), w = totals().waiting.filter(x => x.s === s).length, star = S[s].topics.filter(t => t.focus).length; return `<button class="subj" data-s="${s}" style="--c:${S[s].colour}">
+      <span class="top2"><span class="ic">${esc(S[s].icon)}</span><span><b>${esc(S[s].short)}</b><br><span class="muted small">${P.done} of ${P.total} topics done</span></span></span>
+      ${S[s].board ? `<span class="board">${esc(S[s].board)}</span>` : ""}<span class="muted small">${esc(S[s].blurb)}${S[s].exam ? " · " + esc(S[s].exam) : ""}</span>${star ? `<span class="pill star">⭐ ${star} highlighted topic${star > 1 ? "s" : ""}</span>` : ""}${w ? `<span class="pill new">✦ ${w} new set${w > 1 ? "s" : ""}</span>` : ""}<span class="bar"><i style="width:${P.pct}%"></i></span></button>`; }
 function renderHome(){
   const T = totals();
   $("app").innerHTML = `
@@ -512,10 +523,10 @@ function renderHome(){
     <p class="muted small" style="margin-top:2px">New questions on topics you've finished, set at the right level for you. Your earlier sets are saved and you can review them any time.</p>
     <div class="row" style="margin-top:10px">${T.waiting.slice(0, 12).map(w => `<button class="btn sm ghost" data-w="${w.s}|${w.t}" style="border-left:5px solid ${S[w.s].colour}">${esc(S[w.s].icon)} ${esc(S[w.s].name)}: ${esc(topicOf(w.s, w.t).title)} · Set ${w.r}</button>`).join("")}${T.waiting.length > 12 ? `<span class="muted small">and ${T.waiting.length - 12} more in your subjects</span>` : ""}</div></div>` : ""}
   ${YEARS.map(y => `<div class="card" style="margin-top:18px" id="year${y}">
-    <div class="yearhead"><span class="yr">Year ${y}</span><div><h2>${esc(STAGE[y])}</h2><p class="muted small">${y === 8 ? "KS3 programmes of study: maths and science first, then English, history, geography and computing" : "GCSE Maths, Combined Science (AQA Trilogy Paper 1), English Language and Literature, History, Geography and Computer Science"}</p></div></div>
-    <div class="subjects">${ORDER.filter(s => S[s].year === y).map(s => { const P = subjectProgress(s), w = T.waiting.filter(x => x.s === s).length; return `<button class="subj" data-s="${s}" style="--c:${S[s].colour}">
-      <span class="top2"><span class="ic">${esc(S[s].icon)}</span><span><b>${esc(S[s].short)}</b><br><span class="muted small">${P.done} of ${P.total} topics done</span></span></span>
-      <span class="muted small">${esc(S[s].blurb)}</span>${w ? `<span class="pill new">✦ ${w} new set${w > 1 ? "s" : ""}</span>` : ""}<span class="bar"><i style="width:${P.pct}%"></i></span></button>`; }).join("")}</div>
+    <div class="yearhead"><span class="yr">Year ${y}</span><div><h2>${esc(STAGE[y])}</h2><p class="muted small">${y === 8 ? "KS3 programmes of study: maths and science first, then English, history, geography and computing" : "Pearson Edexcel International GCSE: Maths A, Biology, Chemistry, Physics, History, Geography, Computer Science and Psychology. Cambridge IGCSE: First Language English and ICT."}</p></div></div>
+    ${y === 8 && ORDER.some(s => S[s].revision) ? `<div class="revband"><h2>📝 Term 1 Summative Assessment: revision zone</h2><p class="muted small" style="margin-top:2px">Everything on your Term 1 assessment list: key ideas, fun facts, memory tricks, worked solutions, practice and challenge questions. Topics marked ⭐ were highlighted on your content sheet. Your score and feedback are emailed to you after every topic.</p>
+      <div class="subjects" style="margin-top:10px">${ORDER.filter(s => S[s].year === y && S[s].revision).map(subjCard).join("")}</div></div>` : ""}
+    <div class="subjects"${y === 8 ? ' style="margin-top:14px"' : ""}>${ORDER.filter(s => S[s].year === y && !S[s].revision).map(subjCard).join("")}</div>
   </div>`).join("")}`;
   $("app").querySelectorAll("[data-s]").forEach(b => b.onclick = () => go({ v:"subject", s:b.dataset.s }));
   $("app").querySelectorAll("[data-w]").forEach(b => b.onclick = () => { const [s, t] = b.dataset.w.split("|"); openTopic(s, t); });
@@ -525,7 +536,7 @@ function renderSubject(){
   const s = VIEW.s, SUB = S[s];
   $("app").innerHTML = `<button class="back" id="bk">← All subjects</button>
   <div class="card stack" style="border-top:6px solid ${SUB.colour}">
-    <div><div class="eyebrow">Year ${SUB.year} · ${esc(STAGE[SUB.year])}</div><h1>${esc(SUB.name)}</h1><p class="muted">${esc(SUB.blurb)}</p></div>
+    <div><div class="eyebrow">Year ${SUB.year} · ${esc(SUB.revision ? "Term 1 Summative Assessment revision" : STAGE[SUB.year])}</div><h1>${esc(SUB.name)}</h1>${SUB.board ? `<p class="small" style="font-weight:800;color:${SUB.colour}">${esc(SUB.board)}</p>` : ""}<p class="muted">${esc(SUB.blurb)}${SUB.exam ? " · " + esc(SUB.exam) : ""}</p></div>
     <label class="small" style="font-weight:800">Jump to a topic
       <select class="big" id="topicSel" style="margin-top:6px"><option value="">Choose a topic…</option>${SUB.topics.map((t, i) => `<option value="${t.id}">${i + 1}. ${esc(t.title)}${tstate(s, t.id).done ? " ✓" : ""}</option>`).join("")}</select></label>
     <div class="topics">${SUB.topics.map((t, i) => { const st = tstate(s, t.id), X = run(s, t.id), sc = runScore(s, t.id, X.r);
@@ -533,7 +544,7 @@ function renderSubject(){
       if (X.r > 1 && !X.o.done) meta = sc.answered ? `<span class="pill warn">Set ${X.r} · ${sc.answered}/${sc.n}</span><br>${esc(LVL_NAME(X.o.lv))}` : `<span class="pill new">✦ Set ${X.r} ready</span><br>${esc(LVL_NAME(X.o.lv))} level`;
       else if (X.o.done) meta = `<span class="pill ${sc.score >= 70 ? "ok" : sc.score >= 50 ? "warn" : "bad"}">${X.r > 1 ? "Set " + X.r + ": " : ""}${sc.score}%</span><br>${fmt(topicMs(s, t.id))}`;
       else meta = sc.answered ? `<span class="pill warn">In progress</span><br>${sc.answered}/${sc.n}` : `${t.tasks.length} tasks`;
-      return `<button class="topic ${st.done ? "done" : ""}" data-t="${t.id}"><span class="n">${st.done ? "✓" : i + 1}</span><span><b>${esc(t.title)}</b><br><span class="muted small">${esc(t.strand)}${runsOf(s, t.id) > 1 ? " · " + runsOf(s, t.id) + " sets" : ""}</span></span><span class="meta">${meta}</span></button>`; }).join("")}</div>
+      return `<button class="topic ${st.done ? "done" : ""}" data-t="${t.id}"><span class="n">${st.done ? "✓" : i + 1}</span><span><b>${esc(t.title)}</b>${t.focus ? ` <span class="pill star">⭐ Highlighted</span>` : ""}<br><span class="muted small">${esc(t.strand)}${runsOf(s, t.id) > 1 ? " · " + runsOf(s, t.id) + " sets" : ""}</span></span><span class="meta">${meta}</span></button>`; }).join("")}</div>
   </div>`;
   $("bk").onclick = () => go({ v:"home" });
   $("topicSel").onchange = e => { if (e.target.value) openTopic(s, e.target.value); };
@@ -575,7 +586,7 @@ function renderLearn(){
   <div class="card stack" style="border-top:6px solid ${SUB.colour}">
     <div class="qhead"><div><div class="eyebrow">${esc(SUB.name)} · Learn</div><h1>${esc(T.title)}</h1><p class="muted small">${esc(T.strand)}</p></div>
       <button class="btn sm ghost" id="lSay">🔊 Read aloud</button></div>
-    <div class="lsec"><h2>1. Key ideas</h2><ol class="ideas2">${(L.ideas || []).map(x => `<li dir="auto">${esc(x)}</li>`).join("")}</ol></div>
+    <div class="lsec"><h2>1. Key ideas</h2><ol class="ideas2">${(L.ideas || []).map(x => `<li dir="auto">${esc(x)}</li>`).join("")}</ol>${L.trick ? `<div class="trickbox"><b>🧠 Memory trick:</b> ${esc(L.trick)}</div>` : ""}${L.fun ? `<div class="funbox"><b>🤩 Did you know?</b> ${esc(L.fun)}</div>` : ""}</div>
     <div class="lsec"><h2>2. Worked example</h2><div class="wex"><div class="wq" dir="auto">${esc(ex[0] || "")}</div><p class="small muted" style="margin-top:6px"><b>How to work it out</b></p>${steps(ex.slice(1))}</div></div>
     ${more.length ? `<div class="lsec"><h2>3. More worked examples</h2><p class="muted small">Cover the steps and try each one first, then check.</p>
       ${more.map((m, k) => `<details class="wex"${k === 0 ? " open" : ""}><summary><span class="wq" dir="auto">${m.d ? `<span class="lvl l${m.d}" style="margin:0 6px 0 0">${LVL[m.d]}</span>` : ""}${esc(m.q)}</span></summary>
@@ -815,7 +826,7 @@ function analysis(s, t, r){
 function report(s, t, isRetry, r){
   const T = topicOf(s, t), X = run(s, t, r), sc = runScore(s, t, X.r), A = analysis(s, t, X.r), o = X.o;
   const fixedNow = isRetry ? Object.values(o.retry || {}).filter(q => q.ok).length : 0;
-  const data = { course:"uk", year: S[s].year, totalTopics: ORDER.reduce((a, k) => a + S[k].topics.length, 0), subjTopics: S[s].topics.length, subject: S[s].name, sid: s, topic: T.title + (X.r > 1 ? " · Set " + X.r + " (" + LVL_NAME(o.lv) + ")" : ""), tid: t, round: X.r, level: X.r > 1 ? LVL_NAME(o.lv) : "", strand: T.strand, score: sc.score, right: sc.right, n: sc.n, lv: sc.lv, effort: sc.effort, focus: sc.focus,
+  const data = { course:"uk", year: S[s].year, revision: !!S[s].revision, student: AUTHD.name, totalTopics: ORDER.reduce((a, k) => a + S[k].topics.length, 0), subjTopics: S[s].topics.length, subject: S[s].name, sid: s, topic: T.title + (X.r > 1 ? " · Set " + X.r + " (" + LVL_NAME(o.lv) + ")" : ""), tid: t, round: X.r, level: X.r > 1 ? LVL_NAME(o.lv) : "", strand: T.strand, score: sc.score, right: sc.right, n: sc.n, lv: sc.lv, effort: sc.effort, focus: sc.focus,
     mins: Math.max(1, mins(sc.ms)), secs: Math.round(sc.ms / 1000), got: sc.got, unsure: sc.unsure, need: sc.need, retry: !!isRetry, fixed: fixedNow,
     well: A.well.slice(0, 6).map(q => q.slice(0, 120)), improve: A.improve.slice(0, 8).map(x => ({ q: x.q.slice(0, 120), right: String(x.right).slice(0, 80), given: String(x.given).slice(0, 80), unsure: !!x.unsure, fixed: !!x.fixed })),
     hints: Object.values(o.hn || {}).reduce((a, b) => a + b, 0), solutions: Object.values(o.ans || {}).filter(q => q.sol).length,

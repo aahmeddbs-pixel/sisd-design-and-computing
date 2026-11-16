@@ -246,5 +246,132 @@ G["y10computing/data"] = (d, r) => { const K = kit(r);
   return { d, k:"num", q:`Sound is sampled ${sr} times a second at a bit depth of ${bd} for ${t} seconds. What is the file size in kilobytes (1 KB = 1000 bytes)?`, a:bytes / 1000, tol:0.01, x:`Size = sample rate × bit depth × seconds = ${sr} × ${bd} × ${t} = ${sr * bd * t} bits = ${bytes} bytes = ${bytes / 1000} KB.` };
 };
 
+/* ================= IGCSE extras: Edexcel Maths functions/calculus, Cambridge ICT spreadsheets, Edexcel Physics ================= */
+G["y10maths/functions"] = (d, r) => { const K = kit(r);
+  if (d === 1){ const a = K.int(2, 6), b = K.nz(-9, 9), x = K.int(-4, 6); return { d, k:"num", q:`f(x) = ${a}x ${b < 0 ? "−" : "+"} ${Math.abs(b)}. Find f(${sgn(x)}).`, a:a * x + b, x:`Replace x with ${sgn(x)}: ${a} × ${par(x)} ${b < 0 ? "−" : "+"} ${Math.abs(b)} = ${sgn(a * x + b)}.` }; }
+  if (d === 2){ if (r() < .5){ const a = K.int(2, 5), b = K.nz(-6, 6), c = K.int(2, 4), x = K.int(-3, 4), g = c * x, v = a * g + b;
+      return { d, k:"num", q:`f(x) = ${a}x ${b < 0 ? "−" : "+"} ${Math.abs(b)} and g(x) = ${c}x. Find fg(${sgn(x)}).`, a:v, x:`Work from the inside out: g(${sgn(x)}) = ${c} × ${par(x)} = ${sgn(g)}. Then f(${sgn(g)}) = ${a} × ${par(g)} ${b < 0 ? "−" : "+"} ${Math.abs(b)} = ${sgn(v)}.` }; }
+    const a = K.pick([2, 3, 4, 5]), b = K.nz(-9, 9), y = K.int(-5, 15), xv = (y - b) / a;
+    if (Number.isInteger(xv)) return { d, k:"num", q:`f(x) = ${a}x ${b < 0 ? "−" : "+"} ${Math.abs(b)}. Find f⁻¹(${sgn(y)}).`, a:xv, x:`The inverse undoes f: f⁻¹(x) = (x ${b < 0 ? "+" : "−"} ${Math.abs(b)}) ÷ ${a}. So f⁻¹(${sgn(y)}) = (${sgn(y)} ${b < 0 ? "+" : "−"} ${Math.abs(b)}) ÷ ${a} = ${sgn(xv)}.` };
+    return { d, k:"num", q:`f(x) = ${a}x ${b < 0 ? "−" : "+"} ${Math.abs(b)}. Solve f(x) = ${sgn(a * 3 + b)}.`, a:3, x:`${a}x ${b < 0 ? "−" : "+"} ${Math.abs(b)} = ${sgn(a * 3 + b)}, so ${a}x = ${a * 3} and x = 3.` }; }
+  const a = K.int(1, 4), n = K.pick([2, 3]), b = K.nz(-8, 8), x = K.int(-3, 3);
+  if (r() < .5){ const coef = a * n, rest = b; return { d, k:"num", q:`y = ${a === 1 ? "" : a}x${n === 2 ? "²" : "³"} ${b < 0 ? "−" : "+"} ${Math.abs(b)}x. Find the gradient dy/dx when x = ${sgn(x)}.`, a:coef * Math.pow(x, n - 1) + rest, x:`Differentiate each term: multiply by the power, then reduce the power by 1. dy/dx = ${coef}x${n - 1 === 2 ? "²" : ""} ${b < 0 ? "−" : "+"} ${Math.abs(b)}. At x = ${sgn(x)}: ${coef} × ${par(x)}${n - 1 === 2 ? "²" : ""} ${b < 0 ? "−" : "+"} ${Math.abs(b)} = ${sgn(coef * Math.pow(x, n - 1) + rest)}.` }; }
+  const p = K.int(2, 6), q = K.nz(-12, 12), tx = -q / (2 * p);   // y = px² + qx, turning point where 2px + q = 0
+  return { d, k:"num", q:`y = ${p}x² ${q < 0 ? "−" : "+"} ${Math.abs(q)}x. Find the x-coordinate of the turning point (2 d.p. if needed).`, a:r2(tx), tol:0.006, x:`At a turning point dy/dx = 0. dy/dx = ${2 * p}x ${q < 0 ? "−" : "+"} ${Math.abs(q)} = 0, so x = ${sgn(-q)} ÷ ${2 * p} = ${f(tx)}.` };
+};
+const col = i => "ABCDEFG"[i];
+G["y10ict/spreadsheets"] = (d, r) => { const K = kit(r);
+  const vals = Array.from({ length:K.int(4, 6) }, () => K.int(2, 40)), c = K.pick(["B", "C", "D"]), last = 1 + vals.length, cells = vals.map((v, i) => `${c}${i + 2} = ${v}`).join(", ");
+  if (d === 1){ const fn = K.pick(["SUM", "MAX", "MIN"]), v = fn === "SUM" ? vals.reduce((a, b) => a + b, 0) : fn === "MAX" ? Math.max(...vals) : Math.min(...vals);
+    return { d, k:"num", q:`Cells ${cells}. What does =${fn}(${c}2:${c}${last}) return?`, a:v, x:`${fn} looks at the range ${c}2 to ${c}${last}: ${fn === "SUM" ? "it adds them: " + vals.join(" + ") + " = " + v : fn === "MAX" ? "the largest value is " + v : "the smallest value is " + v}.` }; }
+  if (d === 2){ if (r() < .5){ const lim = K.int(10, 30), v = vals.filter(x => x > lim).length;
+      return { d, k:"num", q:`Cells ${cells}. What does =COUNTIF(${c}2:${c}${last},">${lim}") return?`, a:v, x:`COUNTIF counts the cells that meet the condition (greater than ${lim}): ${vals.filter(x => x > lim).join(", ") || "none"} → ${v}.` }; }
+    const v = vals.reduce((a, b) => a + b, 0) / vals.length; return { d, k:"num", q:`Cells ${cells}. What does =AVERAGE(${c}2:${c}${last}) return? (2 d.p. if needed)`, a:r2(v), tol:0.006, x:`AVERAGE adds the values (${vals.reduce((a, b) => a + b, 0)}) and divides by how many there are (${vals.length}) = ${f(v)}.` }; }
+  if (r() < .5){ const a = K.int(10, 90), lim = K.pick([40, 50, 60]); const res = a >= lim ? "Pass" : "Fail";
+    return K.mcq(`Cell B2 = ${a}. What does =IF(B2>=${lim},"Pass","Fail") display?`, res, [res === "Pass" ? "Fail" : "Pass", "TRUE", "#VALUE!"], `IF tests the condition B2>=${lim}: ${a} ${a >= lim ? "is" : "is not"} at least ${lim}, so it shows "${res}".`, d); }
+  const rw = K.int(3, 9), cl = K.int(1, 3);
+  return K.mcq(`The formula =B2*$E$1 in C2 is copied down to C${rw}. What does it become?`, `=B${rw}*$E$1`, [`=B${rw}*$E$${rw}`, `=B2*$E$1`, `=B${rw}*E${rw}`], `Relative references (B2) change as you copy; absolute references ($E$1) stay fixed. So =B${rw}*$E$1.${cl ? "" : ""}`, d);
+};
+G["y10physics/waves"] = (d, r) => { const K = kit(r);
+  if (d === 1){ const fq = K.pick([2, 5, 10, 50, 100, 200]), lam = K.pick([0.5, 1, 2, 3, 4]); return { d, k:"num", q:`A wave has frequency ${fq} Hz and wavelength ${lam} m. What is its speed, in m/s?`, a:r2(fq * lam), tol:0.01, x:`v = f × λ = ${fq} × ${lam} = ${f(fq * lam)} m/s.` }; }
+  if (d === 2){ const T = K.pick([0.01, 0.02, 0.05, 0.1, 0.25, 0.5]); return { d, k:"num", q:`A wave has a time period of ${T} s. What is its frequency, in Hz?`, a:r2(1 / T), tol:0.01, x:`f = 1 / T = 1 ÷ ${T} = ${f(1 / T)} Hz.` }; }
+  const n1 = 1, ang = K.pick([20, 30, 40, 45, 50]), nG = K.pick([1.33, 1.5]), rr = Math.asin(Math.sin(ang * Math.PI / 180) / nG) * 180 / Math.PI;
+  return { d, k:"num", q:`Light enters ${nG === 1.5 ? "glass" : "water"} (n = ${nG}) from air at an angle of incidence of ${ang}°. Find the angle of refraction (1 d.p.).`, a:Math.round(rr * 10) / 10, tol:0.15, x:`n = sin i / sin r, so sin r = sin ${ang}° ÷ ${nG} = ${f(Math.sin(ang * Math.PI / 180) / nG)}. r = sin⁻¹(…) ≈ ${(Math.round(rr * 10) / 10)}°. It bends towards the normal.` };
+};
+G["y10physics/magnetism"] = (d, r) => { const K = kit(r);
+  const Np = K.pick([100, 200, 400, 500, 1000]); let Ns = K.pick([20, 50, 100, 2000, 4000]); if (Ns === Np) Ns = 2000; const Vp = K.pick([12, 24, 230]);
+  if (d === 1) return K.mcq(`A transformer has ${Np} turns on the primary coil and ${Ns} on the secondary. What type is it?`, Ns > Np ? "Step-up" : "Step-down", [Ns > Np ? "Step-down" : "Step-up", "Neither", "A generator"], `More turns on the secondary = step-up (voltage increases); fewer = step-down.`, d);
+  if (d === 2){ const Vs = Vp * Ns / Np; return { d, k:"num", q:`A transformer has ${Np} primary turns and ${Ns} secondary turns. The input is ${Vp} V. Find the output voltage (2 d.p. if needed).`, a:r2(Vs), tol:0.006, x:`Vp/Vs = Np/Ns, so Vs = Vp × Ns ÷ Np = ${Vp} × ${Ns} ÷ ${Np} = ${f(Vs)} V.` }; }
+  const Vs = K.pick([6, 12, 24]), Is = K.pick([1, 2, 5]), Vpp = 230; return { d, k:"num", q:`A 100% efficient transformer steps ${Vpp} V down to ${Vs} V and supplies ${Is} A. What current flows in the primary coil, in A (3 d.p.)?`, a:Math.round(Vs * Is / Vpp * 1000) / 1000, tol:0.0006, x:`Power in = power out: Vp × Ip = Vs × Is. Ip = ${Vs} × ${Is} ÷ ${Vpp} ≈ ${(Vs * Is / Vpp).toFixed(3)} A.` };
+};
+G["y10physics/astro"] = (d, r) => { const K = kit(r);
+  if (d === 1){ const g = K.pick([1.6, 3.7, 9.8, 24.8]), m = K.int(2, 80); return { d, k:"num", q:`On a body where g = ${g} N/kg, what is the weight of a ${m} kg object, in N?`, a:r2(g * m), tol:0.01, x:`W = mg = ${m} × ${g} = ${f(g * m)} N. Mass stays the same everywhere; weight changes with g.` }; }
+  if (d === 2){ const R = K.pick([7000, 42000, 384000]), T = K.pick([1.6, 24, 655]); const v = 2 * Math.PI * R / T; return { d, k:"num", q:`An object orbits at radius ${R.toLocaleString("en-GB")} km with a period of ${T} hours. Find its orbital speed in km/h (to the nearest whole number).`, a:Math.round(v), tol:1, x:`v = 2πr / T = 2 × π × ${R.toLocaleString("en-GB")} ÷ ${T} ≈ ${Math.round(v).toLocaleString("en-GB")} km/h.` }; }
+  const l0 = K.pick([656, 486, 434]), dl = K.pick([3, 6, 13, 26]); const v = dl / l0 * 3e5;
+  return { d, k:"num", q:`A galaxy's light line of wavelength ${l0} nm is observed at ${l0 + dl} nm. Using v = (Δλ / λ₀) × c with c = 300 000 km/s, how fast is it moving away, in km/s (nearest whole number)?`, a:Math.round(v), tol:1, x:`Δλ = ${dl} nm. v = ${dl} ÷ ${l0} × 300 000 ≈ ${Math.round(v).toLocaleString("en-GB")} km/s. The line is red-shifted, so the galaxy is moving away.` };
+};
+
+/* ================= YEAR 8 TERM 1 REVISION (Maths units 1, 2, 3, 9.2, 10; Science 8I density and pressure) ================= */
+G["y8revmaths/negatives"] = (d, r, seed) => { const K = kit(r);
+  if (d < 3) return MYP("maths/integers", d, seed);
+  const a = K.nz(-9, 9), b = K.nz(-6, 6), c = K.nz(-5, 5), e = K.int(2, 4), k = K.int(0, 2);
+  if (k === 0) return { d, k:"num", q:`Work out: ${sgn(a)} + ${par(b)} × ${par(c)}`, a:a + b * c, x:`BIDMAS: multiply first: ${par(b)} × ${par(c)} = ${sgn(b * c)}. Then ${sgn(a)} + ${par(b * c)} = ${sgn(a + b * c)}.` };
+  if (k === 1) return { d, k:"num", q:`Work out: (${sgn(a)} − ${par(b)}) × ${par(c)}`, a:(a - b) * c, x:`Brackets first: ${sgn(a)} − ${par(b)} = ${sgn(a - b)}. Then × ${par(c)} = ${sgn((a - b) * c)}.` };
+  return { d, k:"num", q:`Work out: ${par(c)}${e === 2 ? "²" : e === 3 ? "³" : "⁴"} − ${par(a)}`, a:Math.pow(c, e) - a, x:`Indices first: ${par(c)}${e === 2 ? "²" : e === 3 ? "³" : "⁴"} = ${sgn(Math.pow(c, e))}. Then ${sgn(Math.pow(c, e))} − ${par(a)} = ${sgn(Math.pow(c, e) - a)}.` };
+};
+G["y8revmaths/primes"] = (d, r, seed) => G["y8maths/number"](d, r, seed);
+G["y8revmaths/equations"] = (d, r) => { const K = kit(r);
+  const x = K.int(-6, 12);
+  if (d === 1){ const k = K.int(0, 2), a = K.int(2, 9);
+    if (k === 0){ const b = K.nz(-10, 15); return { d, k:"num", q:`Solve x ${b < 0 ? "−" : "+"} ${Math.abs(b)} = ${sgn(x + b)}`, a:x, x:`Do the inverse: ${b < 0 ? "add " + Math.abs(b) : "subtract " + b} on both sides. x = ${sgn(x + b)} ${b < 0 ? "+" : "−"} ${Math.abs(b)} = ${sgn(x)}.` }; }
+    if (k === 1) return { d, k:"num", q:`Solve ${a}x = ${sgn(a * x)}`, a:x, x:`Divide both sides by ${a}: x = ${sgn(a * x)} ÷ ${a} = ${sgn(x)}.` };
+    return { d, k:"num", q:`Solve x ÷ ${a} = ${sgn(x)}`, a:a * x, x:`Multiply both sides by ${a}: x = ${sgn(x)} × ${a} = ${sgn(a * x)}.` }; }
+  if (d === 2){ const a = K.int(2, 8), b = K.nz(-12, 12); return { d, k:"num", q:`Solve ${a}x ${b < 0 ? "−" : "+"} ${Math.abs(b)} = ${sgn(a * x + b)}`, a:x, x:`Step 1: ${b < 0 ? "add " + Math.abs(b) : "subtract " + b}: ${a}x = ${sgn(a * x)}. Step 2: divide by ${a}: x = ${sgn(x)}.` }; }
+  if (r() < .5){ const a = K.int(2, 6), b = K.nz(-9, 9); return { d, k:"num", q:`Solve x/${a} ${b < 0 ? "−" : "+"} ${Math.abs(b)} = ${sgn(x + b)}`, a:a * x, x:`${b < 0 ? "Add " + Math.abs(b) : "Subtract " + b}: x/${a} = ${sgn(x)}. Multiply by ${a}: x = ${sgn(a * x)}.` }; }
+  const a = K.int(2, 6), b = K.nz(-5, 5); return { d, k:"num", q:`Solve ${a}(x ${b < 0 ? "−" : "+"} ${Math.abs(b)}) = ${sgn(a * (x + b))}`, a:x, x:`Divide by ${a} first: x ${b < 0 ? "−" : "+"} ${Math.abs(b)} = ${sgn(x + b)}. Then x = ${sgn(x)}. (Or expand: ${a}x ${a * b < 0 ? "−" : "+"} ${Math.abs(a * b)} = ${sgn(a * (x + b))}.)` };
+};
+const lin = (c, v) => c === 0 ? "" : (c === 1 ? "" : c === -1 ? "−" : sgn(c)) + v;
+const joinT = L => L.filter(t => t[0] !== 0).map((t, i) => { const s = lin(t[0], t[1]); return i === 0 ? s : (t[0] < 0 ? " − " + s.replace("−", "") : " + " + s); }).join("") || "0";
+const flatAlts = str => { const f = str.replace(/−/g, "-"); return [f, f.replace(/\s/g, "")]; };
+G["y8revmaths/simplify"] = (d, r) => { const K = kit(r);
+  if (d === 1){ const a = K.int(1, 9), b = K.nz(-7, 9), c = K.nz(-5, 6), v = K.pick(["x", "y", "a", "m"]), tot = a + b + c;
+    return { d, k:"text", q:`Simplify ${joinT([[a, v], [b, v], [c, v]])}`, a:flatAlts(joinT([[tot, v]])), best:joinT([[tot, v]]), x:`They are all like terms in ${v}. Add the numbers: ${a} ${b < 0 ? "−" : "+"} ${Math.abs(b)} ${c < 0 ? "−" : "+"} ${Math.abs(c)} = ${tot}, so ${joinT([[tot, v]]) || "0"}.` }; }
+  if (d === 2){ const a = K.int(2, 8), b = K.nz(-6, 6), c = K.nz(-5, 7), e = K.nz(-6, 6), ans = joinT([[a + c, "x"], [b + e, "y"]]);
+    return { d, k:"text", q:`Simplify ${joinT([[a, "x"], [b, "y"], [c, "x"], [e, "y"]])}`, a:flatAlts(ans), best:ans, x:`Collect x terms: ${a} ${c < 0 ? "−" : "+"} ${Math.abs(c)} = ${a + c}. Collect y terms: ${b} ${e < 0 ? "−" : "+"} ${Math.abs(e)} = ${b + e}. Answer: ${ans}.` }; }
+  if (r() < .5){ const a = K.int(2, 6), b = K.int(2, 6); return K.mcq(`Simplify ${a}x × ${b}xy`, `${a * b}x²y`, [`${a + b}x²y`, `${a * b}xy`, `${a * b}x²y²`], `Multiply the numbers (${a} × ${b} = ${a * b}) and the letters (x × x = x², then y): ${a * b}x²y.`, d); }
+  const m1 = K.int(2, 7), m2 = K.int(2, 6), c = K.int(2, 5); return K.mcq(`Simplify ${c * 2}a${sup(m1 + m2)} ÷ 2a${sup(m2)}`, `${c}a${sup(m1)}`, [`${c}a${sup(m1 + m2 + m2)}`, `${c * 2}a${sup(m1)}`, `${c}a${sup(m1 * m2)}`], `Divide the numbers: ${c * 2} ÷ 2 = ${c}. Subtract the powers: ${m1 + m2} − ${m2} = ${m1}.`, d);
+};
+G["y8revmaths/expand"] = (d, r) => { const K = kit(r);
+  if (d === 1){ const a = K.int(2, 9), b = K.nz(-9, 9), ans = joinT([[a, "x"], [a * b, ""]]); return { d, k:"text", q:`Expand ${a}(x ${b < 0 ? "−" : "+"} ${Math.abs(b)})`, a:flatAlts(ans), best:ans, x:`Multiply each term inside by ${a}: ${a} × x = ${a}x, ${a} × ${par(b)} = ${sgn(a * b)}. So ${ans}.` }; }
+  if (d === 2){ const h = K.int(2, 7), p = K.int(1, 6), q = K.nz(-7, 7); const ans = `${h}(${joinT([[p, "x"], [q, ""]])})`;
+    if (gcd(p, q) !== 1) return G["y8revmaths/expand"](1, r);
+    return { d, k:"text", q:`Factorise fully: ${joinT([[h * p, "x"], [h * q, ""]])}`, a:flatAlts(ans), best:ans, x:`The HCF of ${h * p} and ${Math.abs(h * q)} is ${h}. Take it outside the bracket: ${ans}. Check by expanding.` }; }
+  if (r() < .5){ const a = K.int(2, 6), b = K.int(1, 9), c = K.int(2, 5), x = K.int(-4, 6), y = K.int(-3, 5);
+    return { d, k:"num", q:`If x = ${sgn(x)} and y = ${sgn(y)}, find ${a}x + ${b}y − ${c}`, a:a * x + b * y - c, x:`Substitute: ${a} × ${par(x)} + ${b} × ${par(y)} − ${c} = ${sgn(a * x)} + ${par(b * y)} − ${c} = ${sgn(a * x + b * y - c)}.` }; }
+  const a = K.int(2, 5), b = K.nz(-6, 6), c = K.int(2, 4), e = K.nz(-5, 5), ans = joinT([[a + c, "x"], [a * b + c * e, ""]]);
+  return { d, k:"text", q:`Expand and simplify ${a}(x ${b < 0 ? "−" : "+"} ${Math.abs(b)}) + ${c}(x ${e < 0 ? "−" : "+"} ${Math.abs(e)})`, a:flatAlts(ans), best:ans, x:`${a}x ${a * b < 0 ? "−" : "+"} ${Math.abs(a * b)} + ${c}x ${c * e < 0 ? "−" : "+"} ${Math.abs(c * e)}. Collect like terms: ${ans}.` };
+};
+G["y8revmaths/angles"] = (d, r) => { const K = kit(r); const a = K.int(25, 155);
+  if (d === 1){ if (r() < .5) return { d, k:"num", q:`Angles on a straight line: one is ${a}°. Find the other.`, a:180 - a, x:`Angles on a straight line add to 180°: 180 − ${a} = ${180 - a}°.` };
+    const b = K.int(40, 140), c = K.int(40, 360 - b - 40 - 20); return { d, k:"num", q:`Three angles meet at a point: ${b}°, ${c}° and x. Find x.`, a:360 - b - c, x:`Angles around a point add to 360°: 360 − ${b} − ${c} = ${360 - b - c}°.` }; }
+  if (d === 2){ const kind = K.pick(["alternate", "corresponding", "vertically opposite"]); return { d, k:"num", q:`Two parallel lines are cut by a transversal. One angle is ${a}°. Find the ${kind} angle.`, a, x:`${kind[0].toUpperCase() + kind.slice(1)} angles are equal${kind === "alternate" ? " (Z-shape)" : kind === "corresponding" ? " (F-shape)" : " (they're opposite at a crossing)"}: ${a}°.` }; }
+  if (r() < .5) return { d, k:"num", q:`Parallel lines are cut by a transversal. One angle is ${a}°. Find its co-interior angle.`, a:180 - a, x:`Co-interior angles (C-shape) add to 180°: 180 − ${a} = ${180 - a}°.` };
+  const top = K.int(30, 100); return { d, k:"num", q:`An isosceles triangle has a top angle of ${top}°. Find one base angle.`, a:(180 - top) / 2, x:`Base angles are equal: (180 − ${top}) ÷ 2 = ${f((180 - top) / 2)}°.` };
+};
+G["y8revmaths/charts"] = (d, r) => { const K = kit(r);
+  const names = K.shuffle(["Football", "Swimming", "Tennis", "Netball", "Cricket", "Basketball"]).slice(0, 4), tot = K.pick([18, 20, 24, 30, 36, 40, 45, 60, 72, 90]);
+  const f1 = [1, 2, 3].map(() => K.int(1, Math.floor(tot / 4))); const fr = f1.concat([tot - f1.reduce((a, b) => a + b, 0)]);
+  if (d === 1){ const i = K.int(0, 3); return { d, k:"num", q:`${tot} students chose a sport: ${names.map((n, j) => n + " " + fr[j]).join(", ")}. In a pie chart, what angle is ${names[i]}? (degrees)`, a:r2(fr[i] / tot * 360), tol:0.01, x:`Each student = 360 ÷ ${tot} = ${f(360 / tot)}°. ${names[i]}: ${fr[i]} × ${f(360 / tot)} = ${f(fr[i] / tot * 360)}°.` }; }
+  if (d === 2){ const per = 360 / tot, ang = K.int(2, Math.floor(tot / 3)) * per; return { d, k:"num", q:`A pie chart shows ${tot} people. The sector for 'Tea' is ${f(ang)}°. How many people chose tea?`, a:Math.round(ang / per), x:`Angle per person = 360 ÷ ${tot} = ${f(per)}°. People = ${f(ang)} ÷ ${f(per)} = ${Math.round(ang / per)}.` }; }
+  const L = Array.from({ length:K.pick([7, 9, 11]) }, () => K.int(12, 58)).sort((a, b) => a - b), med = L[(L.length - 1) / 2];
+  const stems = [...new Set(L.map(v => Math.floor(v / 10)))]; const plot = stems.map(s => `${s} | ${L.filter(v => Math.floor(v / 10) === s).map(v => v % 10).join(" ")}`).join("\n");
+  if (r() < .5) return { d, k:"num", q:`Stem-and-leaf diagram (key: 2 | 4 means 24):\n${plot}\nFind the median.`, a:med, x:`There are ${L.length} values, so the median is value number ${(L.length + 1) / 2}. Counting along the ordered leaves gives ${med}.` };
+  return { d, k:"num", q:`Stem-and-leaf diagram (key: 2 | 4 means 24):\n${plot}\nFind the range.`, a:L[L.length - 1] - L[0], x:`Largest = ${L[L.length - 1]}, smallest = ${L[0]}. Range = ${L[L.length - 1] - L[0]}.` };
+};
+G["y8revmaths/data"] = (d, r, seed) => { const K = kit(r);
+  if (d === 1) return MYP("maths/stats", 1, seed);
+  if (d === 2){ const mA = K.int(50, 70), mB = mA + K.nz(-8, 8), rA = K.int(10, 30), rB = rA + K.pick([-8, -5, 5, 8, 12]);
+    return K.mcq(`Class A: mean ${mA}%, range ${rA}. Class B: mean ${mB}%, range ${rB}. Which comparison is correct?`, `Class ${mB > mA ? "B" : "A"} did better on average; Class ${rB > rA ? "B" : "A"}'s results were more spread out`, [`Class ${mB > mA ? "A" : "B"} did better on average; Class ${rB > rA ? "B" : "A"} was more spread out`, `Both classes did the same`, `Class ${mB > mA ? "B" : "A"} did better and was more consistent${rB > rA === mB > mA ? " too" : ""}`].filter((v, i) => !(i === 2 && (rB > rA) !== (mB > mA))), `Compare an AVERAGE (higher mean = better on average) and a SPREAD (bigger range = less consistent).`, d); }
+  const t = K.pick([["hours of revision", "test score", "Positive"], ["temperature", "hot drinks sold", "Negative"], ["shoe size", "phone number", "No"], ["height", "arm span", "Positive"], ["car age", "car value", "Negative"]]);
+  return K.mcq(`What type of correlation would you expect between ${t[0]} and ${t[1]}?`, `${t[2]} correlation`, ["Positive correlation", "Negative correlation", "No correlation"].filter(x => x !== t[2] + " correlation").concat(["Perfect correlation"]), t[2] === "Positive" ? "As one increases, the other tends to increase." : t[2] === "Negative" ? "As one increases, the other tends to decrease." : "There is no link between them.", d);
+};
+G["y8revscience/density"] = (d, r) => { const K = kit(r);
+  const den = K.pick([0.5, 0.8, 0.9, 1.2, 2.5, 2.7, 7.9, 11.3]), V = K.int(2, 25), M = r2(den * V);
+  if (d === 1) return { d, k:"num", q:`A block has a mass of ${M} g and a volume of ${V} cm³. What is its density, in g/cm³?`, a:den, tol:0.01, x:`Density = mass ÷ volume = ${M} ÷ ${V} = ${den} g/cm³.` };
+  if (d === 2){ if (r() < .5) return { d, k:"num", q:`A liquid has a density of ${den} g/cm³. What is the mass of ${V} cm³ of it, in g?`, a:M, tol:0.01, x:`Mass = density × volume = ${den} × ${V} = ${M} g.` };
+    return { d, k:"num", q:`A metal has a density of ${den} g/cm³. What volume does ${M} g of it have, in cm³?`, a:V, tol:0.01, x:`Volume = mass ÷ density = ${M} ÷ ${den} = ${V} cm³.` }; }
+  if (r() < .5) return { d, k:"tf", q:`An object has mass ${M} g and volume ${V} cm³. True or false: it floats in water (density 1 g/cm³).`, a:den < 1, x:`Its density is ${M} ÷ ${V} = ${den} g/cm³, which is ${den < 1 ? "less" : "more"} than water's 1 g/cm³, so it ${den < 1 ? "floats" : "sinks"}.` };
+  const l = K.int(2, 6), w = K.int(2, 5), h = K.int(2, 4), vol = l * w * h, mass = r2(vol * den);
+  return { d, k:"num", q:`A cuboid is ${l} cm × ${w} cm × ${h} cm and has a mass of ${mass} g. Find its density in g/cm³.`, a:den, tol:0.01, x:`Volume = ${l} × ${w} × ${h} = ${vol} cm³. Density = ${mass} ÷ ${vol} = ${den} g/cm³.` };
+};
+G["y8revscience/pressure"] = (d, r) => { const K = kit(r);
+  if (d === 1){ const F = K.int(2, 40) * 10, A = K.pick([2, 4, 5, 10, 20]); return { d, k:"num", q:`A force of ${F} N pushes on an area of ${A} m². What is the pressure, in N/m²?`, a:r2(F / A), tol:0.01, x:`Pressure = force ÷ area = ${F} ÷ ${A} = ${f(F / A)} N/m² (Pa).` }; }
+  if (d === 2){ const P = K.pick([50, 100, 250, 500, 2000]), A = K.pick([0.5, 2, 3, 4]); return { d, k:"num", q:`The pressure under a box is ${P} N/m² and its base area is ${A} m². What force (weight) does it exert, in N?`, a:r2(P * A), tol:0.01, x:`Force = pressure × area = ${P} × ${A} = ${f(P * A)} N.` }; }
+  if (r() < .5){ const w = K.int(5, 30), app = K.int(1, w - 1); return { d, k:"num", q:`A stone weighs ${w} N in air and ${app} N when hung in water. What is the upthrust, in N?`, a:w - app, x:`Upthrust = weight in air − weight in water = ${w} − ${app} = ${w - app} N.` }; }
+  const F = K.int(2, 12) * 50, cm = K.pick([10, 20, 25, 50]); return { d, k:"num", q:`A ${F} N force acts on ${cm} cm². What is the pressure in N/cm²?`, a:r2(F / cm), tol:0.01, x:`Pressure = ${F} ÷ ${cm} = ${f(F / cm)} N/cm².` };
+};
+
+G["y8revmaths/compare"] = (d, r, seed) => G["y8revmaths/data"](d, r, seed);
+G["y8revscience/fluids"] = (d, r, seed) => G["y8revscience/pressure"](d, r, seed);
 window.UK_GEN = { make(key, d, seed){ const g = G[key]; if (!g) return null; try { const t = g(d, rng(seed), seed); if (!t) return null; t.d = t.d || d; if (t.k === "mcq" && (t.a < 0 || !t.o || t.o.length < 2)) return null; return t; } catch(e){ return null; } }, has: key => !!G[key], keys: Object.keys(G), rng };
 })();
