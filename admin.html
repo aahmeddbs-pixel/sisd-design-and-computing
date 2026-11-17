@@ -10,7 +10,7 @@
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
 <script src="/python-pathways/pp-sync.js?v=20261116lv"></script>
 <script src="/python-pathways/answers-view.js?v=20261112all"></script>
-<script src="sdc.js?v=20261116lv"></script>
+<script src="sdc.js?v=20261117mv"></script>
 <script src="/python-pathways/game-dev-data.js?v=20261116gd"></script>
 <script src="study/maths.js?v=20261110a"></script>
 <script src="study/english.js?v=20261110a"></script>
@@ -158,7 +158,7 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
     <section id="t-students">
       <div class="card">
         <h2><span id="stTitle">Students</span> <span class="n" id="stCount">0</span></h2>
-        <p class="muted small" style="margin-top:4px" id="stIntro">Open a student to see their progress and send them feedback. Press <b>✏️ Change course</b> to change a student's course, grade, level or teacher.</p>
+        <p class="muted small" style="margin-top:4px" id="stIntro">Open a student to see their progress and send them feedback. Press <b>🔀 Move teacher / class</b> if a student chose the wrong teacher or class, or <b>✏️ Change course</b> to change their course, grade or level.</p>
         <div id="stWarn"></div>
         <div id="resetBox"></div>
         <div id="slowBox"></div>
@@ -990,12 +990,18 @@ function students(){
     if (["signin","signup","task","wrongcourse","unverified"].indexOf(r.type) < 0 || !r.acct.name || r.acct.name === "(admin)") return;
     const k = SDC.keyOf(r.acct.email, r.acct.name), c = csOf(r.acct.course);
     const s = r.type === "wrongcourse" ? (anyRec(k) || rec(k, c)) : c ? rec(k, c) : (anyRec(k) || rec(k, ""));
-    if (r.type !== "wrongcourse"){ Object.assign(s, { name:r.acct.name, email:r.acct.email || s.email || "", grade:r.acct.grade || s.grade, teacher:r.acct.teacher || s.teacher, level:r.acct.level || s.level, cls:r.acct.cls || s.cls || "" }); }
+    if (r.type !== "wrongcourse"){ s.tAt = Math.max(s.tAt || 0, r.when || 0); Object.assign(s, { name:r.acct.name, email:r.acct.email || s.email || "", grade:r.acct.grade || s.grade, teacher:r.acct.teacher || s.teacher, level:r.acct.level || s.level, cls:r.acct.cls || s.cls || "" }); }
     else { s.name = s.name || r.acct.name; s.email = s.email || r.acct.email; s.wrong = (s.wrong || 0) + 1; }
     if (r.type === "signin" || r.type === "signup"){ s.signins++; s.last = Math.max(s.last, r.when); }
     if (r.type === "task"){ s.active = Math.max(s.active || 0, r.when); s.done = s.done || new Set(); if (r.task && r.task.t) s.done.add(r.task.t); if (!s.lastTask || s.lastTask.when <= r.when) s.lastTask = { when:r.when, t:(r.task && r.task.t) || "" }; }
     if (r.type === "unverified") s.unv = Math.max(s.unv || 0, r.when);
   });
+  // a teacher or the super admin moved the student (🔀 Move or ✏️ Change course): show them under the new teacher and class straight away
+  ROWS.forEach(r => { if (r.type !== "adminchange" || !r.student || !r.to || !r.to.t) return;
+    const k = r.student.key || SDC.keyOf(r.student.email, r.student.name), tc = String(r.to.c || "");
+    Object.values(S).forEach(s => { if (s.key !== k || (s.tAt || 0) > (r.when || 0) || (s.moved || 0) > (r.when || 0)) return;
+      if (tc !== "cs+design" && tc && s.course && csOf(tc) !== s.course) return;
+      s.teacher = r.to.t; if (r.to.cls && s.course !== "cs") s.cls = r.to.cls; s.moved = r.when || Date.now(); }); });
   Object.keys(S).forEach(id => { const s = S[id]; if (s.course) return; const sib = Object.values(S).find(x => x !== s && x.key === s.key && x.course);   // older rows without a course
     if (sib){ ["last","signins","active"].forEach(f => { sib[f] = Math.max(sib[f] || 0, s[f] || 0); }); if (s.done){ sib.done = sib.done || new Set(); s.done.forEach(t => sib.done.add(t)); } delete S[id]; } else s.course = "cs"; });
   Object.values(DS).forEach(d => {   // Design and IT students who haven't signed in through the platform yet
@@ -1053,9 +1059,10 @@ function renderStudents(){
       <td>${pill(s.course)}${s.also && s.also.length ? `<div class="em" title="Also takes ${esc(s.also.map(x => C[x] ? C[x].name : x).join(", "))}">also ${esc(s.also.map(x => C[x] ? C[x].short : x).join(", "))}</div>` : ""}</td><td>${s.grade ? "G" + esc(s.grade) : ""}</td><td>${esc(s.course === "cs" ? levelName("cs", s.level) : s.cls || "")}</td><td>${esc(s.teacher || "")}</td>
       <td class="small">${progressCell(s)}</td>
       <td class="small" data-lc="${i}">${liveCell(s)}</td>
-      <td><div class="acts"><button class="btn sm" data-lv="${i}" style="background:#1E8A55;color:#fff;border-color:#1E8A55" title="See what this student is working on right now">👁 Live view</button>${isSuper() || TKEY ? `<button class="btn sm" data-ed="${i}" title="Change course, grade, level or teacher">✏️ Change course</button>` : ""}<button class="btn ghost sm" data-pr="${i}">Progress &amp; feedback</button><button class="btn ghost sm" data-fp="${i}" title="Download this student's feedback as a PDF">📄 Feedback PDF</button>${s.course === "cs" ? `<button class="btn ghost sm" data-vp="${i}" title="Show or hide this student's PIN">👁 PIN</button>${PIN_DONE[s.key] ? `<button class="btn ok sm" data-pin="${i}" style="background:#1E8A55;color:#fff" title="PIN reset done. Press to reset it again">✓ Done</button>` : `<button class="btn ghost sm" data-pin="${i}">🔑 Reset PIN</button>`}` : (PIN_DONE[s.key + "#pw"] ? `<button class="btn ok sm" data-dpw="${i}" style="background:#1E8A55;color:#fff" title="Password reset done. Press to reset it again">✓ Done</button>` : `<button class="btn ghost sm" data-dpw="${i}">🔑 Reset password</button>`)}${isSuper() ? delBtn(s, i) : ""}</div></td></tr>`).join("")
+      <td><div class="acts"><button class="btn sm" data-lv="${i}" style="background:#1E8A55;color:#fff;border-color:#1E8A55" title="See what this student is working on right now">👁 Live view</button>${isSuper() || TKEY ? `<button class="btn sm" data-mv="${i}" title="Move a student who chose the wrong teacher or class">🔀 Move teacher / class</button><button class="btn sm" data-ed="${i}" title="Change course, grade, level or teacher">✏️ Change course</button>` : ""}<button class="btn ghost sm" data-pr="${i}">Progress &amp; feedback</button><button class="btn ghost sm" data-fp="${i}" title="Download this student's feedback as a PDF">📄 Feedback PDF</button>${s.course === "cs" ? `<button class="btn ghost sm" data-vp="${i}" title="Show or hide this student's PIN">👁 PIN</button>${PIN_DONE[s.key] ? `<button class="btn ok sm" data-pin="${i}" style="background:#1E8A55;color:#fff" title="PIN reset done. Press to reset it again">✓ Done</button>` : `<button class="btn ghost sm" data-pin="${i}">🔑 Reset PIN</button>`}` : (PIN_DONE[s.key + "#pw"] ? `<button class="btn ok sm" data-dpw="${i}" style="background:#1E8A55;color:#fff" title="Password reset done. Press to reset it again">✓ Done</button>` : `<button class="btn ghost sm" data-dpw="${i}">🔑 Reset password</button>`)}${isSuper() ? delBtn(s, i) : ""}</div></td></tr>`).join("")
       : `<tr><td colspan="8" class="muted">${isSuper() ? "No students yet. They appear here after signing in through the platform." : "No students have chosen you as their teacher yet."}</td></tr>`);
   $("stTbl").querySelectorAll("[data-ed]").forEach(b => b.onclick = () => editStudent(list[+b.dataset.ed]));
+  $("stTbl").querySelectorAll("[data-mv]").forEach(b => b.onclick = () => moveStudent(list[+b.dataset.mv]));
   $("stTbl").querySelectorAll("[data-pr]").forEach(b => b.onclick = () => openProgress(list[+b.dataset.pr]));
   $("stTbl").querySelectorAll("[data-lv]").forEach(b => b.onclick = () => openLive(list[+b.dataset.lv]));
   ST_LIST = list; paintLiveCells();
@@ -1700,6 +1707,50 @@ function editStudent(s){
   };
 }
 
+/* ---------- move a student who picked the wrong teacher or class ----------
+   A signed change (the same as ✏️ Change course) that keeps their course, grade, level and work, and only sets the
+   teacher and class. The dashboard shows them under the new teacher at once; an open course page picks it up within
+   two minutes (or at their next sign-in). */
+function moveStudent(s){
+  const c = s.course === "cs" ? "cs" : s.course === "it" ? "it" : "design", G = String(s.grade || ""), cl = c === "cs" ? [] : (CLASSES[G] || []);
+  const base = [...(TEACHERS[c] || TEACHERS.design)], bg = document.createElement("div"); bg.className = "modal-bg";
+  bg.innerHTML = `<div class="modal" role="dialog" aria-label="Move student"><h2 style="margin:0">🔀 Move ${esc(s.name)}</h2>
+    <p class="muted small" style="margin-top:4px">For a student who chose the wrong teacher or class when they signed up. Their course, grade, level, work and password stay the same.</p>
+    <div class="notice small">Now: <b>${esc(s.teacher || "no teacher")}</b>${s.cls ? " · class <b>" + esc(s.cls) + "</b>" : ""} · ${esc(C[c] ? C[c].name : c)}${G ? ", Grade " + esc(G) : ""}</div>
+    <label class="f">Correct teacher<select class="t" id="mvT"></select></label>
+    ${cl.length > 1 ? `<label class="f">Correct class<select class="t" id="mvC">${cl.map(o => `<option value="${esc(o[0])}">${esc(o[1])}</option>`).join("")}</select></label>` : ""}
+    <div id="mvMsg"></div>
+    <div class="row" style="margin-top:16px"><button class="btn" id="mvGo">Move student</button><button class="btn ghost" id="mvX">Cancel</button></div></div>`;
+  document.body.appendChild(bg);
+  const q = x => bg.querySelector(x), close = () => bg.remove();
+  bg.onclick = e => { if (e.target === bg) close(); }; q("#mvX").onclick = close;
+  const fillT = list => { const v = q("#mvT").value; q("#mvT").innerHTML = list.map(t => `<option>${esc(t)}</option>`).join("");
+    const pick = list.find(t => SDC.sameTeacher(t, v || s.teacher || "")); if (pick) q("#mvT").value = pick; };
+  fillT(base);
+  SDC.teacherNames().then(names => { const all = base.slice(); names.forEach(n => { if (!all.some(h => SDC.sameTeacher(h, n))) all.push(n); }); fillT(all); }).catch(() => {});
+  if (q("#mvC") && s.cls && cl.some(o => o[0] === s.cls)) q("#mvC").value = s.cls;
+  if (!canChange()) q("#mvMsg").innerHTML = `<div class="notice warn small">Moving students isn't set up for your account yet. ${isSuper() ? "Lock and sign in again as super admin." : "Ask the super admin to sign in to the dashboard and press <b>Save setup</b> once, then sign in again."}</div>`;
+  q("#mvGo").onclick = async () => {
+    const t = q("#mvT").value, cls = q("#mvC") ? q("#mvC").value : (s.cls || "");
+    if (SDC.sameTeacher(t, s.teacher || "") && cls === (s.cls || "")){ q("#mvMsg").innerHTML = `<div class="notice warn small">That's the teacher and class ${esc(String(s.name).split(" ")[0])} already has.</div>`; return; }
+    q("#mvGo").disabled = true; q("#mvMsg").innerHTML = `<div class="notice small">Moving…</div>`;
+    try {
+      const id = await SDC.idOf(s.email || "", s.name); let A = null;
+      try { A = (await SDC.lookup(s.email || "", s.name)).assign; } catch(e){}
+      if (A && A.del) A = null;
+      const keep = A && (A.c === c || (A.also === "cs" && c === "cs") || (A.c === "design" && c === "design"));
+      const o = keep ? Object.assign({}, A, { k:id, t, cls: c === "cs" ? (A.cls || "") : cls, at: Date.now() })
+        : { k:id, c, g:G, t, l: c === "cs" ? (s.level || "") : "", cls: c === "cs" ? "" : cls, at: Date.now() };
+      delete o.sp;
+      SDC.sendRow("S", id, await signAssign(o));
+      const ex = { student:{ name:s.name, email:s.email || "", key:s.key }, to:{ c, g:G, l:o.l || "", cls:o.cls || "", t }, from:{ c, g:G, cls:s.cls || "", t:s.teacher || "" }, move:1 };
+      SDC.log("adminchange", { name: isSuper() ? "(admin)" : (ME && ME.name) || "(teacher)", course:c, grade:G, teacher:t }, ex);
+      ROWS.push(Object.assign({ sdc:1, type:"adminchange", when:Date.now(), acct:{ name:"(admin)" } }, ex));
+      close(); renderAll();
+      toast(String(s.name).split(" ")[0] + " moved to " + t + (o.cls && c !== "cs" ? ", class " + o.cls : "") + (canSee(t) ? "." : ". They now show on " + t + "'s dashboard."));
+    } catch(e){ q("#mvGo").disabled = false; q("#mvMsg").innerHTML = `<div class="notice bad small">Couldn't move them: ${esc(e.message)}</div>`; }
+  };
+}
 /* ---------------- sign-in log ---------------- */
 function renderLog(){
   const f = $("lgF").value;

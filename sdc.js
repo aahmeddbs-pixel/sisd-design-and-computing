@@ -1461,8 +1461,31 @@ const live = (() => {
   }
   return { send, where: w => { where = String(w || "").slice(0, 160); }, ask, button, buttonHtml, recent, one, acks, _snap: () => { const g = student(); return g ? snapshot(g) : null; } };
 })();
+/* a teacher moved this student to another teacher or class (or changed their course settings) while their page is open:
+   the page applies it within two minutes instead of waiting for the next sign-in */
+const watch = (() => {
+  let fn = null, busy = false;
+  async function check(){
+    const g = gate(); if (!fn || busy || !g || !g.acct || !g.acct.name || document.hidden || offline()) return;
+    busy = true;
+    try { const L = await lookup(g.acct.email || "", g.acct.name), A = L && L.assign; if (!A || A.del || !A.at) return;
+      const k = "sdc_asgseen|" + keyOf(g.acct.email, g.acct.name), seen = +(localStorage.getItem(k) || 0); if (A.at <= seen) return;
+      localStorage.setItem(k, String(A.at));
+      const newT = A.t && !sameTeacher(A.t, g.acct.teacher || ""), newC = A.cls && A.cls !== (g.acct.cls || "");
+      try { fn(A); } catch(e){}
+      if (newT || newC){ patchGate({ acct: Object.assign({}, g.acct, A.t ? { teacher:A.t } : {}, A.cls ? { cls:A.cls } : {}) });
+        const n = document.createElement("div"); n.className = "notranslate-auto";
+        n.style.cssText = "position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:2147483500;background:#1E8A55;color:#fff;padding:12px 18px;border-radius:12px;font:700 15px/1.4 Arial,Helvetica,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.25);max-width:90vw;text-align:center";
+        n.textContent = "Your teacher has updated your class: you're now with " + (A.t || g.acct.teacher || "your teacher") + (A.cls && newC ? ", class " + A.cls : "") + ". Your work is all still here.";
+        document.body.appendChild(n); setTimeout(() => n.remove(), 9000); }
+    } catch(e){} finally { busy = false; }
+  }
+  setInterval(check, 120000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) setTimeout(check, 2000); });
+  return { on: f => { fn = f; setTimeout(check, 20000); }, check };
+})();
 return { jsonp, PORTAL, COURSES, studyPlusOK, studyPlusEmail, studyReport, STUDY_PLUS, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
-  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, forgot, forgotDialog, resetDone, emailCode, checkCode, usernameOf, isUsername, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, gloss, listen, stopReading, speak, slow, live, rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
+  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, forgot, forgotDialog, resetDone, emailCode, checkCode, usernameOf, isUsername, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, gloss, listen, stopReading, speak, slow, live, watchAssign: f => watch.on(f), rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();
 
 /* ---------- Readable everywhere: light mode, dark mode, any screen ----------
