@@ -1468,7 +1468,12 @@ const watch = (() => {
   async function check(){
     const g = gate(); if (!fn || busy || !g || !g.acct || !g.acct.name || document.hidden || offline()) return;
     busy = true;
-    try { const L = await lookup(g.acct.email || "", g.acct.name), A = L && L.assign; if (!A || A.del || !A.at) return;
+    try { const L = await lookup(g.acct.email || "", g.acct.name), A = L && L.assign;
+      if (A && A.del && !isTester(g.acct.email) && !(createdMs(g.acct) > A.at)){   // deleted by the super admin while signed in: sign out now
+        log("deletedsignin", Object.assign({}, g.acct, { course:g.course }), { open:true });
+        try { if (window.SDC_forget) window.SDC_forget(g.acct); } catch(e){}
+        signedOutNotice(MSG.deleted(), "bad"); setTimeout(() => leave("deleted"), 600); return; }
+      if (!A || A.del || !A.at) return;
       const k = "sdc_asgseen|" + keyOf(g.acct.email, g.acct.name), seen = +(localStorage.getItem(k) || 0); if (A.at <= seen) return;
       localStorage.setItem(k, String(A.at));
       const newT = A.t && !sameTeacher(A.t, g.acct.teacher || ""), newC = A.cls && A.cls !== (g.acct.cls || "");

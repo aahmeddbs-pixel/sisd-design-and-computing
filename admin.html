@@ -10,7 +10,7 @@
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
 <script src="/python-pathways/pp-sync.js?v=20261116lv"></script>
 <script src="/python-pathways/answers-view.js?v=20261112all"></script>
-<script src="sdc.js?v=20261117mv"></script>
+<script src="sdc.js?v=20261117dl"></script>
 <script src="/python-pathways/game-dev-data.js?v=20261116gd"></script>
 <script src="study/maths.js?v=20261110a"></script>
 <script src="study/english.js?v=20261110a"></script>
@@ -981,7 +981,7 @@ function renderHP(){
 
 /* ---------------- students ---------------- */
 /* one row per student per course: a student taking Computer Science and Design has two rows, each with that course's progress */
-function students(){
+function students(opt){
   const S = {}, csOf = c => c === "cs" ? "cs" : c === "it" ? "it" : c ? "design" : "";
   const rec = (k, c) => { const id = k + "#" + c; return S[id] = S[id] || { key:k, course:c, last:0, signins:0 }; };
   const anyRec = k => Object.values(S).find(x => x.key === k);
@@ -993,6 +993,8 @@ function students(){
     if (r.type !== "wrongcourse"){ s.tAt = Math.max(s.tAt || 0, r.when || 0); Object.assign(s, { name:r.acct.name, email:r.acct.email || s.email || "", grade:r.acct.grade || s.grade, teacher:r.acct.teacher || s.teacher, level:r.acct.level || s.level, cls:r.acct.cls || s.cls || "" }); }
     else { s.name = s.name || r.acct.name; s.email = s.email || r.acct.email; s.wrong = (s.wrong || 0) + 1; }
     if (r.type === "signin" || r.type === "signup"){ s.signins++; s.last = Math.max(s.last, r.when); }
+    if (r.type === "signup") s.signupAt = Math.max(s.signupAt || 0, r.when || 0);
+    { const cv = r.acct && r.acct.created, cm = typeof cv === "number" ? cv : Date.parse(cv || "") || 0; if (cm) s.created = Math.max(s.created || 0, cm); }
     if (r.type === "task"){ s.active = Math.max(s.active || 0, r.when); s.done = s.done || new Set(); if (r.task && r.task.t) s.done.add(r.task.t); if (!s.lastTask || s.lastTask.when <= r.when) s.lastTask = { when:r.when, t:(r.task && r.task.t) || "" }; }
     if (r.type === "unverified") s.unv = Math.max(s.unv || 0, r.when);
   });
@@ -1014,12 +1016,16 @@ function students(){
     s.live = LIVE[s.key] || null; if (s.live) s.active = Math.max(s.active, s.live.act || 0, s.live.at || 0);
     s.also = Object.values(S).filter(x => x !== s && x.key === s.key && x.course && x.course !== s.course).map(x => x.course); s.both = s.also.length > 0;
     if (s.both && s.course !== "cs"){ s.dcls = s.cls; } else if (s.both){ const d = Object.values(S).find(x => x.key === s.key && x.course === "design"); s.dcls = d && d.cls; } });
-  const gone = {};   // accounts the super admin deleted: hidden unless the student has been active since (a new account)
-  ROWS.forEach(r => { if (r.type === "admindelete" && r.student && r.student.key) gone[r.student.key] = Math.max(gone[r.student.key] || 0, r.when); });
+  // accounts the super admin deleted: hidden for good, unless the student has made a NEW account since (signed up again).
+  // Activity from a page still open at the time (saves, live notes) no longer brings them back.
+  const gone = {};
+  ROWS.forEach(r => { if (r.type !== "admindelete" || !r.student || !r.student.key) return; const k = r.partial ? r.student.key + "#" + (r.student.course || "") : r.student.key; gone[k] = Math.max(gone[k] || 0, r.when); });
   SDC.DELETED.forEach(d => { gone["e:" + d.email] = Math.max(gone["e:" + d.email] || 0, d.at); });
   Object.values(S).forEach(s => { s.seen = Math.max(s.active || 0, s.last || 0, s.when || 0);
     if (s.seen && /^\d+$/.test(String(s.grade || ""))) s.grade = String(Math.min(12, +SDC.rolled(s.grade, s.seen))); });   // moved up on 1 September
-  return Object.values(S).filter(s => s.name && canSee(s.teacher) && !(gone[s.key] && s.seen <= gone[s.key])).sort((a, b) => (a.course || "").localeCompare(b.course || "") || String(a.grade).localeCompare(String(b.grade), undefined, { numeric:true }) || a.name.localeCompare(b.name));
+  const reborn = (s, at) => (s.signupAt || 0) > at || (s.created || 0) > at;
+  const isGone = s => { const a = gone[s.key], b = gone[s.key + "#" + s.course]; return (a && !reborn(s, a)) || (b && !reborn(s, b)); };
+  return Object.values(S).filter(s => s.name && (opt && opt.all ? true : canSee(s.teacher) && !isGone(s))).sort((a, b) => (a.course || "").localeCompare(b.course || "") || String(a.grade).localeCompare(String(b.grade), undefined, { numeric:true }) || a.name.localeCompare(b.name));
 }
 /* short progress summary for the table */
 function pySummary(snap){
@@ -1142,6 +1148,44 @@ async function healDeletes(){
     n.innerHTML = `<b>✅ Fixed:</b> ${done.map(esc).join(", ")} can sign in again, with the same course, grade and class as before. Their PIN and work are unchanged. <button class="btn sm" style="margin-left:8px">OK</button>`;
     n.querySelector("button").onclick = () => n.remove(); document.body.appendChild(n); }
 }
+/* Accounts Mr. Ahmed asked to delete completely (17 Nov 2026). Runs on its own on the super admin dashboard: every
+   course entry for each of these students is deleted with a signed change, so their login stops working on every
+   computer, open pages sign them out, and they no longer show anywhere. First names only (Aisha, Malika) are matched
+   only on accounts he had already deleted from this dashboard, so another Aisha or Malika is never touched. */
+const PURGE = { full:["sofia bardin", "talia boueiz", "sasha montavon"], deletedFirst:["aisha", "malika"], before:Date.parse("2026-11-17T23:59:59+04:00") };
+let purging = false;
+async function purgeNamed(){
+  if (!isSuper() || purging || !canChange() || !ROWS.length) return; purging = true;
+  const done = [], seenK = new Set(), nm = n => String(n || "").trim().toLowerCase().replace(/\s+/g, " ");
+  try {
+    const delKeys = new Set(ROWS.filter(r => r.type === "admindelete" && r.student && r.student.key).map(r => r.student.key));
+    const all = students({ all:true });
+    for (const s of all){
+      const n = nm(s.name), first = n.split(" ")[0];
+      const hit = PURGE.full.some(f => n === f || (n.startsWith(f.split(" ")[0] + " ") && n.endsWith(" " + f.split(" ").pop()))) || (PURGE.deletedFirst.includes(first) && delKeys.has(s.key));
+      if (!hit || seenK.has(s.key)) continue; seenK.add(s.key);
+      const entries = all.filter(x => x.key === s.key);
+      if (entries.some(x => (x.signupAt || 0) > PURGE.before || (x.created || 0) > PURGE.before)) continue;   // a brand-new account made after today: leave it
+      const id = await SDC.idOf(s.email || "", s.name);
+      let A = null; try { A = (await SDC.lookup(s.email || "", s.name)).assign; } catch(e){ continue; }
+      const fullyGone = ROWS.some(r => r.type === "admindelete" && r.student && r.student.key === s.key && !r.partial && r.purge);
+      if (A && A.del && fullyGone) continue;   // already done
+      const at = Date.now();
+      SDC.sendRow("S", id, await signAssign({ k:id, del:true, at }));
+      for (const x of entries){
+        const ex = { student:{ name:x.name, email:x.email || "", key:x.key, course:x.course || "" }, partial:0, purge:1 };
+        SDC.log("admindelete", { name:"(admin)", course:x.course || "", grade:x.grade || "", teacher:x.teacher || "" }, ex);
+        ROWS.push(Object.assign({ sdc:1, type:"admindelete", when:at, acct:{ name:"(admin)" } }, ex));
+      }
+      done.push(s.name + " (" + entries.map(x => C[x.course] ? C[x.course].name : x.course).join(" + ") + ")");
+    }
+  } catch(e){ console.warn("purge", e); }
+  purging = false;
+  if (done.length){ try { SDC.flush(); } catch(e){} renderStudents();
+    const n = document.createElement("div"); n.className = "notice ok"; n.style.cssText = "position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:9999;max-width:560px;box-shadow:0 8px 30px rgba(0,0,0,.25);padding:14px 16px";
+    n.innerHTML = `<b>🗑 Deleted completely:</b> ${done.map(esc).join(", ")}. They can't sign in any more and no longer show on the dashboard. <button class="btn sm" style="margin-left:8px">OK</button>`;
+    n.querySelector("button").onclick = () => n.remove(); document.body.appendChild(n); }
+}
 function deleteStudent(s){
   if (!isSuper()) return;
   const bg = document.createElement("div"); bg.className = "modal-bg";
@@ -1150,6 +1194,7 @@ function deleteStudent(s){
     <div class="notice warn small" style="margin-top:10px">${s.seen ? "Last online <b>" + esc(fmtDT(s.seen)) + "</b> (" + idleDays(s) + " days ago)." + (idleDays(s) < DELETE_AFTER_DAYS ? " <b>This student has been active recently: make sure this is the right account.</b>" : "") : "This student has never been seen online."}
       Deleting removes the account from the dashboard and from every computer the next time someone tries to sign in with it. Their old work is not brought back.
       The student can <b>sign up again</b> with the same name and email to start fresh.</div>
+    ${sameAccount(s) ? `<label class="row small" style="margin-top:10px;gap:8px;align-items:flex-start"><input type="checkbox" id="dAll" checked style="margin-top:3px"><span><b>Delete completely</b>: also delete their ${esc(C[sameAccount(s).course] ? C[sameAccount(s).course].name : sameAccount(s).course)} account (they use one login for both). Untick to remove only ${esc(C[s.course] ? C[s.course].name : s.course || "this course")}.</span></label>` : ""}
     <label class="f" style="margin-top:12px">Type <b>DELETE</b> to confirm<input class="t" id="dConf" autocomplete="off"></label>
     <div id="dMsg"></div>
     <div class="row" style="margin-top:16px"><button class="btn red" id="dGo" disabled>Delete account</button><button class="btn ghost" id="dNo">Cancel</button></div></div>`;
@@ -1160,12 +1205,12 @@ function deleteStudent(s){
   q("#dGo").onclick = async () => {
     q("#dGo").disabled = true;
     try {
-      const id = await SDC.idOf(s.email || "", s.name), at = Date.now(), keep = sameAccount(s);
+      const id = await SDC.idOf(s.email || "", s.name), at = Date.now(), keep = q("#dAll") && q("#dAll").checked ? null : sameAccount(s);
       // the same student is still listed for the other course (one login for both): only take this course away,
       // never delete the login they still use
       SDC.sendRow("S", id, await signAssign(keep ? { k:id, c:keep.course, g:String(keep.grade || ""), t:keep.teacher || "", l: keep.course === "cs" ? keep.level || "" : "", cls: keep.course === "design" ? keep.cls || "" : "", at } : { k:id, del:true, at }));
-      SDC.log("admindelete", { name:"(admin)", course:s.course || "", grade:s.grade || "", teacher:s.teacher || "" }, { student:{ name:s.name, email:s.email || "", key:s.key, course:s.course || "" } });
-      ROWS.push({ sdc:1, type:"admindelete", when:at, acct:{ name:"(admin)" }, student:{ name:s.name, email:s.email || "", key:s.key } });
+      SDC.log("admindelete", { name:"(admin)", course:s.course || "", grade:s.grade || "", teacher:s.teacher || "" }, { student:{ name:s.name, email:s.email || "", key:s.key, course:s.course || "" }, partial: keep ? 1 : 0 });
+      ROWS.push({ sdc:1, type:"admindelete", when:at, acct:{ name:"(admin)" }, student:{ name:s.name, email:s.email || "", key:s.key, course:s.course || "" }, partial: keep ? 1 : 0 });
     } catch(e){ q("#dMsg").innerHTML = `<div class="notice bad">Could not delete: ${esc(e.message)}</div>`; q("#dGo").disabled = false; return; }
     close(); renderStudents(); toast(s.name + "'s account has been deleted.");
   };
@@ -1808,7 +1853,7 @@ function renderStudy(){
       <div class="scroll" style="margin-top:6px"><table class="tbl"><tr><th>When</th><th>Topic</th><th>Score</th><th>Effort</th><th>Work time</th><th>Strengths and gaps</th></tr>${recent || `<tr><td colspan="6" class="muted">No finished topics yet.</td></tr>`}</table></div>
     </div>`; }).join("");
 }
-function renderAll(){ setTimeout(lessonPopups, 800); renderHP(); renderResets(); renderSlow(); renderVerifyWaiting(); renderDesignRequests(); renderStudents(); renderLog(); try { renderStudy(); } catch(e){} try { renderGameDev(); } catch(e){} setTimeout(healDeletes, 1500); }
+function renderAll(){ setTimeout(lessonPopups, 800); setTimeout(purgeNamed, 1500); renderHP(); renderResets(); renderSlow(); renderVerifyWaiting(); renderDesignRequests(); renderStudents(); renderLog(); try { renderStudy(); } catch(e){} try { renderGameDev(); } catch(e){} setTimeout(healDeletes, 1500); }
 /* ---------- students who signed up but can't get in because they haven't verified their email ---------- */
 /* ---------- students who've been stuck on one task for a long time (after two reminders on their screen) ---------- */
 function renderSlow(){
