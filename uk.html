@@ -9,8 +9,9 @@
 <meta name="robots" content="noindex,nofollow">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
 <script src="sdc.js?v=20261117dl"></script>
+<script src="study/lang.js?v=20261117fr"></script>
 <script src="study/gen.js?v=20261114c"></script>
-<script src="uk/gen.js?v=20261114d"></script>
+<script src="uk/gen.js?v=20261117fr"></script>
 <script src="uk/y8.js?v=20261114c"></script>
 <script src="uk/y10.js?v=20261114c"></script>
 <script src="uk/y8-more.js?v=20261114c"></script>
@@ -18,6 +19,9 @@
 <script src="uk/learn-extra.js?v=20261114d"></script>
 <script src="uk/y10-igcse.js?v=20261114d"></script>
 <script src="uk/y8-revision.js?v=20261114d"></script>
+<script src="uk/french.js?v=20261117fr"></script>
+<script src="uk/ks-extra.js?v=20261117fr"></script>
+<script src="uk/explain-fill.js?v=20261117fr"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -244,7 +248,7 @@ setTimeout(() => { try { (last ? $("lu") : $("lu")).focus(); } catch(e){} }, 50)
 (function(){
 "use strict";
 const $ = id => document.getElementById(id), esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const S = window.UK || {}, ORDER = ["y8revmaths","y8revscience","y8revenglish","y8revhistory","y8revgeography","y8maths","y8biology","y8chemistry","y8physics","y8english","y8history","y8geography","y8computing","y10maths","y10biology","y10chemistry","y10physics","y10english","y10history","y10geography","y10computing","y10ict","y10psychology"].filter(k => S[k]);
+const S = window.UK || {}, ORDER = ["y8revmaths","y8revscience","y8revenglish","y8revhistory","y8revgeography","y8maths","y8biology","y8chemistry","y8physics","y8english","y8history","y8geography","y8computing","y8french","y10maths","y10biology","y10chemistry","y10physics","y10english","y10history","y10geography","y10computing","y10ict","y10psychology","y10french"].filter(k => S[k]);
 const YEARS = [8, 10], STAGE = { 8:"Key Stage 3", 10:"IGCSE (Edexcel and Cambridge)" }, subjLabel = s => S[s].name;
 ORDER.forEach(k => { if (!S[k].short){ S[k].short = S[k].name; S[k].name = "Year " + S[k].year + " " + S[k].name; } });
 const IDLE_MS = 60000, FOCUS_SEC_PER_TASK = 40, SET_SIZE = 8;
@@ -571,7 +575,7 @@ function setIntro(s, t, X){
 }
 
 /* ---------- the Learn page: key ideas, worked examples (how to work it out), then practice ---------- */
-function steps(L){ return `<ol class="steps">${L.map(x => `<li dir="auto">${esc(x)}</li>`).join("")}</ol>`; }
+function steps(L){ return `<ol class="steps">${L.map(x => `<li dir="auto">${esc(x)}${VIEW && VIEW.s ? sayBtns(x, VIEW.s) : ""}</li>`).join("")}</ol>`; }
 function genExamples(s, t){
   const key = s + "/" + t; if (!GEN.has(key)) return [];
   let h = 7; for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
@@ -586,13 +590,14 @@ function renderLearn(){
   <div class="card stack" style="border-top:6px solid ${SUB.colour}">
     <div class="qhead"><div><div class="eyebrow">${esc(SUB.name)} · Learn</div><h1>${esc(T.title)}</h1><p class="muted small">${esc(T.strand)}</p></div>
       <button class="btn sm ghost" id="lSay">🔊 Read aloud</button></div>
-    <div class="lsec"><h2>1. Key ideas</h2><ol class="ideas2">${(L.ideas || []).map(x => `<li dir="auto">${esc(x)}</li>`).join("")}</ol>${L.trick ? `<div class="trickbox"><b>🧠 Memory trick:</b> ${esc(L.trick)}</div>` : ""}${L.fun ? `<div class="funbox"><b>🤩 Did you know?</b> ${esc(L.fun)}</div>` : ""}</div>
-    <div class="lsec"><h2>2. Worked example</h2><div class="wex"><div class="wq" dir="auto">${esc(ex[0] || "")}</div><p class="small muted" style="margin-top:6px"><b>How to work it out</b></p>${steps(ex.slice(1))}</div></div>
+    <div class="lsec"><h2>1. Key ideas</h2><ol class="ideas2">${(L.ideas || []).map(x => ideaLi(x, s)).join("")}</ol>${L.trick ? `<div class="trickbox"><b>🧠 Memory trick:</b> ${esc(L.trick)}${sayBtns(L.trick, s)}</div>` : ""}${L.fun ? `<div class="funbox"><b>🤩 Did you know?</b> ${esc(L.fun)}</div>` : ""}${verbBox(s, t)}</div>
+    <div class="lsec"><h2>2. Worked example</h2><div class="wex"><div class="wq" dir="auto">${esc(ex[0] || "")}${sayBtns(L.example || "", s)}</div><p class="small muted" style="margin-top:6px"><b>How to work it out</b></p>${steps(ex.slice(1))}</div></div>
     ${more.length ? `<div class="lsec"><h2>3. More worked examples</h2><p class="muted small">Cover the steps and try each one first, then check.</p>
       ${more.map((m, k) => `<details class="wex"${k === 0 ? " open" : ""}><summary><span class="wq" dir="auto">${m.d ? `<span class="lvl l${m.d}" style="margin:0 6px 0 0">${LVL[m.d]}</span>` : ""}${esc(m.q)}</span></summary>
         <p class="small muted" style="margin-top:8px"><b>How to work it out</b></p>${steps(m.steps || [])}<div class="wa"><b>Answer:</b> <span dir="auto" style="white-space:pre-line">${esc(m.a)}</span></div></details>`).join("")}</div>` : ""}
     <div class="lsec"><h2>${more.length ? "4" : "3"}. Practice</h2>
       <p class="muted small">${X.tasks.length} questions${X.r > 1 ? " in Set " + X.r : ""}, from Core to Challenge. Stuck on a question? Ask for a hint: you get 3, then the solution.</p>
+      ${linksBox(s, t)}
       ${st.read ? "" : `<label class="agree"><input type="checkbox" id="kRead"> I have read the key ideas and worked examples.</label>`}
       <div class="row" style="justify-content:flex-end;margin-top:10px">${runsOf(s, t) > 1 ? `<button class="btn ghost" id="mySets">📚 My sets</button>` : ""}<button class="btn red" id="kGo" ${st.read ? "" : "disabled"}>${X.o.done ? "See my results →" : started ? "Continue practice →" : "Start practice →"}</button></div></div>
   </div>`;
@@ -607,16 +612,29 @@ function renderLearn(){
 function showKnowledge(s, t, gate){
   const T = topicOf(s, t), rtl = S[s].rtl;
   modal(`<div class="eyebrow">${esc(S[s].name)} · Key knowledge</div><h3 style="margin-top:4px">${esc(T.title)}</h3>
-    <ul class="ideas">${T.learn.ideas.map(x => `<li dir="auto">${esc(x)}</li>`).join("")}</ul>
-    <div class="example" dir="auto"><b>Worked example</b>\n${esc(T.learn.example)}</div>
+    <ul class="ideas">${T.learn.ideas.map(x => ideaLi(x, s)).join("")}</ul>
+    <div class="example" dir="auto"><b>Worked example</b>${sayBtns(T.learn.example, s)}\n${esc(T.learn.example)}</div>
+    ${verbBox(s, t)}${linksBox(s, t)}
     ${gate ? `<label class="agree"><input type="checkbox" id="kRead"> I have read the key knowledge and the worked example.</label>` : ""}
     <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn sm ghost" id="kSay">🔊 Read aloud</button><button class="btn" id="kGo" ${gate ? "disabled" : ""}>${gate ? "Start the tasks →" : "Close"}</button></div>`);
   if (gate) $("kRead").onchange = e => $("kGo").disabled = !e.target.checked;
   $("kSay").onclick = () => say(T.title + ". " + T.learn.ideas.join(" ") + " Worked example. " + T.learn.example, rtl);
   $("kGo").onclick = () => { hush(); closeModal(); if (gate){ tstate(s, t).read = true; save(); render(); const X = run(s, t); if (X.r > 1 && !Object.keys(X.o.ans).length) setIntro(s, t, X); } };
 }
-function say(text, rtl){ try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(String(text).replace(/[→←✓]/g, " ")); u.lang = rtl ? "en-GB" : "en-GB"; u.rate = .95; speechSynthesis.speak(u); } catch(e){} }
-function hush(){ try { speechSynthesis.cancel(); } catch(e){} }
+function say(text, rtl){ const s = VIEW && VIEW.s; if (window.SPX) return SPX.speak(text, s ? LANG(s) : "en"); try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(String(text).replace(/[→←✓]/g, " ")); u.lang = "en-GB"; u.rate = .95; speechSynthesis.speak(u); } catch(e){} }
+/* ---------- language audio, verb lab and further-learning links (study/lang.js) ---------- */
+const LANG = s => (S[s] && S[s].lang) || (S[s] && S[s].rtl ? "ar" : "en");
+const hasSPX = () => !!window.SPX;
+function sayBtns(text, s){ if (!hasSPX() || LANG(s) === "en") return ""; return " " + SPX.btn(text, "mix-" + LANG(s)) + SPX.slowBtn(text, "mix-" + LANG(s)); }
+function ideaLi(x, s){ return `<li dir="auto">${LANG(s) !== "en" && hasSPX() ? `<span class="spxidea"><span>${esc(x)}</span>${sayBtns(x, s)}</span>` : esc(x)}</li>`; }
+function linkCtx(s, t){ const SUB = S[s], T = topicOf(s, t) || {}, k = s + " " + (SUB.name || "");
+  return { level: (SUB.year === 10 ? "IGCSE" : "KS3 Year 8"), subject: SUB.short || SUB.name, topic: String(T.title || "").replace(/^[^A-Za-zÀ-ÿ0-9(]+/, ""), bbc: T.bbc, yt: T.yt, lang: SUB.lang,
+    khan: /math|science|biology|chemistry|physics|comput/i.test(k) ? String(T.title || "").replace(/^[^A-Za-zÀ-ÿ0-9(]+/, "") : false, extra: T.links || [] }; }
+function linksBox(s, t){ return hasSPX() ? SPX.linksHTML(linkCtx(s, t)) : ""; }
+function verbBox(s, t){ const T = topicOf(s, t) || {}, L = T.learn || {}; if (!hasSPX() || !L.verbs) return "";
+  return (L.pron ? `<div class="spxpron"><b>👄 Pronunciation help</b><ul class="ideas">${L.pron.map(x => ideaLi(x, s)).join("")}</ul></div>` : "") + SPX.verbsHTML(L.verbs, S[s].verbLevel || "core"); }
+
+function hush(){ try { if (window.SPX) SPX.hush(); else speechSynthesis.cancel(); } catch(e){} }
 
 /* ---------- one task at a time ---------- */
 let pick = null;
@@ -637,7 +655,7 @@ function renderTopic(){
     <div class="qhead"><div><div class="eyebrow">${esc(SUB.name)} · ${esc(T.title)}${r > 1 ? " · Set " + r : ""}${retry ? " · Fix my mistakes" : ""}</div><div class="muted small">Task ${pos + 1} of ${list.length}${r > 1 ? " · " + esc(LVL_NAME(o.lv)) + " level" : ""}</div></div>
       <div class="row">${runsOf(s, t) > 1 ? `<button class="btn sm ghost" id="mySets">📚 My sets</button>` : ""}<button class="btn sm ghost" id="kAgain">📘 Learn</button></div></div>
     <div class="dots" aria-hidden="true">${dots}</div>
-    <div class="q" dir="auto">${lvlTag(task)} ${esc(task.q)}</div>
+    <div class="q" dir="auto">${lvlTag(task)} ${esc(task.q)}${sayBtns(task.q, s)}${task.k === "mcq" && LANG(s) !== "en" && hasSPX() ? " " + SPX.btn(task.o.join(". "), "mix-" + LANG(s), "🔊 Options") : ""}</div>
     <div id="answerBox">${answerUI(task, SUB.rtl, r)}</div>
     <div id="after"></div>
     <div id="hintBox"></div>
@@ -793,14 +811,21 @@ function paintHintsDone(o, i, s, t, task){ const n = hintsUsed(o, i); if (!n || 
   $("hintBox").innerHTML = H.slice(0, n).map((h, k) => `<div class="hint"><b>💡 Hint ${k + 1} of ${HINTS_MAX}</b><br><span dir="auto">${esc(h)}</span></div>`).join(""); }
 
 /* explanation pop-up: shown after every check, right or wrong, to reinforce the knowledge */
+function autoX(task){
+  const T = VIEW && VIEW.s && VIEW.t ? topicOf(VIEW.s, VIEW.t) : null, L = (T && T.learn && T.learn.ideas) || [];
+  const key = new Set(String(task.q + " " + rightText(task)).toLowerCase().match(/[a-zà-ÿ]{4,}/g) || []);
+  let best = "", sc = 0; L.forEach(x => { const n = (String(x).toLowerCase().match(/[a-zà-ÿ]{4,}/g) || []).filter(w => key.has(w)).length; if (n > sc){ sc = n; best = x; } });
+  return "The correct answer is: " + rightText(task) + "." + (best ? "\nKey idea: " + best : "");
+}
 function explain(task, rec, rtl){
   modal(`<div class="eyebrow">${rec.sol ? "Here's how to work it out" : rec.ok ? "Well done — here's why it's right" : "Let's fix this"}</div>
     <h3 style="margin-top:4px" dir="auto">${esc(task.q)}</h3>
     ${rec.ok || rec.sol ? "" : `<p style="margin-top:8px"><span class="pill bad">Your answer</span> <span dir="auto">${esc(givenText(task, rec.g)) || "—"}</span></p>`}
-    <p style="margin-top:8px"><span class="pill ok">Correct answer</span> <span dir="auto">${esc(rightText(task))}</span></p>
-    <div class="example" dir="auto"><b>💡 Explanation and example</b>\n${esc(task.x)}</div>
+    <p style="margin-top:8px"><span class="pill ok">Correct answer</span> <span dir="auto">${esc(rightText(task))}</span>${VIEW && VIEW.s ? sayBtns(rightText(task), VIEW.s) : ""}</p>
+    <div class="example" dir="auto"><b>💡 Explanation and example</b>${VIEW && VIEW.s ? sayBtns(task.x, VIEW.s) : ""}\n${esc(task.x || autoX(task))}</div>
+    ${VIEW && VIEW.s && VIEW.t ? linksBox(VIEW.s, VIEW.t) : ""}
     <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn sm ghost" id="xSay">🔊 Read aloud</button><button class="btn" id="xOk">Got it</button></div>`);
-  $("xSay").onclick = () => say(task.x, rtl);
+  $("xSay").onclick = () => say(task.x || autoX(task), rtl);
   $("xOk").onclick = () => { hush(); closeModal(); };
 }
 

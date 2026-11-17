@@ -40,3 +40,11 @@ One sign-in page for SISD's Computer Science (Python Pathways), Design and IT co
 - Off by default. Super admin → 🔀 Switches → **Computer Science units**: switch on **Unit** (Grade 7 CS students then see a card above their Python lessons) and open each of the four stages when the class is ready. Stored in the signed switches state as `unlocks.cs7gd = { on, s1, s2, s3, s4 }`.
 - Stages: 1 Game Idea (research, proposal, pixel sprite, success criteria), 2 Level Design (a map and full write-up for every level, game flow, code plan, test plan), 3 Build & Test (share link, milestones, diary, test log), 4 Playtest & Evaluate. Submit unlocks only when every checklist item is complete.
 - Work saves on the computer and, locked with the student's Computer Science key, online ("W" rows). Submissions go to the teacher log (`gamedev`) and appear in the dashboard's **🎮 G7 Game Dev** tab with feedback and PDF.
+
+## Study Plus and Study Plus UK: audio, verb lab and further learning (Nov 2026)
+- `study/lang.js` (both sites): 🔊 / 🐢 buttons read French in a French voice and English in an English voice, even inside one sentence (Arabic script in an Arabic voice). On key ideas, worked examples, questions, answer options and the explanation pop-up. A "Slow French audio" switch is remembered on the device.
+- Verb lab: 28 key French verbs, each with every present-tense form, how it sounds, other tenses, how to use it, three example sentences with audio, and the common mistake. Shown in every French topic (`learn.verbs`, `learn.pron`).
+- Every explanation pop-up and learn page has 🔗 Learn more links (YouTube search, BBC Bitesize, Khan Academy for maths and science, Forvo for French).
+- Study Plus French: new topics "Verb lab" and "Free time, sport and weather"; adjective-position fix (BAGS).
+- Study Plus UK: Year 8 French (KS3) and Year 10 French (Edexcel IGCSE 4FR1, five themes plus grammar); Year 10 Maths vectors, circle theorems, sequences and algebraic fractions; Year 10 Chemistry Groups 1 and 7 and chemical tests; Year 8 Maths transformations, constructions and bearings.
+- `uk/explain-fill.js` adds explanations to 409 questions that had none; any question still without one shows the correct answer and the most relevant key idea.
