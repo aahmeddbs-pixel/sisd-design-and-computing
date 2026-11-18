@@ -66,9 +66,12 @@ const COURSES = {
 // Teacher's private log (the same Google Form as the Python Pathways Log): type, student, email, teacher, data
 const LOG = { url:"https://docs.google.com/forms/d/e/1FAIpQLSfFnVZORF6176gPE9a2zGNpivDuklLFF5cHzdQz1YxfAxThRA/formResponse",
   entries:{ type:"entry.1355322393", student:"entry.1753714859", email:"entry.1091945433", teacher:"entry.1559320258", data:"entry.145790134" } };
-// Registry and admin assignments live in the Python Pathways Sync form/sheet as scrambled PPS2 rows
-const SYNC = { action:"https://docs.google.com/forms/d/e/1FAIpQLSdGZGdrzAvN_21zfKHufKcba8003hZIeUhzTKQJ3Mun53trlQ/formResponse", entry:"entry.544835510",
-  id:"12_g1ySZtyUX-rXTuOHcZ7_vUzCkdhXV_T7KF5NjBFa0", gid:"1433531983" };
+// Registry and admin assignments live in the sync form/sheet as scrambled PPS2 rows.
+// 18 Nov 2026: the first sync sheet (12_g1y…) grew past what Google Sheets can hold and stopped taking rows on 16 Nov at 10:44.
+// New rows go to "SDC Sync 2"; the old sheet is still read (newest sheet first).
+const SYNC = { action:"https://docs.google.com/forms/d/e/1FAIpQLScz4HZXAuqSguFrhRDLAtAV2PxAi6K8uF2Vzx4cPWFCevMYdA/formResponse", entry:"entry.919327250",
+  id:"1qRTsBkS6MfA7lHEU5ZN3e3cbQAGtjrF8xmSfHGHKEoE", gid:"996219689" };
+const SYNC_OLD = [{ id:"12_g1ySZtyUX-rXTuOHcZ7_vUzCkdhXV_T7KF5NjBFa0", gid:"1433531983" }];
 const SIG_PUB = {"key_ops":["verify"],"ext":true,"kty":"EC","x":"g6JG87cYBkusgs-I5KvQKNdcS2VGwCu4FP9lJYIvu58","y":"Tc06F7jM1RaDT6RsO7UTPumlWm7d3MNQNtqky5ygZAE","crv":"P-256"};
 const GATE_KEY = "sdc_gate", Q_KEY = "sdc_q", GATE_HOURS = 12;
 const TE = new TextEncoder();
@@ -162,15 +165,16 @@ function enqueue(action, fields){ const q = getQ(); q.push({ a:action, f:fields 
 window.addEventListener("online", flush); setTimeout(flush, 4000);
 
 /* ---------- reading scrambled rows back from the sync sheet ---------- */
-function gviz(tq, sheet){
+function gviz(tq, sheet, src){
+  src = src || SYNC;
   return new Promise((res, rej) => {
     const cb = "__sdc" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), sc = document.createElement("script");
     const done = () => { clearTimeout(t); try { delete window[cb]; } catch(e){ window[cb] = undefined; } sc.remove(); };
     const t = setTimeout(() => { done(); rej(new Error("timeout")); }, 15000);
     window[cb] = r => { done(); if (!r || r.status === "error") return rej(new Error("read")); res(r); };
     sc.onerror = () => { done(); rej(new Error("reach")); };
-    const where = sheet ? "sheet=" + encodeURIComponent(sheet) + "&" : "gid=" + SYNC.gid + "&";
-    sc.src = `https://docs.google.com/spreadsheets/d/${SYNC.id}/gviz/tq?${where}headers=1&tqx=out:json;responseHandler:${cb}&tq=${encodeURIComponent(tq)}&_=${Date.now()}`;
+    const where = sheet ? "sheet=" + encodeURIComponent(sheet) + "&" : "gid=" + src.gid + "&";
+    sc.src = `https://docs.google.com/spreadsheets/d/${src.id}/gviz/tq?${where}headers=1&tqx=out:json;responseHandler:${cb}&tq=${encodeURIComponent(tq)}&_=${Date.now()}`;
     document.head.appendChild(sc);
   });
 }
@@ -179,20 +183,24 @@ let COL = null;
 async function column(){
   if (COL) return COL;
   const locs = [];
-  for (const sheet of ["", ...[1,2,3,4,5,6].map(n => "Form responses " + n), "Form Responses 1", "Form Responses 2"]){
-    let r; try { r = await gviz("select * limit 30", sheet); } catch(e){ if (!sheet) throw e; continue; }
-    const cols = (r.table && r.table.cols) || [], rws = (r.table && r.table.rows) || [];
-    let i = cols.findIndex((x, j) => rws.some(row => String(((row.c || [])[j] || {}).v || "").startsWith("PPS2|")));
-    if (i < 0) i = cols.findIndex(x => /^\s*data\s*$/i.test(x.label || ""));
-    if (i >= 0) locs.push({ col: cols[i].id, time: cols[0].id, sheet });
+  for (const src of [SYNC].concat(SYNC_OLD)){   // the new sheet first, then the old, full one (its linked tab only)
+    const mine = [];
+    for (const sheet of src === SYNC ? ["", ...[1,2,3,4,5,6].map(n => "Form responses " + n), "Form Responses 1", "Form Responses 2"] : [""]){
+      let r; try { r = await gviz("select * limit 30", sheet, src); } catch(e){ if (!sheet && src === SYNC) throw e; continue; }
+      const cols = (r.table && r.table.cols) || [], rws = (r.table && r.table.rows) || [];
+      let i = cols.findIndex((x, j) => rws.some(row => String(((row.c || [])[j] || {}).v || "").startsWith("PPS2|")));
+      if (i < 0) i = cols.findIndex(x => /^\s*data\s*$/i.test(x.label || ""));
+      if (i >= 0) mine.push({ col: cols[i].id, time: cols[0].id, sheet, src });
+    }
+    if (!mine.length) mine.push({ col: "B", time: "A", sheet: "", src });
+    locs.push(...mine);
   }
-  if (!locs.length) locs.push({ col: "B", time: "A", sheet: "" });
   return (COL = locs);
 }
 async function rows(kind, id, limit){
   const out = [], seen = new Set();
   for (const c of await column()){
-    let r; try { r = await gviz(`select ${c.col} where ${c.col} starts with 'PPS2|${kind}|${id}|' order by ${c.time} desc limit ${limit || 30}`, c.sheet); } catch(e){ if (!c.sheet) throw e; continue; }
+    let r; try { r = await gviz(`select ${c.col} where ${c.col} starts with 'PPS2|${kind}|${id}|' order by ${c.time} desc limit ${limit || 30}`, c.sheet, c.src); } catch(e){ if (!c.sheet && c.src === SYNC) throw e; continue; }
     ((r.table && r.table.rows) || []).forEach(row => { const v = String(((row.c || [])[0] || {}).v || ""); if (seen.has(v)) return; seen.add(v);
       const p = v.split("|"); if (p.length >= 7) out.push({ ver:+p[3], text:p.slice(6).join("|") }); });
   }
@@ -1437,7 +1445,7 @@ const live = (() => {
   async function recent(kind, since, limit){
     const out = [], seen = new Set();
     for (const c of await column()){
-      let r; try { r = await gviz(`select ${c.col} where ${c.col} starts with 'PPS2|${kind}|' and ${c.col} > 'PPS2|${kind}|${Math.floor(since)}' order by ${c.time} desc limit ${limit || 400}`, c.sheet); } catch(e){ if (!c.sheet) throw e; continue; }
+      let r; try { r = await gviz(`select ${c.col} where ${c.col} starts with 'PPS2|${kind}|' and ${c.col} > 'PPS2|${kind}|${Math.floor(since)}' order by ${c.time} desc limit ${limit || 400}`, c.sheet, c.src); } catch(e){ if (!c.sheet && c.src === SYNC) throw e; continue; }
       ((r.table && r.table.rows) || []).forEach(row => { const v = String(((row.c || [])[0] || {}).v || ""); if (seen.has(v)) return; seen.add(v);
         const p = v.split("|"); if (p.length >= 7 && /^\d{13}$/.test(p[2])) out.push({ ver:+p[2], id:p[3], text:p.slice(6).join("|") }); });
     }
@@ -1445,7 +1453,7 @@ const live = (() => {
   }
   async function one(kind, id, since){
     for (const c of await column()){
-      let r; try { r = await gviz(`select ${c.col} where ${c.col} starts with 'PPS2|${kind}|' and ${c.col} > 'PPS2|${kind}|${Math.floor(since)}' and ${c.col} contains '|${id}|' order by ${c.time} desc limit 1`, c.sheet); } catch(e){ if (!c.sheet) throw e; continue; }
+      let r; try { r = await gviz(`select ${c.col} where ${c.col} starts with 'PPS2|${kind}|' and ${c.col} > 'PPS2|${kind}|${Math.floor(since)}' and ${c.col} contains '|${id}|' order by ${c.time} desc limit 1`, c.sheet, c.src); } catch(e){ if (!c.sheet && c.src === SYNC) throw e; continue; }
       const v = String((((r.table && r.table.rows) || [])[0] || { c:[] }).c[0] ? r.table.rows[0].c[0].v : "");
       const p = v.split("|"); if (p.length >= 7) return { ver:+p[2], id:p[3], text:p.slice(6).join("|") };
     }
@@ -1454,7 +1462,7 @@ const live = (() => {
   async function acks(limit){
     const out = [];
     for (const c of await column()){
-      let r; try { r = await gviz(`select ${c.col} where ${c.col} starts with 'PPS2|K|' order by ${c.time} desc limit ${limit || 400}`, c.sheet); } catch(e){ if (!c.sheet) throw e; continue; }
+      let r; try { r = await gviz(`select ${c.col} where ${c.col} starts with 'PPS2|K|' order by ${c.time} desc limit ${limit || 400}`, c.sheet, c.src); } catch(e){ if (!c.sheet && c.src === SYNC) throw e; continue; }
       ((r.table && r.table.rows) || []).forEach(row => { const p = String(((row.c || [])[0] || {}).v || "").split("|"); if (p.length >= 9) out.push({ id:p[2], at:+p[3], ver:+p[6], st:p[7], by:p.slice(8).join("|") }); });
     }
     return out.sort((a, b) => b.at - a.at);
