@@ -1275,9 +1275,7 @@ function designNotes(s, c){
     });
     if (x.self && x.done && st.some(v => v !== "ok")) I.push(`${tag}: you rated yourself ${x.self}. Check the rubric: some parts still need more before that level is secure.`);
   });
-  const prac = W.practice || {};
-  if (prac.correct) S.push(`You passed the practice questions (${prac.correct} correct), so you understand the method.`);
-  else N.push("Do the practice questions so you're sure of the method before you finish the task.");
+  // practice questions are not assessed: feedback comes from the student's own task answers only
   const next = strands.find(x => !x.done);
   if (next) N.push(`Next, complete Strand ${next.n}: ${shortLabel(next.strand)}.`);
   const left = strands.filter(x => !x.done).length;
@@ -1351,7 +1349,7 @@ function autoNotes(s, about){   // a starting point the teacher edits before sen
     Object.values(snap.paths).forEach(P => Object.keys(P.lessons || {}).forEach(n => { const L = P.lessons[n], core = L.core || [];
       if (core.length && core.every(x => x.ok)) well.push("Completed all exercises in Lesson " + n + " (" + L.title + ")");
       core.filter(x => !x.ok).slice(0, 2).forEach(x => next.push("Finish \"" + x.t + "\" in Lesson " + n));
-      if ((L.prac || []).length >= 3) well.push("Kept practising in Lesson " + n + " (" + L.prac.length + " practice questions)"); }));
+ }));   // practice questions are not assessed
     return { s: well.slice(0, 3).join("\n"), i: next.slice(0, 3).join("\n"), n: "" }; }
   const crits = s.ds ? Object.keys(s.ds.work).sort() : [];
   const c = (String(about || "").match(/Criterion ([A-D])/) || [])[1] || crits[crits.length - 1];

@@ -48,3 +48,10 @@ One sign-in page for SISD's Computer Science (Python Pathways), Design and IT co
 - Study Plus French: new topics "Verb lab" and "Free time, sport and weather"; adjective-position fix (BAGS).
 - Study Plus UK: Year 8 French (KS3) and Year 10 French (Edexcel IGCSE 4FR1, five themes plus grammar); Year 10 Maths vectors, circle theorems, sequences and algebraic fractions; Year 10 Chemistry Groups 1 and 7 and chemical tests; Year 8 Maths transformations, constructions and bearings.
 - `uk/explain-fill.js` adds explanations to 409 questions that had none; any question still without one shows the correct answer and the most relevant key idea.
+
+## Download my work (Word), every course (Nov 2026)
+- **Design and IT:** each unit on the student's home page (and last year's units under History) has **⬇ Download my work (Word)**, also on the "Download and hand in" step. One .docx with every strand of Criteria A to D: the task wording, then the student's own answers, tables, sketches and screenshots. Criteria with nothing answered are left out.
+- **Computer Science (Python Pathways):** **📄 Download my work (Word)** on the lessons page and the Submit step. Every level the student has worked in, each lesson's Exercise 1–3 with the task and the student's code, and whether it was solved.
+- **G7 Game Development:** **📄 Download all my work (Word)** under each stage. Every stage with answers, tables, the pixel sprite and level maps as pictures.
+- Never included: worked examples, example answers/levels, hints, practice questions. Built in the browser by `python-pathways/work-docx.js` (CS and Game Dev) and the Design course's own report builder.
+- **Practice is not assessed:** practice questions no longer appear in strengths, improvements or next steps (student feedback, staff auto-notes, the Design criterion PDF and the text sent to the teacher log). The Python skill level now comes from the three lesson exercises only (Mastered = all three solved without advice). Practice still counts for House Points, weekly rankings and unlocking Submit.
