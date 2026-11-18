@@ -226,7 +226,7 @@ function mailVia_(to, subject, html, o){
 /* RUN THIS after connecting: emails your school address through the platform's Gmail and logs whether it worked */
 function checkMailer(){ Logger.log("Platform mailer: " + (mailVia_(HP_REPLY_TO, "SISD Design and Computing: emails to colleagues are connected", '<p style="font-family:Arial">Emails to teachers and students now go out from the platform\'s own Gmail. This is a check: nothing to do.</p>', { name: "Mr. Ahmed" }) ? "WORKING (check abdulaziz.ahmed@sisd.ae)" : "NOT working")); }
 /* to a colleague: only ever from the platform's Gmail */
-function staffMail_(to, subject, html){ return DOMAIN.test(String(to || "")) && mailVia_(to, subject, html, { name: "Mr. Ahmed" }); }
+function staffMail_(to, subject, html){ return DOMAIN.test(String(to || "")) && mailVia_(to, subject, html, { name: "SISD Design and Computing" }); }
 /* to a student: from the platform's Gmail; only if that can't be reached, from this account (so codes and passwords still arrive) */
 function studentMail_(to, subject, html, o){
   o = o || {};
