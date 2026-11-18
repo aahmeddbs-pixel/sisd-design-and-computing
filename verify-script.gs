@@ -126,14 +126,12 @@ function code_(p){
   cache.put(hk, JSON.stringify({ h: hash_("sdc-code|" + code), at: Date.now(), tries: 0 }), CODE_MIN * 60);
   cache.put("codes-count", String(n + 1), 3600);
   const subject = "Your SISD Design and Computing sign-up code: " + code;
-  MailApp.sendEmail({ to: email, name: "SISD Design and Computing", subject: subject,
-    htmlBody: '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#16223A;max-width:520px">' +
+  studentMail_(email, subject, '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#16223A;max-width:520px">' +
       '<div style="background:#1B2D4E;color:#fff;padding:14px 18px;border-bottom:4px solid #DC2B3E;font-weight:bold">SISD Design and Computing</div>' +
       '<p>Hi ' + (first || "there") + ',</p><p>Type this code on the sign-up page to confirm it\'s you:</p>' +
       '<p style="font-size:30px;font-weight:bold;letter-spacing:6px;background:#EEF1F7;border-radius:8px;padding:12px 18px;display:inline-block;font-family:Consolas,monospace">' + code + '</p>' +
       '<p>The code works for ' + CODE_MIN + ' minutes. After that you sign in with your <b>username</b> and password. Your email address is not kept.</p>' +
-      '<p style="color:#5B6782;font-size:13px">If you did not sign up, ignore this email: nothing will happen.</p></div>' });
-  try { Utilities.sleep(1500); GmailApp.search('in:sent subject:"' + subject + '"', 0, 5).forEach(t => t.moveToTrash()); } catch(err){}   // keep no copy of the address in Sent
+      '<p style="color:#5B6782;font-size:13px">If you did not sign up, ignore this email: nothing will happen.</p></div>', { trash: true });   // no copy of the address kept in Sent
   return { ok: true };
 }
 function check_(p){
@@ -158,16 +156,13 @@ function start_(email, kind){
   sheet_().appendRow([email, kind, hash_(token), new Date(), ""]);
   const link = ScriptApp.getService().getUrl() + "?a=verify&e=" + encodeURIComponent(email) + "&t=" + token;
   const who = kind === "staff" ? "staff dashboard" : "course";
-  MailApp.sendEmail({
-    to: email, name: "SISD Design and Computing",
-    subject: "Verify your email for SISD Design and Computing",
-    htmlBody: '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#16223A;max-width:520px">' +
+  studentMail_(email, "Verify your email for SISD Design and Computing",
+    '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#16223A;max-width:520px">' +
       '<div style="background:#1B2D4E;color:#fff;padding:14px 18px;border-bottom:4px solid #DC2B3E;font-weight:bold">SISD Design and Computing</div>' +
       '<p>Hello,</p><p>Someone signed up for the SISD Design and Computing ' + who + ' with this email address. If it was you, press the button to verify your email:</p>' +
       '<p><a href="' + link + '" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Verify my email</a></p>' +
       '<p>Then go back to the sign-in page and sign in. The link works for ' + LINK_HOURS + ' hours.</p>' +
-      '<p style="color:#5B6782;font-size:13px">If you did not sign up, ignore this email: nothing will happen.</p></div>'
-  });
+      '<p style="color:#5B6782;font-size:13px">If you did not sign up, ignore this email: nothing will happen.</p></div>', { trash: true });
   return { ok: true, sent: true };
 }
 
@@ -217,15 +212,26 @@ function connectTeacherMailer(){
   if (MAILER_URL_PASTE && MAILER_KEY_PASTE){ P.setProperty("MAILER_URL", MAILER_URL_PASTE); P.setProperty("MAILER_KEY", MAILER_KEY_PASTE); }
   Logger.log("Teacher mailer: " + (P.getProperty("MAILER_URL") ? "connected" : "NOT connected (paste the URL and key first)"));
 }
-/* true when the teacher's email was accepted */
-function staffMail_(to, subject, html){
+/* hand an email to the platform's Gmail; true when it was sent. o.name = sender name, o.trash = keep no copy in Sent */
+function mailVia_(to, subject, html, o){
+  o = o || {};
   const P = PropertiesService.getScriptProperties(), url = P.getProperty("MAILER_URL"), key = P.getProperty("MAILER_KEY");
-  if (!url || !key || !DOMAIN.test(String(to || ""))) return false;
+  if (!url || !key || !to) return false;
   try {
     const r = UrlFetchApp.fetch(url, { method: "post", contentType: "application/json", muteHttpExceptions: true, followRedirects: true,
-      payload: JSON.stringify({ key: key, to: String(to).toLowerCase(), subject: String(subject).slice(0, 200), html: String(html) }) });
+      payload: JSON.stringify({ key: key, to: String(to).toLowerCase(), subject: String(subject).slice(0, 200), html: String(html), name: o.name || "", trash: !!o.trash }) });
     return /"ok"\s*:\s*true/.test(r.getContentText());
   } catch(err){ return false; }
+}
+/* to a colleague: only ever from the platform's Gmail */
+function staffMail_(to, subject, html){ return DOMAIN.test(String(to || "")) && mailVia_(to, subject, html, { name: "Mr. Ahmed" }); }
+/* to a student: from the platform's Gmail; only if that can't be reached, from this account (so codes and passwords still arrive) */
+function studentMail_(to, subject, html, o){
+  o = o || {};
+  if (mailVia_(to, subject, html, o)) return true;
+  MailApp.sendEmail({ to: to, name: o.name || "SISD Design and Computing", subject: subject, htmlBody: html });
+  if (o.trash){ try { Utilities.sleep(1500); GmailApp.search('in:sent subject:"' + subject + '"', 0, 5).forEach(t => t.moveToTrash()); } catch(err){} }
+  return true;
 }
 /* where every "student needs help" email goes (as well as the class teacher) */
 const SLOW_TO = "abdulaziz.ahmed@sisd.ae";
@@ -276,12 +282,12 @@ function resetRequest_(p){
   const tips = cs
     ? '<li>Your PIN is the 4 numbers you chose when you signed up.</li><li>Type your name exactly as you did when you signed up (first and last name).</li><li>If you signed up on another device (for example an iPad), try signing in there once: that puts your work online.</li>'
     : '<li>Use your full school email (ending in @sisd.ae).</li><li>Passwords are case-sensitive: check Caps Lock.</li><li>If you also take Computer Science, you can sign in to Design with your school email and your Computer Science PIN.</li>';
-  if (!isUser) try { MailApp.sendEmail({ to: email, name: "SISD Design and Computing", subject: "Your " + courseName_(c) + " " + what + " reset request",
-    htmlBody: mailBox_("Reset request", '<p>Hi ' + escH_(first) + ',</p><p>We have received your request to reset your <b>' + courseName_(c) + ' ' + what + '</b>.</p>' +
+  if (!isUser) try { studentMail_(email, "Your " + courseName_(c) + " " + what + " reset request",
+    mailBox_("Reset request", '<p>Hi ' + escH_(first) + ',</p><p>We have received your request to reset your <b>' + courseName_(c) + ' ' + what + '</b>.</p>' +
       '<p><b>What happens next:</b> your teacher will reset it on the staff dashboard. As soon as they do, you will get another email with your new ' + what + '. Your saved work is kept.</p>' +
       '<p><b>While you wait, check these:</b></p><ul>' + tips + '</ul>' +
       '<p><a href="' + SITE + '" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Open SISD Design and Computing</a></p>' +
-      '<p style="color:#5B6782;font-size:13px">If you did not ask for this, you can ignore this email. Your ' + what + ' has not been changed.</p>') }); } catch(err){}
+      '<p style="color:#5B6782;font-size:13px">If you did not ask for this, you can ignore this email. Your ' + what + ' has not been changed.</p>')); } catch(err){}
   const staff = mailBox_("Reset request", '<p><b>' + escH_(name || email) + '</b> (' + (isUser ? "username " : "") + escH_(email) + ') has asked for a new <b>' + courseName_(c) + ' ' + what + '</b>.</p>' +
     '<p>Open the staff dashboard → Students &amp; progress. The request is in the <b>Reset requests</b> box: press <b>Reset now</b>. ' + (isUser ? "Give the student the temporary password it shows; they then create their own password." : "The new " + what + " is emailed to the student automatically.") + '</p>' +
     '<p><a href="' + SITE + 'admin.html" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Open the staff dashboard</a></p>');
@@ -303,12 +309,12 @@ function resetDone_(p){
   const how = cs
     ? '<ol><li>Open SISD Design and Computing and choose <b>Computer Science</b>.</li><li>Type your name: <b>' + escH_(name) + '</b></li><li>Type your new PIN.</li></ol><p>You can then change it to a PIN of your own choice.</p>'
     : '<ol><li>Open SISD Design and Computing and choose <b>' + courseName_(c) + '</b>.</li><li>Type your school email: <b>' + escH_(email) + '</b></li><li>Type your new password exactly as shown (capital letters matter).</li>' + (temp ? '<li>Create your own new password when asked. You will use it from then on.</li>' : '') + '</ol>';
-  MailApp.sendEmail({ to: email, name: "SISD Design and Computing", subject: "Your new " + courseName_(c) + " " + what,
-    htmlBody: mailBox_("New " + what, '<p>Hi ' + escH_(first) + ',</p><p>Your teacher has reset your <b>' + courseName_(c) + ' ' + what + '</b>. Your new ' + what + ' is:</p>' +
+  studentMail_(email, "Your new " + courseName_(c) + " " + what,
+    mailBox_("New " + what, '<p>Hi ' + escH_(first) + ',</p><p>Your teacher has reset your <b>' + courseName_(c) + ' ' + what + '</b>. Your new ' + what + ' is:</p>' +
       '<p style="font-size:26px;font-weight:bold;letter-spacing:2px;background:#EEF1F7;border-radius:8px;padding:12px 16px;display:inline-block;font-family:Consolas,monospace">' + escH_(secret) + '</p>' +
       '<p><b>How to sign in</b> (works on any device, and your work is kept):</p>' + how +
       '<p><a href="' + SITE + '" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Sign in now</a></p>' +
-      '<p style="color:#5B6782;font-size:13px">Keep your ' + what + ' private. Don\'t share it with other students.</p>') });
+      '<p style="color:#5B6782;font-size:13px">Keep your ' + what + ' private. Don\'t share it with other students.</p>'), { trash: true });
   return { ok: true, sent: true };
 }
 
@@ -392,7 +398,7 @@ function study_(p){
       '<h3 style="color:#1E8A55;font-size:16px;margin:16px 0 6px">What went well</h3>' + (well ? '<ul style="padding-left:18px;margin:0">' + well + '</ul>' : '<p style="color:#5B6782">Keep going: next time aim to get some right and rate them "I\'ve got it".</p>') +
       '<h3 style="color:#C0283A;font-size:16px;margin:16px 0 6px">Questions to look at again</h3>' + (imp ? '<ul style="padding-left:18px;margin:0">' + imp + '</ul>' : '<p style="color:#5B6782">None: brilliant!</p>') +
       '<p><a href="' + SITE + 'uk.html" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Back to Study Plus</a></p>');
-    MailApp.sendEmail({ to: to, name: "Study Plus", subject: "Your Study Plus results · " + String(d.subject || "") + " · " + String(d.topic || "") + " · " + score + "%", htmlBody: sbody });
+    studentMail_(to, "Your Study Plus results · " + String(d.subject || "") + " · " + String(d.topic || "") + " · " + score + "%", sbody, { name: "Study Plus" });
   }
   return { ok: true, sent: true };
 }
