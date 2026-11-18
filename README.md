@@ -55,3 +55,9 @@ One sign-in page for SISD's Computer Science (Python Pathways), Design and IT co
 - **G7 Game Development:** **📄 Download all my work (Word)** under each stage. Every stage with answers, tables, the pixel sprite and level maps as pictures.
 - Never included: worked examples, example answers/levels, hints, practice questions. Built in the browser by `python-pathways/work-docx.js` (CS and Game Dev) and the Design course's own report builder.
 - **Practice is not assessed:** practice questions no longer appear in strengths, improvements or next steps (student feedback, staff auto-notes, the Design criterion PDF and the text sent to the teacher log). The Python skill level now comes from the three lesson exercises only (Mastered = all three solved without advice). Practice still counts for House Points, weekly rankings and unlocking Submit.
+
+## Grade 10: one login for Design and IT (Nov 2026)
+- A Grade 10 student uses the **same username and password** for Design and IT. Choosing either course at the front page and signing in works; the account is no longer blocked as "registered for the other course".
+- Once signed in, **Change course ▾** shows **Switch to IT** / **Switch to Design**. Switching saves and sends the current work first and does not ask for a new sign-in.
+- Each course keeps its own units and work; the unit last open in each course is remembered. Every switch is logged to the teacher log (`switchcourse`), and the staff dashboard shows "also IT" / "also Design".
+- Applies to Grade 10 only (`g10Pair` in `sdc.js`, `g10Both` / `g10Switch` in the Design course). Other grades are unchanged.

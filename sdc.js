@@ -423,7 +423,7 @@ async function confirm(a, signup){
   try { L = await lookup(a.email, a.name); } catch(e){ L = null; }
   if (!L){ // sheet unreachable: let them in, it is checked again next time (new sign-ups must still verify)
     const made0 = createdMs(a), vm = c === "cs" || a.viaCS || a.viaCode ? null : await verifyGate(a.email, "student", !!signup || (made0 ? made0 >= sinceMs() : false), a);   // new accounts must verify even when the online register can't be read if (vm){ log("unverified", Object.assign({}, a, { course:c }), { signup:!!signup }); return { ok:false, verify:true, msg:vm }; }
-    patchGate({ who:{ email:normEmail(a.email), name:a.name } });
+    patchGate({ who:{ email:normEmail(a.email), name:a.name }, acct: acctOf(Object.assign({}, a, { course:c })) });   // acct: the course menu needs the grade (Grade 10 Design ⇄ IT)
     if (!(g && g.logged)) { log("signin", Object.assign({}, a, { course:c }), { gate:g && g.mode, unchecked:true }); patchGate({ logged:true }); }
     return { ok:true, assign:null };
   }
@@ -599,7 +599,15 @@ async function isDeleted(email, name){ try { const L = await lookup(email, name)
 /* Computer Science students (name + PIN) can also use Design (Grades 6–10), switching without signing in again.
    Students who signed up for Design (school email + password) only see Design. */
 const BOTH_GRADES = ["6", "7", "8", "9", "10"];
+/* Grade 10 students who take both IT and Design use ONE login for both (same username and password, same site).
+   True when c1 and c2 are Design and IT (either way round) and the student is in Grade 10. */
+const G10_PAIR = ["design", "it"];
+function g10Pair(c1, c2, ...grades){
+  if (!c1 || !c2 || c1 === c2 || G10_PAIR.indexOf(c1) < 0 || G10_PAIR.indexOf(c2) < 0) return false;
+  return grades.some(g => String(g == null ? "" : g).replace(/^G/i, "") === "10");
+}
 function bothOk(c1, c2, ...grades){
+  if (g10Pair(c1, c2, ...grades)) return true;   // Grade 10: one login opens both Design and IT
   return false;   // a second course now needs the teacher's approval (a signed change with also: the first course)
 }
 async function canSignUp(email, name, c){
@@ -1239,6 +1247,10 @@ let STRIP = null;
 /* the other course a signed-in student can switch to straight away: only Computer Science students (Design, Grades 6–10) */
 function courseChoices(cur){
   const g0 = gate() || {}, L = g0.link;
+  if (STRIP && STRIP.signedIn && G10_PAIR.indexOf(cur) >= 0){   // Grade 10: Design ⇄ IT with the same login
+    const ac = g0.acct || {}, other = cur === "design" ? "it" : "design";
+    if (isTester(ac.email) || g10Pair(cur, other, ac.grade)) return [other].concat(L && L.cs ? ["cs"] : []);
+  }
   if (!STRIP || !STRIP.signedIn || !L || !L.cs) return [];
   const n = parseInt(String(L.cs.grade || (g0.acct || {}).grade || "").replace(/^G/i, ""), 10);
   const sp = studyPlusOK(g0.acct || g0.who || L.cs);
@@ -1281,6 +1293,12 @@ function strip(c, onSignOut, noLang, mainSel, onSignIn){
   document.getElementById("sdcCourse").onchange = e => {
     const to = e.target.value; if (!to) return;
     const link = (gate() || {}).link || null, was = STRIP.signedIn;
+    if (was && course(to) && COURSES[to].app === COURSES[STRIP.c].app && G10_PAIR.indexOf(to) >= 0 && G10_PAIR.indexOf(STRIP.c) >= 0){   // Grade 10 Design ⇄ IT: same site, same login, no new sign-in
+      try { if (window.SDC_beforeSwitch) window.SDC_beforeSwitch(to); } catch(x){}   // the course page saves (and sends) the work first, staying signed in
+      const g2 = gate() || {}, ac = Object.assign({}, g2.acct || {}, { course:to });
+      try { log("switchcourse", ac, { from:STRIP.c, to }); } catch(x){}
+      setGate(Object.assign({}, g2, { course:to, mode:"signin", acct:ac, sw:{ from:STRIP.c, at:Date.now() } })); location.href = COURSES[to].app; return;
+    }
     if (was && onSignOut){ try { onSignOut(true); } catch(x){} }   // save this course first (the link to the other course is kept)
     if (to === "__portal"){ leave(""); return; }
     if (to === "__study"){ location.href = PORTAL + "study.html"; return; }
@@ -1497,7 +1515,7 @@ const watch = (() => {
   document.addEventListener("visibilitychange", () => { if (!document.hidden) setTimeout(check, 2000); });
   return { on: f => { fn = f; setTimeout(check, 20000); }, check };
 })();
-return { jsonp, PORTAL, COURSES, studyPlusOK, studyPlusEmail, studyReport, STUDY_PLUS, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
+return { jsonp, PORTAL, COURSES, g10Pair, studyPlusOK, studyPlusEmail, studyReport, STUDY_PLUS, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
   log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, forgot, forgotDialog, resetDone, emailCode, checkCode, usernameOf, isUsername, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, gloss, listen, stopReading, speak, slow, live, watchAssign: f => watch.on(f), rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();
 
