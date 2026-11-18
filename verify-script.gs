@@ -205,6 +205,28 @@ function notify_(p){
   return { ok: true, sent: true };
 }
 
+/* ---------- emails to colleagues go out from the platform's own Gmail, never from this account ----------
+   This script runs on a personal Gmail, which Gmail would show in the From line. Every email to a teacher is
+   handed to "teacher-mailer.gs" (a small web app on the platform's own Gmail): sender name "Mr. Ahmed",
+   replies to the school address. Set-up once: paste the mailer's web app URL and key below, then run
+   connectTeacherMailer (▶ Run). The key and URL are kept in this project's settings, not in this file. */
+const STAFF_EMAILS = { french: "ciaran.french@sisd.ae", abdelaziz: "sahar.abdelaziz@sisd.ae" };   // surname → school email
+const MAILER_URL_PASTE = "", MAILER_KEY_PASTE = "";
+function connectTeacherMailer(){
+  const P = PropertiesService.getScriptProperties();
+  if (MAILER_URL_PASTE && MAILER_KEY_PASTE){ P.setProperty("MAILER_URL", MAILER_URL_PASTE); P.setProperty("MAILER_KEY", MAILER_KEY_PASTE); }
+  Logger.log("Teacher mailer: " + (P.getProperty("MAILER_URL") ? "connected" : "NOT connected (paste the URL and key first)"));
+}
+/* true when the teacher's email was accepted */
+function staffMail_(to, subject, html){
+  const P = PropertiesService.getScriptProperties(), url = P.getProperty("MAILER_URL"), key = P.getProperty("MAILER_KEY");
+  if (!url || !key || !DOMAIN.test(String(to || ""))) return false;
+  try {
+    const r = UrlFetchApp.fetch(url, { method: "post", contentType: "application/json", muteHttpExceptions: true, followRedirects: true,
+      payload: JSON.stringify({ key: key, to: String(to).toLowerCase(), subject: String(subject).slice(0, 200), html: String(html) }) });
+    return /"ok"\s*:\s*true/.test(r.getContentText());
+  } catch(err){ return false; }
+}
 /* where every "student needs help" email goes (as well as the class teacher) */
 const SLOW_TO = "abdulaziz.ahmed@sisd.ae";
 /* a student has been stuck on one task for a long time: email their class teacher (and you) */
@@ -226,7 +248,7 @@ function slow_(p){
     '<p><a href="' + SITE + 'admin.html" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Open the staff dashboard</a></p></div>';
   const subject = "Student needs help: " + (name || email);
   let teacherSent = false;
-  if (te && DOMAIN.test(te) && te !== me){ try { MailApp.sendEmail({ to: te, name: "SISD Design and Computing", subject: subject, htmlBody: body }); teacherSent = true; } catch(err){} }
+  if (te && DOMAIN.test(te) && te !== me) teacherSent = staffMail_(te, subject, body);   // from the platform's Gmail, not this one
   MailApp.sendEmail({ to: me, name: "SISD Design and Computing", subject: subject + (te === me ? "" : te ? (teacherSent ? " (also sent to " + te + ")" : " (could not email " + te + ")") : " (teacher email unknown)"), htmlBody: body });
   return { ok: true, sent: true, teacher: teacherSent };
 }
@@ -264,7 +286,7 @@ function resetRequest_(p){
     '<p>Open the staff dashboard → Students &amp; progress. The request is in the <b>Reset requests</b> box: press <b>Reset now</b>. ' + (isUser ? "Give the student the temporary password it shows; they then create their own password." : "The new " + what + " is emailed to the student automatically.") + '</p>' +
     '<p><a href="' + SITE + 'admin.html" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Open the staff dashboard</a></p>');
   const subject = "Reset request: " + (name || email) + " (" + courseName_(c) + ")";
-  if (te && DOMAIN.test(te) && te !== SLOW_TO){ try { MailApp.sendEmail({ to: te, name: "SISD Design and Computing", subject: subject, htmlBody: staff }); } catch(err){} }
+  if (te && DOMAIN.test(te) && te !== SLOW_TO) staffMail_(te, subject, staff);   // from the platform's Gmail, not this one
   MailApp.sendEmail({ to: SLOW_TO, name: "SISD Design and Computing", subject: subject, htmlBody: staff });
   return { ok: true, sent: true };
 }
@@ -516,7 +538,7 @@ function hpEmail_(L){
    @sisd.ae address that contains the teacher's surname, so nobody can redirect a class's data elsewhere. */
 const HP_FROM_NAME = "Mr. Ahmed", HP_REPLY_TO = "abdulaziz.ahmed@sisd.ae";
 const hpSurname_ = n => String(n || "").toLowerCase().replace(/[^a-z\s'-]/g, " ").trim().split(/\s+/).pop() || "";
-function hpTeachers_(){ try { return JSON.parse(hpProps_().getProperty("HP_TEACHERS") || "{}"); } catch(err){ return {}; } }
+function hpTeachers_(){ let m = {}; try { m = JSON.parse(hpProps_().getProperty("HP_TEACHERS") || "{}"); } catch(err){} return Object.assign({}, m, STAFF_EMAILS); }
 function hpTeachersIn_(json){
   if (!json) return;
   let m = null; try { m = JSON.parse(json); } catch(err){ return; }
@@ -596,6 +618,24 @@ function hpTest_(){
   MailApp.sendEmail({ to: HP_REPLY_TO, name: HP_FROM_NAME, replyTo: HP_REPLY_TO, subject: "TEST · Lesson summary and House Points: " + hpLabel_(cls), htmlBody: '<p style="font-family:Arial;color:#B4580B"><b>This is a test with made-up students.</b> It is what a class teacher receives after each lesson.</p>' + hpTeacherEmail_(L, rows) });
   return { ok: true, sent: true, to: HP_REPLY_TO };
 }
+/* RUN THIS to send Mr French a test of his lesson summary (his latest real lesson in the last week, or sample students) */
+function testTeacherEmail(){ Logger.log(JSON.stringify(hpTeacherTest_("French"))); }
+function hpTeacherTest_(surname){
+  const te = hpTeachers_()[hpSurname_(surname)]; if (!te) return { ok: false, reason: "no email for " + surname };
+  let L = null, rows = [];
+  try { rows = hpRows_() || []; L = hpLessons_(rows).filter(x => x.ended && hpSurname_(x.cls.teacher) === hpSurname_(surname)).sort((a, b) => b.end - a.end)[0] || null; } catch(err){}
+  let note = "This is a test of the lesson summary you will now receive after each lesson.";
+  if (!L){
+    const now = Date.now(), st = now - 50 * 60000, cls = { course: "cs", grade: "7", teacher: "Mr. French", cls: "" };
+    const S = (name, tasks, mins) => ({ name: name, course: "cs", level: "beginner", tasks: tasks, score: tasks, mins: mins, last: st, seen: {} });
+    const studs = { a: S("Sample Student A", 8, 42), b: S("Sample Student B", 6, 38), c: S("Sample Student C", 5, 33), d: S("Sample Student D", 1, 12) };
+    L = { key: "test", cls: cls, start: st, end: now - 5 * 60000, students: studs, n: 4, top: [studs.a, studs.b, studs.c] }; rows = [];
+    note += " It uses made-up students because no recent lesson of yours was found.";
+  }
+  const html = '<p style="font-family:Arial;color:#B4580B;font-size:14px"><b>' + note + '</b></p>' + hpTeacherEmail_(L, rows);
+  const ok = staffMail_(te, "TEST · Lesson summary and House Points: " + hpLabel_(L.cls), html);
+  return { ok: ok, to: te, lesson: L.key === "test" ? "sample" : hpLabel_(L.cls) };
+}
 function hpTick(){
   const lock = LockService.getScriptLock(); if (!lock.tryLock(5000)) return;
   try {
@@ -610,8 +650,10 @@ function hpTick(){
       sent[L.key] = now;
       // the same lesson's summary for the class teacher, from Mr. Ahmed
       const te = hpTeachers_()[hpSurname_(L.cls.teacher)];
-      if (te && te !== HP_REPLY_TO && hpCanCopy_() && MailApp.getRemainingDailyQuota() > 1){
-        try { MailApp.sendEmail({ to: te, name: HP_FROM_NAME, replyTo: HP_REPLY_TO, subject: "Lesson summary and House Points: " + hpLabel_(L.cls) + " · " + Utilities.formatDate(new Date(L.start), "Asia/Dubai", "EEE d MMM HH:mm"), htmlBody: hpTeacherEmail_(L, rows) }); } catch(err){}
+      if (te && te !== HP_REPLY_TO){
+        const subj = "Lesson summary and House Points: " + hpLabel_(L.cls) + " · " + Utilities.formatDate(new Date(L.start), "Asia/Dubai", "EEE d MMM HH:mm");
+        if (hpCanCopy_()){ try { MailApp.sendEmail({ to: te, name: HP_FROM_NAME, replyTo: HP_REPLY_TO, subject: subj, htmlBody: hpTeacherEmail_(L, rows) }); } catch(err){} }
+        else staffMail_(te, subj, hpTeacherEmail_(L, rows));   // from the platform's Gmail: this account's address never reaches the teacher
       }
     });
     Object.keys(sent).forEach(k => { if (now - sent[k] > 7 * 86400000) delete sent[k]; });   // keep a week
