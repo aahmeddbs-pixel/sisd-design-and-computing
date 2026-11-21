@@ -19,7 +19,9 @@
 <script src="uk/learn-extra.js?v=20261114d"></script>
 <script src="uk/y10-igcse.js?v=20261114d"></script>
 <script src="uk/y8-revision.js?v=20261114d"></script>
-<script src="uk/y8-revision2.js?v=20261121b"></script>
+<script src="uk/y8-revision2.js?v=20261121c"></script>
+<script src="uk/baby/videos.js?v=20261121a"></script>
+<script src="uk/baby/sambusa.js?v=20261121a"></script>
 <script src="uk/french.js?v=20261117fr"></script>
 <script src="uk/ks-extra.js?v=20261117fr"></script>
 <script src="uk/bank30-sci.js?v=20261120a"></script>
@@ -177,6 +179,11 @@ select.big{border:2px solid var(--line);background:var(--card);border-radius:10p
 .lsec{border-top:1px solid var(--line);padding-top:14px}
 .vid{margin:10px 0 0}.vid video,.vid iframe{width:100%;aspect-ratio:16/9;border:0;border-radius:12px;background:#000;display:block}.vid figcaption{font-size:.85rem;font-weight:700;margin-top:4px}
 .vlinkx{display:block;margin-top:8px;font-weight:700}
+.sbtips{background:#FFF6DC;border-radius:14px;padding:12px 16px}.sbtips ul{margin:6px 0 0;padding-left:18px}
+.sbvid{border-top:1px solid var(--line);padding-top:14px}.sbvid video{width:100%;aspect-ratio:16/9;border-radius:14px;background:#000;display:block;margin:8px 0}
+.sbcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;margin-top:8px}
+.sbcard{border:2px solid var(--line);background:#fff;border-radius:18px;padding:10px 4px;font:inherit;font-weight:800;font-size:1rem;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px}
+.sbcard .e{font-size:3rem;line-height:1}.sbcard.pop{animation:sbpop .45s}@keyframes sbpop{40%{transform:scale(1.15)}}
 .sheets{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-top:8px}.sheets a{text-decoration:none;color:inherit;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}.sheets img{width:100%;display:block;aspect-ratio:910/1287;object-fit:cover;object-position:top}.sheets span{display:block;font-size:.75rem;padding:4px 6px;font-weight:700}
 .lsec h2{font-size:1.1rem;margin-bottom:8px}
 .ideas2{margin-left:22px;display:grid;gap:8px}
@@ -260,7 +267,7 @@ const $ = id => document.getElementById(id), esc = s => String(s == null ? "" : 
 const S = window.UK || {}, ORDER = ["y8revmaths","y8revscience","y8revenglish","y8revhistory","y8revgeography","y8revfrench","y8revmscs","y8revhindi","y8revarabic","y8revislamic","y8maths","y8biology","y8chemistry","y8physics","y8english","y8history","y8geography","y8computing","y8french","y10maths","y10biology","y10chemistry","y10physics","y10english","y10history","y10geography","y10computing","y10ict","y10psychology","y10french"].filter(k => S[k]);
 const YEARS = [8, 10], STAGE = { 8:"Key Stage 3", 10:"IGCSE (Edexcel and Cambridge)" }, subjLabel = s => S[s].name;
 ORDER.forEach(k => { if (!S[k].short){ S[k].short = S[k].name; S[k].name = "Year " + S[k].year + " " + S[k].name; } });
-const IDLE_MS = 60000, FOCUS_SEC_PER_TASK = 40, SET_SIZE = 8;
+const IDLE_MS = 60000, FOCUS_SEC_PER_TASK = 40, SET_SIZE = 15;
 const GEN = window.UK_GEN || { make(){ return null; }, has(){ return false; } };
 
 /* ---------- who is signed in (the sign-in script above set UK_AUTH) ---------- */
@@ -364,9 +371,30 @@ const TC = {};   // built tasks for each set (not saved: rebuilt from the set's 
 function runsOf(s, t){ const st = tstate(s, t); return 1 + ((st.rounds && st.rounds.length) || 0); }
 function run(s, t, r){
   const st = tstate(s, t), T = topicOf(s, t); r = r || runsOf(s, t);
-  if (r <= 1 || !st.rounds || !st.rounds[r - 2]) return { r:1, o:st, tasks:T.tasks, refs:T.tasks.map((_, i) => ({ s:"b", i })) };
+  if (r <= 1 || !st.rounds || !st.rounds[r - 2]){ const refs = set1Refs(s, t, st, T), ck = s + "/" + t + "/1/" + refs.length; return { r:1, o:st, tasks: TC[ck] = TC[ck] || refs.map(ref => resolve(s, t, ref)), refs }; }
   const o = st.rounds[r - 2], ck = s + "/" + t + "/" + r + "/" + o.seed;
   return { r, o, tasks: TC[ck] = TC[ck] || o.refs.map(ref => resolve(s, t, ref)), refs:o.refs };
+}
+/* Set 1: the topic's own questions topped up to 15, with a spread of Core, Extended and Challenge, easiest first.
+   A Set 1 already started before this change keeps its original questions so saved answers still line up. */
+function set1Refs(s, t, st, T){
+  const base = T.tasks.map((_, i) => ({ s:"b", i }));
+  if (!st.n15 && (st.done || Object.keys(st.ans || {}).length)) return base;
+  st.n15 = true;
+  if (base.length >= SET_SIZE) return base;
+  const lvOf = x => (x && x.d) || 1, cnt = { 1:0, 2:0, 3:0 }; T.tasks.forEach(x => cnt[lvOf(x)]++);
+  const pool = T.pool || [], used = new Set(), extra = [], gk = s + "/" + t, hasGen = GEN.has(gk);
+  let h = 7; for (const ch of gk) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  for (let k = 0; base.length + extra.length < SET_SIZE && k < 40; k++){
+    const d = [1, 2, 3].sort((a, b) => cnt[a] - cnt[b] || a - b)[0];
+    let i = pool.findIndex((x, j) => !used.has(j) && lvOf(x) === d);
+    if (i < 0 && hasGen){ extra.push({ s:"g", d, g:(h + k * 2654435761) >>> 0 }); cnt[d]++; continue; }
+    if (i < 0) i = pool.findIndex((x, j) => !used.has(j));
+    if (i < 0) break;
+    used.add(i); extra.push({ s:"p", i }); cnt[lvOf(pool[i])]++;
+  }
+  const lvl = ref => ref.s === "g" ? ref.d : lvOf(ref.s === "p" ? pool[ref.i] : T.tasks[ref.i]);
+  return base.concat(extra).map((r, n) => ({ r, n })).sort((a, b) => lvl(a.r) - lvl(b.r) || a.n - b.n).map(x => x.r);
 }
 function resolve(s, t, ref){
   const T = topicOf(s, t); let b = null;
@@ -448,8 +476,8 @@ window.addEventListener("online", () => Cloud.push());
 async function saveNow(){ save(); try { await Promise.race([Cloud.push(), new Promise(r => setTimeout(r, 2500))]); } catch(e){} }
 
 /* ---------- switcher: home, Year 8, Year 10 ---------- */
-function paintSwitcher(){ $("switcher").innerHTML = `<option value="">Go to ▾</option><option value="home">Home</option><option value="8">Year 8 subjects</option><option value="10">Year 10 subjects</option>`; $("switcher").value = ""; }
-$("switcher").onchange = e => { const to = e.target.value; e.target.value = ""; if (!to) return; go({ v:"home" }); if (to !== "home") setTimeout(() => { const el = $("year" + to); if (el) el.scrollIntoView({ behavior:"smooth" }); }, 50); };
+function paintSwitcher(){ $("switcher").innerHTML = `<option value="">Go to ▾</option><option value="home">Home</option><option value="8">Year 8 subjects</option><option value="10">Year 10 subjects</option><option value="sambusa">🥟 Sambusa (little ones)</option>`; $("switcher").value = ""; }
+$("switcher").onchange = e => { const to = e.target.value; e.target.value = ""; if (!to) return; if (to === "sambusa") return go({ v:"sambusa" }); go({ v:"home" }); if (to !== "home") setTimeout(() => { const el = $("year" + to); if (el) el.scrollIntoView({ behavior:"smooth" }); }, 50); };
 $("outBtn").onclick = async () => { stopWork(); await saveNow(); try { sessionStorage.removeItem(SESS_KEY); sessionStorage.removeItem("uk_auth"); } catch(e){} location.reload(); };
 
 /* ---------- marking ---------- */
@@ -519,6 +547,7 @@ function render(){
   if (VIEW.v === "sets") return renderSets();
   if (VIEW.v === "review") return renderReview();
   if (VIEW.v === "learn") return renderLearn();
+  if (VIEW.v === "sambusa") return window.SAMBUSA ? SAMBUSA.render($("app"), () => go({ v:"home" })) : go({ v:"home" });
 }
 
 function subjCard(s){ const P = subjectProgress(s), w = totals().waiting.filter(x => x.s === s).length, star = S[s].topics.filter(t => t.focus).length; return `<button class="subj" data-s="${s}" style="--c:${S[s].colour}">
@@ -540,7 +569,12 @@ function renderHome(){
     ${y === 8 && ORDER.some(s => S[s].revision) ? `<div class="revband"><h2>📝 Term 1 Summative Assessment: revision zone</h2><p class="muted small" style="margin-top:2px">Everything on your Term 1 assessment list: key ideas, fun facts, memory tricks, worked solutions, practice and challenge questions. Topics marked ⭐ were highlighted on your content sheet. Your score and feedback are emailed to you after every topic.</p>
       <div class="subjects" style="margin-top:10px">${ORDER.filter(s => S[s].year === y && S[s].revision).map(subjCard).join("")}</div></div>` : ""}
     <div class="subjects"${y === 8 ? ' style="margin-top:14px"' : ""}>${ORDER.filter(s => S[s].year === y && !S[s].revision).map(subjCard).join("")}</div>
-  </div>`).join("")}`;
+  </div>`).join("")}
+  <div class="card sbhome" style="margin-top:18px" id="yearsambusa">
+    <div class="yearhead"><span class="yr" style="background:#F0B040;color:#3A2A00">🥟</span><div><h2>Sambusa</h2><p class="muted small">For little ones: happy videos and picture cards that teach a 1-year-old first words and fruits. Separate from KS3 and KS4.</p></div></div>
+    <button class="btn" id="goSambusa" style="margin-top:10px">Open Sambusa ▸</button>
+  </div>`;
+  $("goSambusa").onclick = () => go({ v:"sambusa" });
   $("app").querySelectorAll("[data-s]").forEach(b => b.onclick = () => go({ v:"subject", s:b.dataset.s }));
   $("app").querySelectorAll("[data-w]").forEach(b => b.onclick = () => { const [s, t] = b.dataset.w.split("|"); openTopic(s, t); });
 }
@@ -556,7 +590,7 @@ function renderSubject(){
       let meta;
       if (X.r > 1 && !X.o.done) meta = sc.answered ? `<span class="pill warn">Set ${X.r} · ${sc.answered}/${sc.n}</span><br>${esc(LVL_NAME(X.o.lv))}` : `<span class="pill new">✦ Set ${X.r} ready</span><br>${esc(LVL_NAME(X.o.lv))} level`;
       else if (X.o.done) meta = `<span class="pill ${sc.score >= 70 ? "ok" : sc.score >= 50 ? "warn" : "bad"}">${X.r > 1 ? "Set " + X.r + ": " : ""}${sc.score}%</span><br>${fmt(topicMs(s, t.id))}`;
-      else meta = sc.answered ? `<span class="pill warn">In progress</span><br>${sc.answered}/${sc.n}` : `${t.tasks.length} tasks`;
+      else meta = sc.answered ? `<span class="pill warn">In progress</span><br>${sc.answered}/${sc.n}` : `${X.tasks.length} questions`;
       return `<button class="topic ${st.done ? "done" : ""}" data-t="${t.id}"><span class="n">${st.done ? "✓" : i + 1}</span><span><b>${esc(t.title)}</b>${t.focus ? ` <span class="pill star">⭐ Highlighted</span>` : ""}<br><span class="muted small">${esc(t.strand)}${runsOf(s, t.id) > 1 ? " · " + runsOf(s, t.id) + " sets" : ""}</span></span><span class="meta">${meta}</span></button>`; }).join("")}</div>
   </div>`;
   $("bk").onclick = () => go({ v:"home" });
@@ -859,6 +893,12 @@ function analysis(s, t, r){
     else if (a.rate >= 2){ improve.push({ q: task.q, right: rightText(task), given: givenText(task, a.g), unsure: true }); gaps.push(i); } });
   return { well, improve, gaps };
 }
+/* every subject's progress, for the parent's progress email */
+function progressAll(){
+  return ORDER.map(k => { const T = S[k].topics; let done = 0, sum = 0, sets = 0;
+    T.forEach(x => { const st = tstate(k, x.id); if (!st.done) return; done++; const X = run(k, x.id); const last = X.o.done ? X.r : Math.max(1, X.r - 1); sum += runScore(k, x.id, last).score; sets += runsOf(k, x.id) - (X.o.done ? 0 : 1); });
+    return { subject: S[k].name, year: S[k].year, rev: !!S[k].revision, done, total: T.length, avg: done ? Math.round(sum / done) : null, sets }; }).filter(x => x.done || x.rev);
+}
 function report(s, t, isRetry, r){
   const T = topicOf(s, t), X = run(s, t, r), sc = runScore(s, t, X.r), A = analysis(s, t, X.r), o = X.o;
   const fixedNow = isRetry ? Object.values(o.retry || {}).filter(q => q.ok).length : 0;
@@ -866,7 +906,7 @@ function report(s, t, isRetry, r){
     mins: Math.max(1, mins(sc.ms)), secs: Math.round(sc.ms / 1000), got: sc.got, unsure: sc.unsure, need: sc.need, retry: !!isRetry, fixed: fixedNow,
     well: A.well.slice(0, 6).map(q => q.slice(0, 120)), improve: A.improve.slice(0, 8).map(x => ({ q: x.q.slice(0, 120), right: String(x.right).slice(0, 80), given: String(x.given).slice(0, 80), unsure: !!x.unsure, fixed: !!x.fixed })),
     hints: Object.values(o.hn || {}).reduce((a, b) => a + b, 0), solutions: Object.values(o.ans || {}).filter(q => q.sol).length,
-    totalMs: totals().ms };
+    totalMs: totals().ms, progress: progressAll() };
   DB.reports.push(Object.assign({ at: Date.now() }, data)); if (DB.reports.length > 300) DB.reports.shift(); save();
   try { SDC.log("studyplus", ACCT, { study: data }); } catch(e){}
   try { SDC.studyReport(ACCT, data); } catch(e){}

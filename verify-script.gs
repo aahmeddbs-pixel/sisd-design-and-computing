@@ -346,6 +346,14 @@ function verify_(email, token){
 const STUDY_TO = "aahmed.dbs@gmail.com";
 /* Study Plus UK: each year group's student also gets a copy of their own results (fixed here, never from the page). */
 const UK_STUDENT_TO = { 8: "maira.mo.ahmed@gmail.com", 10: "mahamohamed27.a@gmail.com" };
+/* every Study Plus UK topic (Year 8 and Year 10) also goes here, with an overview of every subject's progress */
+const UK_PROGRESS_TO = "maira.mo.ahmed@gmail.com";
+function progressTable_(d){
+  const P = (Array.isArray(d.progress) ? d.progress : []).slice(0, 60), h = escH_;
+  if (!P.length) return "";
+  const row = x => '<tr><td style="padding:6px 8px;border-bottom:1px solid #E3E8F0">Year ' + (+x.year || "") + ' · ' + h(String(x.subject || "").slice(0, 60)) + (x.rev ? " 📝" : "") + '</td><td style="padding:6px 8px;border-bottom:1px solid #E3E8F0;text-align:center">' + Math.round(+x.done || 0) + '/' + Math.round(+x.total || 0) + '</td><td style="padding:6px 8px;border-bottom:1px solid #E3E8F0;text-align:center;font-weight:bold;color:' + (x.avg == null ? "#5B6782" : +x.avg >= 70 ? "#1E8A55" : +x.avg >= 50 ? "#B26A00" : "#C0283A") + '">' + (x.avg == null ? "—" : Math.round(+x.avg) + "%") + '</td></tr>';
+  return '<h3 style="color:#1B2D4E;font-size:16px;margin:16px 0 6px">Progress in every subject</h3><table style="width:100%;border-collapse:collapse;font-size:14px"><tr style="background:#F3F5F9"><th style="padding:6px 8px;text-align:left">Subject</th><th style="padding:6px 8px">Topics done</th><th style="padding:6px 8px">Average score</th></tr>' + P.map(row).join("") + '</table><p style="color:#5B6782;font-size:12px">📝 = Term 1 revision subject. Average = latest finished set in each completed topic.</p>';
+}
 /* written feedback and next steps from the score, effort, hints and gaps */
 function advice_(d){
   const sc = Math.round(+d.score || 0), gaps = (d.improve || []).filter(x => !x.unsure).length, unsure = (d.improve || []).filter(x => x.unsure).length, hints = Math.round(+d.hints || 0), sol = Math.round(+d.solutions || 0);
@@ -391,6 +399,17 @@ function study_(p){
   MailApp.sendEmail({ to: STUDY_TO, name: "SISD Design and Computing", subject: (uk ? "Study Plus UK · " + yr : "Study Plus: ") + name + " · " + String(d.subject || "") + " · " + String(d.topic || "") + " · " + score + "%" + (d.retry ? " (retry)" : ""), htmlBody: body });
   /* the student's own copy: fixed address per year group, set here and never taken from the page */
   const to = uk ? UK_STUDENT_TO[+d.year] : "";
+  /* progress copy for every topic, both year groups, with the all-subject overview */
+  if (uk && UK_PROGRESS_TO) {
+    const who = String(d.student || "").slice(0, 40) || name;
+    const pbody = mailBox_("Study Plus UK progress · Year " + (+d.year),
+      '<p><b>' + h(who) + '</b> ' + (d.retry ? 'fixed mistakes in' : 'finished') + ' <b>' + h(d.subject) + ': ' + h(d.topic) + '</b>.</p>' +
+      '<table style="width:100%;border-collapse:separate;border-spacing:6px"><tr>' + cell("Score", score + "%", col) + cell("Right first time", num(d.right) + "/" + num(d.n)) + cell("Work time", mins + " min") + cell("Effort", effort + "%") + '</tr></table>' +
+      advHtml +
+      '<h3 style="color:#C0283A;font-size:16px;margin:16px 0 6px">Questions to look at again</h3>' + (imp ? '<ul style="padding-left:18px;margin:0">' + imp + '</ul>' : '<p style="color:#5B6782">None: brilliant!</p>') +
+      progressTable_(d));
+    if (UK_PROGRESS_TO !== to) studentMail_(UK_PROGRESS_TO, "Study Plus UK progress · Year " + (+d.year) + " · " + String(d.subject || "") + " · " + String(d.topic || "") + " · " + score + "%", pbody, { name: "Study Plus" });
+  }
   if (to) {
     const who = String(d.student || "").slice(0, 40) || "there";
     const sbody = mailBox_("Your Study Plus results",
@@ -399,6 +418,7 @@ function study_(p){
       advHtml +
       '<h3 style="color:#1E8A55;font-size:16px;margin:16px 0 6px">What went well</h3>' + (well ? '<ul style="padding-left:18px;margin:0">' + well + '</ul>' : '<p style="color:#5B6782">Keep going: next time aim to get some right and rate them "I\'ve got it".</p>') +
       '<h3 style="color:#C0283A;font-size:16px;margin:16px 0 6px">Questions to look at again</h3>' + (imp ? '<ul style="padding-left:18px;margin:0">' + imp + '</ul>' : '<p style="color:#5B6782">None: brilliant!</p>') +
+      (to === UK_PROGRESS_TO ? progressTable_(d) : "") +
       '<p><a href="' + SITE + 'uk.html" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Back to Study Plus</a></p>');
     studentMail_(to, "Your Study Plus results · " + String(d.subject || "") + " · " + String(d.topic || "") + " · " + score + "%", sbody, { name: "Study Plus" });
   }
