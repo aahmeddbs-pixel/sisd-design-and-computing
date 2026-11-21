@@ -21,10 +21,11 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: pip install soundfile numpy
       - run: python tools/sambusa-voice/human.py
-      - run: |
+      - if: always()
+        run: |
           git config user.name "sambusa-voice-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A uk/baby tools/sambusa-voice/report.txt
-          git commit -m "Sambusa: real human voice recordings added to the videos and picture cards" || exit 0
+          git commit -m "Sambusa: real human voice recordings added to the videos and picture cards (see tools/sambusa-voice/report.txt)" || exit 0
           git pull --rebase origin main
           git push origin HEAD:main

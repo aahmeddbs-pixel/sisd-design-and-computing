@@ -70,55 +70,65 @@ def load(path):
     fade = min(len(a) // 4, int(SR * 0.02)); a[:fade] *= np.linspace(0, 1, fade); a[-fade:] *= np.linspace(1, 0, fade)
     return a / max(1e-6, np.abs(a).max()) * 0.9
 
-WORDS = json.load(open(os.path.join(TOOLS, "words.json"), encoding="utf-8"))
-keys = [("sw:" + x[0][3:]) if x[0].startswith("sw-") else x[0] for x in WORDS]
-clips, credits, report = {}, [], []
-for k in keys:
-    w = k[3:] if k.startswith("sw:") else k
-    t, I, kind = find_sw(w) if k.startswith("sw:") else find_en(w)
-    if not t: report.append(f"MISSING {k}"); continue
-    ext = os.path.splitext(t)[1]; local = os.path.join(CLIPS, re.sub(r"[^a-z0-9]+", "_", k.lower()) + ext)
-    data = get(I["url"], binary=True)
-    if not data: report.append(f"DOWNLOAD FAILED {k} {t}"); continue
-    open(local, "wb").write(data)
-    try: clips[k] = load(local)
-    except Exception as e: report.append(f"DECODE FAILED {k} {e}"); continue
-    credits.append(dict(word=w, lang="sw" if k.startswith("sw:") else "en", file=t[5:], page=I["page"], author=I["author"][:120], licence=I["licence"], voice=kind))
-    report.append(f"OK {k:14s} {kind:24s} {t[5:]}  [{I['licence']}] {I['author'][:60]}")
-    time.sleep(0.3)
-print("\n".join(report), flush=True)
+def main():
+  WORDS = json.load(open(os.path.join(TOOLS, "words.json"), encoding="utf-8"))
+  keys = [("sw:" + x[0][3:]) if x[0].startswith("sw-") else x[0] for x in WORDS]
+  global report
+  clips, credits = {}, []
+  for k in keys:
+      w = k[3:] if k.startswith("sw:") else k
+      t, I, kind = find_sw(w) if k.startswith("sw:") else find_en(w)
+      if not t: report.append(f"MISSING {k}"); continue
+      ext = os.path.splitext(t)[1]; local = os.path.join(CLIPS, re.sub(r"[^a-z0-9]+", "_", k.lower()) + ext)
+      data = get(I["url"], binary=True)
+      if not data: report.append(f"DOWNLOAD FAILED {k} {t}"); continue
+      open(local, "wb").write(data)
+      try: clips[k] = load(local)
+      except Exception as e: report.append(f"DECODE FAILED {k} {e}"); continue
+      credits.append(dict(word=w, lang="sw" if k.startswith("sw:") else "en", file=t[5:], page=I["page"], author=I["author"][:120], licence=I["licence"], voice=kind))
+      report.append(f"OK {k:14s} {kind:24s} {t[5:]}  [{I['licence']}] {I['author'][:60]}")
+      time.sleep(0.3)
+  print("\n".join(report), flush=True)
 
-# picture cards: the recording, and a gently slowed copy (same voice, same pitch)
-for x in WORDS:
-    k = ("sw:" + x[0][3:]) if x[0].startswith("sw-") else x[0]
-    for f in (x[0] + ".mp3", x[0] + "-slow.mp3"):
-        p = os.path.join(BABY, "words", f)
-        if os.path.exists(p): os.remove(p)
-    if k not in clips: continue
-    wav = os.path.join(CLIPS, "_t.wav"); import soundfile as sf; sf.write(wav, clips[k], SR)
-    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", wav, "-ac", "1", "-b:a", "64k", os.path.join(BABY, "words", x[0] + ".mp3")], check=True)
-    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", wav, "-af", "atempo=0.75,apad=pad_dur=0.2", "-ac", "1", "-b:a", "64k", os.path.join(BABY, "words", x[0] + "-slow.mp3")], check=True)
-    os.remove(wav)
+  # picture cards: the recording, and a gently slowed copy (same voice, same pitch)
+  for x in WORDS:
+      k = ("sw:" + x[0][3:]) if x[0].startswith("sw-") else x[0]
+      for f in (x[0] + ".mp3", x[0] + "-slow.mp3"):
+          p = os.path.join(BABY, "words", f)
+          if os.path.exists(p): os.remove(p)
+      if k not in clips: continue
+      wav = os.path.join(CLIPS, "_t.wav"); import soundfile as sf; sf.write(wav, clips[k], SR)
+      subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", wav, "-ac", "1", "-b:a", "64k", os.path.join(BABY, "words", x[0] + ".mp3")], check=True)
+      subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", wav, "-af", "atempo=0.75,apad=pad_dur=0.2", "-ac", "1", "-b:a", "64k", os.path.join(BABY, "words", x[0] + "-slow.mp3")], check=True)
+      os.remove(wav)
 
-# videos: music bed + the real word recordings at the cue times
-js = open(os.path.join(BABY, "videos.js"), encoding="utf-8").read()
-VIDEOS = json.loads(js[js.index("= ") + 2: js.rstrip().rindex(";")])
-for v in VIDEOS:
-    raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", os.path.join(BEDS, v["id"] + ".m4a"), "-f", "f32le", "-ac", "1", "-ar", str(SR), "-"], capture_output=True, check=True).stdout
-    bed = np.frombuffer(raw, dtype=np.float32).copy() * 0.6
-    voice = np.zeros(len(bed) + SR * 4, np.float32)
-    for t, k in v["cues"]:
-        if k in clips: o = int(t * SR); voice[o:o + len(clips[k])] += clips[k]
-    mix = np.clip(bed + voice[:len(bed)], -1, 1)
-    wav = os.path.join(BABY, "_" + v["id"] + ".wav"); import soundfile as sf; sf.write(wav, mix, SR)
-    src = os.path.join(BABY, v["id"] + ".mp4"); tmp = os.path.join(BABY, "_" + v["id"] + ".tmp.mp4")
-    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", src, "-i", wav, "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "128k", "-shortest", "-movflags", "+faststart", tmp], check=True)
-    os.replace(tmp, src); os.remove(wav)
+  # videos: music bed + the real word recordings at the cue times
+  js = open(os.path.join(BABY, "videos.js"), encoding="utf-8").read()
+  VIDEOS = json.loads(js[js.index("= ") + 2: js.rstrip().rindex(";")])
+  for v in VIDEOS:
+      raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", os.path.join(BEDS, v["id"] + ".m4a"), "-f", "f32le", "-ac", "1", "-ar", str(SR), "-"], capture_output=True, check=True).stdout
+      bed = np.frombuffer(raw, dtype=np.float32).copy() * 0.6
+      voice = np.zeros(len(bed) + SR * 4, np.float32)
+      for t, k in v["cues"]:
+          if k in clips: o = int(t * SR); voice[o:o + len(clips[k])] += clips[k]
+      mix = np.clip(bed + voice[:len(bed)], -1, 1)
+      wav = os.path.join(BABY, "_" + v["id"] + ".wav"); import soundfile as sf; sf.write(wav, mix, SR)
+      src = os.path.join(BABY, v["id"] + ".mp4"); tmp = os.path.join(BABY, "_" + v["id"] + ".tmp.mp4")
+      subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", src, "-i", wav, "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "128k", "-shortest", "-movflags", "+faststart", tmp], check=True)
+      os.replace(tmp, src); os.remove(wav)
 
-json.dump(credits, open(os.path.join(BABY, "credits.json"), "w"), ensure_ascii=False, indent=0)
-open(os.path.join(TOOLS, "report.txt"), "w").write("\n".join(report) + "\n")
-for f in os.listdir(CLIPS): os.remove(os.path.join(CLIPS, f))
-os.rmdir(CLIPS)
-for f in ("voice.json",):
-    if os.path.exists(os.path.join(BABY, f)): os.remove(os.path.join(BABY, f))
-print("done", len(clips), "of", len(keys))
+  json.dump(credits, open(os.path.join(BABY, "credits.json"), "w"), ensure_ascii=False, indent=0)
+  open(os.path.join(TOOLS, "report.txt"), "w").write("\n".join(report) + "\n")
+  for f in os.listdir(CLIPS): os.remove(os.path.join(CLIPS, f))
+  os.rmdir(CLIPS)
+  for f in ("voice.json",):
+      if os.path.exists(os.path.join(BABY, f)): os.remove(os.path.join(BABY, f))
+  print("done", len(clips), "of", len(keys))
+
+report = []
+if __name__ == "__main__":
+    import traceback
+    try: main()
+    except Exception:
+        report.append("CRASH\n" + traceback.format_exc())
+        open(os.path.join(TOOLS, "report.txt"), "w").write("\n".join(report) + "\n"); print(report[-1]); sys.exit(1)
