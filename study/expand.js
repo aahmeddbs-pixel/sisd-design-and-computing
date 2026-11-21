@@ -32,7 +32,7 @@ function topUp(subjects, GEN){
       const out = [], push = q => { const n = norm(q.q); if (seen.has(n) || out.length >= need) return; seen.add(n); out.push(q); };
       /* 0. topics with a question generator: fixed extra questions with new numbers, Core to Challenge */
       const gk = k + "/" + T.id;
-      if (GEN && GEN.has && GEN.has(gk)) for (let i = 0; out.length < need && i < need * 4; i++){ const d = 1 + (i % 3), g = GEN.make(gk, d, (hash(gk) + i * 2654435761 + 17) >>> 0); if (g) push(Object.assign({}, g, { gen:"bank" })); }
+      if (GEN && GEN.has && GEN.has(gk)) for (let i = 0; out.length < need && i < need * 25; i++){ const d = 1 + (i % 3), g = GEN.make(gk, d, (hash(gk) + i * 2654435761 + 17) >>> 0); if (g) push(Object.assign({}, g, { gen:"bank" })); }
       /* 1. name the term: the definition is given, choose the word it defines */
       defs.filter(d => d.T === T).forEach(d => {
         const others = defs.filter(e => norm(e.t) !== norm(d.t) && !norm(d.r).includes(norm(e.t)));
