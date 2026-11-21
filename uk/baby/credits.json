@@ -1,0 +1,281 @@
+[
+{
+"word": "apple",
+"lang": "en",
+"file": "En-uk-apple.ogg",
+"page": "https://commons.wikimedia.org/wiki/File:En-uk-apple.ogg",
+"author": "Association Shtooka, Judith Franck",
+"licence": "CC BY 3.0 us",
+"voice": "Judith (London)"
+},
+{
+"word": "banana",
+"lang": "en",
+"file": "LL-Q1860 (eng)-Simplificationalizer-banana.wav",
+"page": "https://commons.wikimedia.org/wiki/File:LL-Q1860_(eng)-Simplificationalizer-banana.wav",
+"author": "Speaker: Simplificationalizer\nRecorder: Simplificationalizer",
+"licence": "CC0",
+"voice": "Lingua Libre (English)"
+},
+{
+"word": "orange",
+"lang": "en",
+"file": "En-uk-orange.ogg",
+"page": "https://commons.wikimedia.org/wiki/File:En-uk-orange.ogg",
+"author": "Association Shtooka, Judith Franck",
+"licence": "CC BY 3.0 us",
+"voice": "Judith (London)"
+},
+{
+"word": "grapes",
+"lang": "en",
+"file": "LL-Q1860 (eng)-Vealhurl-grapes.wav",
+"page": "https://commons.wikimedia.org/wiki/File:LL-Q1860_(eng)-Vealhurl-grapes.wav",
+"author": "Speaker: Vealhurl\nRecorder: Vealhurl",
+"licence": "CC BY-SA 4.0",
+"voice": "Lingua Libre (English)"
+},
+{
+"word": "strawberry",
+"lang": "en",
+"file": "LL-Q1860 (eng)-Xavier hillier-strawberry.wav",
+"page": "https://commons.wikimedia.org/wiki/File:LL-Q1860_(eng)-Xavier_hillier-strawberry.wav",
+"author": "Speaker: Xavier hillier\nRecorder: Xavier hillier",
+"licence": "CC0",
+"voice": "Lingua Libre (English)"
+},
+{
+"word": "mango",
+"lang": "en",
+"file": "LL-Q1860 (eng)-Simplificationalizer-mango.wav",
+"page": "https://commons.wikimedia.org/wiki/File:LL-Q1860_(eng)-Simplificationalizer-mango.wav",
+"author": "Speaker: Simplificationalizer\nRecorder: Simplificationalizer",
+"licence": "CC0",
+"voice": "Lingua Libre (English)"
+},
+{
+"word": "pear",
+"lang": "en",
+"file": "En-uk-pear.ogg",
+"page": "https://commons.wikimedia.org/wiki/File:En-uk-pear.ogg",
+"author": "Association Shtooka, Judith Franck",
+"licence": "CC BY 3.0 us",
+"voice": "Judith (London)"
+},
+{
+"word": "cherry",
+"lang": "en",
+"file": "En-uk-cherry.ogg",
+"page": "https://commons.wikimedia.org/wiki/File:En-uk-cherry.ogg",
+"author": "Association Shtooka, Judith Franck",
+"licence": "CC BY 3.0 us",
+"voice": "Judith (London)"
+},
+{
+"word": "pineapple",
+"lang": "en",
+"file": "LL-Q1860 (eng)-Louisalphonse28-Pineapple.wav",
+"page": "https://commons.wikimedia.org/wiki/File:LL-Q1860_(eng)-Louisalphonse28-Pineapple.wav",
+"author": "Speaker: Louisalphonse28\nRecorder: Louisalphonse28",
+"licence": "CC0",
+"voice": "Lingua Libre (English)"
+},
+{
+"word": "kiwi",
+"lang": "en",
+"file": "LL-Q1860 (eng)-Wodencafe-kiwi.wav",
+"page": "https://commons.wikimedia.org/wiki/File:LL-Q1860_(eng)-Wodencafe-kiwi.wav",
+"author": "Speaker: Wodencafe\nRecorder: Wodencafe",
+"licence": "CC0",
+"voice": "Lingua Libre (English)"
+},
+{
+"word": "peach",
+"lang": "en",
+"file": "LL-Q1860 (eng)-Louisalphonse28-Peach.wav",
+"page": "https://commons.wikimedia.org/wiki/File:LL-Q1860_(eng)-Louisalphonse28-Peach.wav",
+"author": "Speaker: Louisalphonse28\nRecorder: Louisalphonse28",
+"licence": "CC0",
+"voice": "Lingua Libre (English)"
+},
+{
+"word": "hi",
+"lang": "en",
+"file": "En-uk-hi.ogg",
+"page": "https://commons.wikimedia.org/wiki/File:En-uk-hi.ogg",
+"author": "Association Shtooka, Judith Franck",
+"licence": "CC BY 3.0 us",
+"voice": "Judith (London)"
+},
+{
+"word": "mama",
+"lang": "en",
+"file": "LL-Q1860 (eng)-Grendelkhan-mama.wav",
+"page": "https://commons.wikimedia.org/wiki/File:LL-Q1860_(eng)-Grendelkhan-mama.wav",
+"author": "Speaker: Grendelkhan\nRecorder: Grendelkhan",
+"licence": "CC0",
+"voice": "Lingua Libre (English)"
+},
+{
+"word": "dada",
+"lang": "en",
+"file": "LL-Q1860 (eng)-Flame, not lame-dada.wav",
+"page": "https://commons.wikimedia.org/wiki/File:LL-Q1860_(eng)-Flame,_not_lame-dada.wav",
+"author": "Speaker: Flame, not lame\nRecorder: Flame",
+"licence": "CC0",
+"voice": "Lingua Libre (English)"
+},
+{
+"word": "baby",
+"lang": "en",
+"file": "En-uk-baby.ogg",
+"page": "https://commons.wikimedia.org/wiki/File:En-uk-baby.ogg",
+"author": "Association Shtooka, Judith Franck",
+"licence": "CC BY 3.0 us",
+"voice": "Judith (London)"
+},
+{
+"word": "milk",
+"lang": "en",
+"file": "En-uk-milk.ogg",
+"page": "https://commons.wikimedia.org/wiki/File:En-uk-milk.ogg",
+"author": "Association Shtooka, Judith Franck",
+"licence": "CC BY 3.0 us",
+"voice": "Judith (London)"
+},
+{
+"word": "water",
+"lang": "en",
+"file": "En-uk-water.ogg",
+"page": "https://commons.wikimedia.org/wiki/File:En-uk-water.ogg",
+"author": "Association Shtooka, Judith Franck",
+"licence": "CC BY 3.0 us",
+"voice": "Judith (London)"
+},
+{
+"word": "ball",
+"lang": "en",
+"file": "LL-Q1860 (eng)-Wodencafe-ball.wav",
+"page": "https://commons.wikimedia.org/wiki/File:LL-Q1860_(eng)-Wodencafe-ball.wav",
+"author": "Speaker: Wodencafe\nRecorder: Wodencafe",
+"licence": "CC0",
+"voice": "Lingua Libre (English)"
+},
+{
+"word": "more",
+"lang": "en",
+"file": "En-uk-more.ogg",
+"page": "https://commons.wikimedia.org/wiki/File:En-uk-more.ogg",
+"author": "Association Shtooka, Judith Franck",
+"licence": "CC BY 3.0 us",
+"voice": "Judith (London)"
+},
+{
+"word": "hug",
+"lang": "en",
+"file": "LL-Q1860 (eng)-Grendelkhan-hug.wav",
+"page": "https://commons.wikimedia.org/wiki/File:LL-Q1860_(eng)-Grendelkhan-hug.wav",
+"author": "Speaker: Grendelkhan\nRecorder: Grendelkhan",
+"licence": "CC0",
+"voice": "Lingua Libre (English)"
+},
+{
+"word": "shoes",
+"lang": "en",
+"file": "En-uk-shoes.ogg",
+"page": "https://commons.wikimedia.org/wiki/File:En-uk-shoes.ogg",
+"author": "Association Shtooka, Judith Franck",
+"licence": "CC BY 3.0 us",
+"voice": "Judith (London)"
+},
+{
+"word": "book",
+"lang": "en",
+"file": "En-uk-book.ogg",
+"page": "https://commons.wikimedia.org/wiki/File:En-uk-book.ogg",
+"author": "Association Shtooka, Judith Franck",
+"licence": "CC BY 3.0 us",
+"voice": "Judith (London)"
+},
+{
+"word": "bath",
+"lang": "en",
+"file": "LL-Q1860 (eng)-Grendelkhan-bath.wav",
+"page": "https://commons.wikimedia.org/wiki/File:LL-Q1860_(eng)-Grendelkhan-bath.wav",
+"author": "Speaker: Grendelkhan\nRecorder: Grendelkhan",
+"licence": "CC0",
+"voice": "Lingua Libre (English)"
+},
+{
+"word": "dog",
+"lang": "en",
+"file": "En-uk-dog.ogg",
+"page": "https://commons.wikimedia.org/wiki/File:En-uk-dog.ogg",
+"author": "Association Shtooka, Judith Franck",
+"licence": "CC BY 3.0 us",
+"voice": "Judith (London)"
+},
+{
+"word": "cat",
+"lang": "en",
+"file": "LL-Q1860 (eng)-Wodencafe-cat.wav",
+"page": "https://commons.wikimedia.org/wiki/File:LL-Q1860_(eng)-Wodencafe-cat.wav",
+"author": "Speaker: Wodencafe\nRecorder: Wodencafe",
+"licence": "CC0",
+"voice": "Lingua Libre (English)"
+},
+{
+"word": "cow",
+"lang": "en",
+"file": "LL-Q1860 (eng)-Grendelkhan-cow.wav",
+"page": "https://commons.wikimedia.org/wiki/File:LL-Q1860_(eng)-Grendelkhan-cow.wav",
+"author": "Speaker: Grendelkhan\nRecorder: Grendelkhan",
+"licence": "CC0",
+"voice": "Lingua Libre (English)"
+},
+{
+"word": "duck",
+"lang": "en",
+"file": "LL-Q1860 (eng)-Grendelkhan-duck.wav",
+"page": "https://commons.wikimedia.org/wiki/File:LL-Q1860_(eng)-Grendelkhan-duck.wav",
+"author": "Speaker: Grendelkhan\nRecorder: Grendelkhan",
+"licence": "CC0",
+"voice": "Lingua Libre (English)"
+},
+{
+"word": "sheep",
+"lang": "en",
+"file": "LL-Q1860 (eng)-Nattes à chat-sheep.wav",
+"page": "https://commons.wikimedia.org/wiki/File:LL-Q1860_(eng)-Nattes_%C3%A0_chat-sheep.wav",
+"author": "Speaker: Nattes à chat\nRecorder: Nattes à chat",
+"licence": "CC BY-SA 4.0",
+"voice": "Lingua Libre (English)"
+},
+{
+"word": "chicken",
+"lang": "en",
+"file": "En-uk-chicken.ogg",
+"page": "https://commons.wikimedia.org/wiki/File:En-uk-chicken.ogg",
+"author": "Association Shtooka, Judith Franck",
+"licence": "CC BY 3.0 us",
+"voice": "Judith (London)"
+},
+{
+"word": "fish",
+"lang": "en",
+"file": "En-uk-fish.ogg",
+"page": "https://commons.wikimedia.org/wiki/File:En-uk-fish.ogg",
+"author": "Association Shtooka, Judith Franck",
+"licence": "CC BY 3.0 us",
+"voice": "Judith (London)"
+},
+{
+"word": "bird",
+"lang": "en",
+"file": "LL-Q1860 (eng)-Muldoonsamuel55-Bird.wav",
+"page": "https://commons.wikimedia.org/wiki/File:LL-Q1860_(eng)-Muldoonsamuel55-Bird.wav",
+"author": "Speaker: Muldoonsamuel55\nRecorder: Muldoonsamuel55",
+"licence": "CC0",
+"voice": "Lingua Libre (English)"
+}
+]
