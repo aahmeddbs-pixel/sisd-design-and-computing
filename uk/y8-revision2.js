@@ -1,7 +1,7 @@
 /* UK Study Plus · Year 8 Term 1 Summative revision, part 2 (Dubai Scholars, 2026–27 content document).
-   Adds: English Paper 1 (reading) and Paper 2 (writing) topics, French, MSCS, Hindi, Arabic, and Islamic Education
+   Adds: English Paper 1 (reading) and Paper 2 (writing) topics, French, MSCS, Arabic, and Islamic Education
    (with the teacher's three revision answer keys shown as page images, so the Qur'anic Arabic is exactly as printed).
-   Question generators (fact banks, French verb tables, word roots, Hindi grammar) give hundreds of different questions.
+   Question generators (fact banks, French verb tables, word roots) give hundreds of different questions.
    Loads after uk/y8-revision.js. */
 (function(U){
 "use strict";
@@ -403,59 +403,6 @@ U.y8revmscs = { name:"MSCS: Term 1 Revision", short:"MSCS", year:8, revision:tru
    fun:"Gunpowder was discovered by alchemists trying to make a potion for eternal life — instead they made fireworks!",
    trick:"The 4 great inventions: 'Please Print Good Compasses' — Paper, Printing, Gunpowder, Compass.",
    tasks: gen("y8revmscs/tech", "111122223333", 99011), pool: gen("y8revmscs/tech", "1122331122331", 99501) })
-]};
-
-/* =====================================================================================
-   HINDI (Mon 30 Nov P1 · Tue 1 Dec P2)
-   ===================================================================================== */
-const PRON = [["मैं", "हूँ", "जाता", "I"], ["हम", "हैं", "जाते", "we"], ["तुम", "हो", "जाते", "you (informal)"], ["आप", "हैं", "जाते", "you (polite)"], ["वह (लड़का)", "है", "जाता", "he"], ["वह (लड़की)", "है", "जाती", "she"], ["वे", "हैं", "जाते", "they"], ["तू", "है", "जाता", "you (very informal)"]];
-const VERBS_H = [["जा", "go"], ["खा", "eat"], ["पढ़", "read/study"], ["खेल", "play"], ["लिख", "write"], ["दौड़", "run"], ["सो", "sleep"]];
-const SYN = [["पानी", ["जल", "नीर"]], ["सूर्य", ["रवि", "दिनकर", "भानु"]], ["आकाश", ["गगन", "नभ", "अंबर"]], ["पृथ्वी", ["धरती", "भूमि", "धरा"]], ["फूल", ["पुष्प", "सुमन", "कुसुम"]], ["माता", ["माँ", "जननी"]], ["पिता", ["जनक", "बाप"]], ["घर", ["गृह", "भवन", "सदन"]], ["हवा", ["वायु", "पवन", "समीर"]], ["आग", ["अग्नि", "अनल"]], ["पेड़", ["वृक्ष", "तरु"]], ["चाँद", ["चंद्रमा", "शशि", "इंदु"]], ["नदी", ["सरिता", "तटिनी"]], ["मित्र", ["दोस्त", "सखा"]], ["आँख", ["नेत्र", "नयन", "लोचन"]], ["शरीर", ["तन", "देह"]], ["बादल", ["मेघ", "जलद"]], ["समुद्र", ["सागर", "जलधि"]], ["राजा", ["नृप", "भूप"]]];
-const ANT = [["दिन", "रात"], ["सुख", "दुःख"], ["अमीर", "गरीब"], ["आना", "जाना"], ["जीवन", "मृत्यु"], ["प्रश्न", "उत्तर"], ["सच", "झूठ"], ["गर्म", "ठंडा"], ["आगे", "पीछे"], ["ऊपर", "नीचे"], ["अंदर", "बाहर"], ["दोस्त", "दुश्मन"], ["बड़ा", "छोटा"], ["प्रकाश", "अंधकार"], ["जीत", "हार"], ["स्वस्थ", "अस्वस्थ"], ["आलसी", "परिश्रमी"], ["पुराना", "नया"], ["आसान", "कठिन"], ["स्वर्ग", "नरक"]];
-G2["y8revhindi/grammar"] = (d, r) => { const K = kit(r);
-  if (d === 1){ const S = K.pick([["मैं", "पुरुषवाचक सर्वनाम (personal)"], ["वह", "पुरुषवाचक सर्वनाम (personal)"], ["कौन", "प्रश्नवाचक सर्वनाम (interrogative)"], ["क्या", "प्रश्नवाचक सर्वनाम (interrogative)"], ["अपने आप", "निजवाचक सर्वनाम (reflexive)"], ["कोई", "अनिश्चयवाचक सर्वनाम (indefinite)"], ["यह", "निश्चयवाचक सर्वनाम (demonstrative)"], ["जो", "संबंधवाचक सर्वनाम (relative)"]]);
-    return mcq(1, `'${S[0]}' किस प्रकार का सर्वनाम है? (What type of pronoun is '${S[0]}'?)`, S[1], ["पुरुषवाचक सर्वनाम (personal)", "प्रश्नवाचक सर्वनाम (interrogative)", "निजवाचक सर्वनाम (reflexive)", "अनिश्चयवाचक सर्वनाम (indefinite)", "निश्चयवाचक सर्वनाम (demonstrative)", "संबंधवाचक सर्वनाम (relative)"].filter(x => x !== S[1]).slice(0, 3), `'${S[0]}' → ${S[1]}. सर्वनाम = a word used in place of a noun.`); }
-  if (d === 2){ const P = K.pick(PRON), V = K.pick(VERBS_H), stem = V[0], ending = P[2].replace("जा", ""), form = stem + ending, ans = `${P[0].split(" ")[0]} स्कूल ${form} ${P[1]}`.replace("स्कूल", V[0] === "जा" ? "स्कूल" : "रोज़");
-    const right = `${form} ${P[1]}`, wrongs = PRON.filter(x => x[1] !== P[1] || x[2] !== P[2]).map(x => `${stem + x[2].replace("जा", "")} ${x[1]}`).filter(w => w !== right);
-    return mcq(2, `सही क्रिया चुनिए (Choose the correct verb form):\n${P[0]} रोज़ ___ । (${V[1]}, ${P[3]})`, right, K.shuffle([...new Set(wrongs)]).slice(0, 3), `${P[0]} → ${P[3]}: verb ending '${ending}' + '${P[1]}' → ${P[0].split(" ")[0]} रोज़ ${right}।`); }
-  if (K.int(0, 1)){ const S = K.pick(SYN), w = K.pick(S[1]), others = K.shuffle(SYN.filter(x => x !== S)).slice(0, 3).map(x => K.pick(x[1]));
-    return mcq(3, `'${S[0]}' का पर्यायवाची शब्द चुनिए (Choose a synonym of '${S[0]}'):`, w, others, `${S[0]} के पर्यायवाची: ${S[1].join(", ")}।`); }
-  const A = K.pick(ANT), flip = K.int(0, 1), q = flip ? A[1] : A[0], a = flip ? A[0] : A[1], others = K.shuffle(ANT.filter(x => x !== A)).slice(0, 3).map(x => x[K.int(0, 1)]);
-  return mcq(3, `'${q}' का विलोम शब्द चुनिए (Choose the opposite of '${q}'):`, a, others, `${q} ↔ ${a} (विलोम = opposite).`); };
-G2["y8revhindi/reading"] = factGen([
- [1, "ताजमहल कहाँ स्थित है? (Where is the Taj Mahal?)", "आगरा (Agra)", ["दिल्ली (Delhi)", "जयपुर (Jaipur)", "मुंबई (Mumbai)"], "ताजमहल आगरा में यमुना नदी के किनारे है।", "ताजमहल आगरा में है।", "ताजमहल मुंबई में है।"],
- [1, "ताजमहल किसने बनवाया? (Who had the Taj Mahal built?)", "शाहजहाँ (Shah Jahan)", ["अकबर (Akbar)", "बाबर (Babur)", "औरंगज़ेब (Aurangzeb)"], "मुगल सम्राट शाहजहाँ ने अपनी पत्नी मुमताज़ महल की याद में बनवाया।", "ताजमहल शाहजहाँ ने बनवाया।", "ताजमहल अकबर ने बनवाया।"],
- [1, "ताजमहल किसकी याद में बनवाया गया? (In whose memory?)", "मुमताज़ महल (Mumtaz Mahal)", ["जहाँगीर (Jahangir)", "नूरजहाँ (Nur Jahan)", "अकबर (Akbar)"], "मुमताज़ महल शाहजहाँ की पत्नी थीं।", "ताजमहल मुमताज़ महल की याद में बना।", "ताजमहल नूरजहाँ की याद में बना।"],
- [1, "ताजमहल किस नदी के किनारे है? (Which river?)", "यमुना (Yamuna)", ["गंगा (Ganga)", "सिंधु (Indus)", "नर्मदा (Narmada)"], "यमुना नदी आगरा से होकर बहती है।", "ताजमहल यमुना के किनारे है।", "ताजमहल गंगा के किनारे है।"],
- [2, "ताजमहल किस पत्थर से बना है? (Built from which stone?)", "सफ़ेद संगमरमर (white marble)", ["लाल बलुआ पत्थर (red sandstone)", "ग्रेनाइट (granite)", "ईंट (brick)"], "चाँदनी रात में संगमरमर चमकता है।", "ताजमहल सफ़ेद संगमरमर से बना है।", "ताजमहल लाल ईंटों से बना है।"],
- [2, "ताजमहल को किस सूची में शामिल किया गया है? (Which list is it on?)", "विश्व के सात नए अजूबे और यूनेस्को विश्व धरोहर (New Seven Wonders and UNESCO World Heritage)", ["केवल भारत के स्कूल (only Indian schools)", "कोई सूची नहीं (no list)", "खेल स्थल (sports venues)"], "1983 में यूनेस्को विश्व धरोहर बना।", "ताजमहल यूनेस्को विश्व धरोहर स्थल है।", "ताजमहल किसी सूची में नहीं है।"],
- [1, "'व्यायाम' का अर्थ क्या है? (What does 'vyayam' mean?)", "Exercise (कसरत)", ["Food (भोजन)", "Sleep (नींद)", "Study (पढ़ाई)"], "व्यायाम = शारीरिक कसरत।", "व्यायाम का अर्थ exercise है।", "व्यायाम का अर्थ sleep है।"],
- [2, "व्यायाम का एक लाभ बताइए। (A benefit of exercise?)", "शरीर स्वस्थ और मन प्रसन्न रहता है (body healthy, mind happy)", ["शरीर कमज़ोर होता है (body weak)", "नींद नहीं आती (no sleep)", "आलस्य बढ़ता है (more laziness)"], "व्यायाम से रोग दूर रहते हैं, शरीर फुर्तीला रहता है।", "व्यायाम से शरीर स्वस्थ रहता है।", "व्यायाम से आलस्य बढ़ता है।"],
- [2, "व्यायाम करने का सबसे अच्छा समय कौन-सा माना जाता है? (Best time?)", "सुबह (morning)", ["आधी रात (midnight)", "भोजन के तुरंत बाद (right after a meal)", "कभी नहीं (never)"], "सुबह की ताज़ी हवा में व्यायाम लाभदायक है।", "सुबह व्यायाम करना अच्छा माना जाता है।", "भोजन के तुरंत बाद भारी व्यायाम करना चाहिए।"],
- [3, "अनुच्छेद-लेखन में क्या होना चाहिए? (A good paragraph needs…)", "एक केंद्रीय विषय, सरल वाक्य, उदाहरण और निष्कर्ष (one main idea, clear sentences, examples, conclusion)", ["केवल शीर्षक (only a title)", "अंग्रेज़ी शब्द (English words)", "बिना विराम चिह्न (no punctuation)"], "80–100 शब्द, विषय पर केंद्रित।", "अनुच्छेद एक विषय पर केंद्रित होता है।", "अनुच्छेद में निष्कर्ष नहीं होना चाहिए।"],
- [3, "चित्र-लेखन में आप क्या करते हैं? (In picture composition you…)", "चित्र में दिख रहे दृश्य का वर्णन करते हैं (describe what you see in the picture)", ["कविता याद करते हैं (memorise a poem)", "गणित हल करते हैं (solve maths)", "चित्र बनाते हैं (draw a picture)"], "कौन, क्या, कहाँ, कब, क्यों — इन प्रश्नों के उत्तर लिखें।", "चित्र-लेखन में चित्र का वर्णन करते हैं।", "चित्र-लेखन में नया चित्र बनाना होता है।"]]);
-U.y8revhindi = { name:"Hindi: Term 1 Revision", short:"Hindi", year:8, revision:true, icon:"🪷", colour:"#C2185B", exam:"P1 Mon 30 Nov · 60 marks · 1h 30m · P2 dictation Tue 1 Dec",
-  blurb:"सर्वनाम (pronouns), सर्वनाम के साथ क्रिया, विलोम और पर्यायवाची शब्द, व्यायाम और ताजमहल, अनुच्छेद और चित्र-लेखन", topics:[
- T({ id:"grammar", focus:true, title:"✍️ व्याकरण: सर्वनाम, क्रिया, विलोम और पर्यायवाची", strand:R + " · Grammar: pronouns, verbs with pronouns, antonyms, synonyms",
-   ideas:["सर्वनाम (pronoun): संज्ञा के स्थान पर प्रयोग होने वाला शब्द — मैं, तुम, आप, वह, वे, यह, कौन, कोई, जो, अपने आप।",
-     "सर्वनाम के भेद: पुरुषवाचक (मैं, तुम, वह), निश्चयवाचक (यह, वह), अनिश्चयवाचक (कोई, कुछ), प्रश्नवाचक (कौन, क्या), संबंधवाचक (जो, सो), निजवाचक (अपने आप, स्वयं)।",
-     "सर्वनाम के साथ सही क्रिया: मैं जाता/जाती हूँ, हम जाते हैं, तुम जाते हो, आप जाते हैं, वह जाता/जाती है, वे जाते हैं।",
-     "विलोम शब्द (antonyms): दिन–रात, सुख–दुःख, आसान–कठिन, जीत–हार।",
-     "पर्यायवाची शब्द (synonyms): पानी — जल, नीर; सूर्य — रवि, दिनकर; पेड़ — वृक्ष, तरु।"],
-   example:"सही वाक्य बनाइए: 'आप कल कहाँ गया?'\n'आप' आदरसूचक बहुवचन है।\nक्रिया भी बहुवचन होगी: 'गए'।\nसही वाक्य: आप कल कहाँ गए?",
-   fun:"Hindi is the third most spoken language in the world, with over 600 million speakers!",
-   trick:"हूँ–हो–है–हैं: मैं हूँ, तुम हो, वह है, हम/आप/वे हैं।",
-   tasks: gen("y8revhindi/grammar", "111122223333", 100011), pool: gen("y8revhindi/grammar", "1122331122331", 100501) }),
- T({ id:"reading", title:"📖 पठन और लेखन: व्यायाम, ताजमहल, अनुच्छेद, चित्र-लेखन", strand:R + " · Reading (seen and unseen passages) and writing",
-   ideas:["व्यायाम: शरीर को स्वस्थ, मज़बूत और फुर्तीला रखता है; मन प्रसन्न रहता है; रोग दूर रहते हैं। सुबह का समय सबसे अच्छा।",
-     "ताजमहल: आगरा में यमुना नदी के किनारे, मुगल सम्राट शाहजहाँ ने अपनी पत्नी मुमताज़ महल की याद में सफ़ेद संगमरमर से बनवाया (लगभग 1632–1653)। यूनेस्को विश्व धरोहर।",
-     "अपठित गद्यांश: पहले प्रश्न पढ़ें, फिर गद्यांश; उत्तर पूरे वाक्य में और अपने शब्दों में लिखें।",
-     "अनुच्छेद-लेखन (80–100 शब्द): भूमिका → मुख्य बातें (लाभ, उदाहरण) → निष्कर्ष।",
-     "चित्र-लेखन: कौन? क्या कर रहे हैं? कहाँ? कब? क्यों? — इन प्रश्नों से वर्णन करें।"],
-   example:"अनुच्छेद: 'व्यायाम का महत्त्व' (नमूना)\nस्वस्थ शरीर में ही स्वस्थ मन रहता है। व्यायाम हमारे जीवन के लिए बहुत आवश्यक है।\nप्रतिदिन सुबह व्यायाम करने से शरीर में फुर्ती आती है और रोग दूर रहते हैं।\nदौड़ना, तैरना, योग और खेल-कूद अच्छे व्यायाम हैं।\nइसलिए हमें प्रतिदिन कम से कम आधा घंटा व्यायाम करना चाहिए।",
-   fun:"About 20,000 workers and 1,000 elephants helped build the Taj Mahal!",
-   trick:"अनुच्छेद = भूमिका + लाभ + उदाहरण + निष्कर्ष।",
-   tasks: gen("y8revhindi/reading", "111122223333", 101011), pool: gen("y8revhindi/reading", "1122331122331", 101501) })
 ]};
 
 /* =====================================================================================

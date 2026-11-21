@@ -11,17 +11,9 @@ const WORDS = [
   ["First words", [["👋","hi","Wave hi!"],["👩","mama","Mama"],["👨","dada","Dada"],["👶","baby","Baby"],["🥛","milk","Milk"],["💧","water","Water"],["⚽","ball","Ball"],["🍪","more","More, please!"],["🤗","hug","A big hug"],["👟","shoes","Shoes"],["📖","book","Book"],["🛁","bath","Bath time"]]],
   ["Animals", [["🐶","dog","The dog says woof woof"],["🐱","cat","The cat says meow"],["🐮","cow","The cow says moo"],["🦆","duck","The duck says quack quack"],["🐑","sheep","The sheep says baa"],["🐔","chicken","The chicken says cluck cluck"],["🐟","fish","Fish"],["🐦","bird","The bird says tweet tweet"]]]];
 
-/* Swahili as spoken in Mombasa (Kimvita, coastal): respectful greetings, coastal food words. [emoji, Swahili, English, reply] */
+/* Swahili fruit words, as said in Mombasa. [emoji, Swahili] */
 const SWW = [
-  ["Salamu · Greetings", [["👵","shikamoo","greeting an elder (respect)","marahaba"],["🙋","hujambo","how are you?","sijambo"],["🌅","habari ya asubuhi","good morning","nzuri"],["🤝","salaam aleikum","peace be with you","aleikum salaam"],["🚪","hodi","may I come in? (knock knock)","karibu"],["👋","kwaheri","goodbye"],["🌙","lala salama","sleep well"]]],
-  ["Maneno mazuri · Kind words", [["🙏","asante","thank you"],["🤲","tafadhali","please"],["🩹","pole","sorry you're hurt"],["😔","samahani","excuse me, sorry"],["🍽️","bismillah","said before eating"],["😊","alhamdulillah","thanks be to God"]]],
-  ["Familia · Family", [["👩","mama","mum"],["👨","baba","dad"],["👵","bibi","grandma"],["👴","babu","grandpa"],["👦","kaka","brother"],["👧","dada","sister"],["👶","mtoto","baby, child"]]],
-  ["Chakula · Mombasa food", [["💧","maji","water"],["🥛","maziwa","milk"],["☕","chai","tea"],["🍚","wali","rice"],["🍞","mkate","bread"],["🐟","samaki","fish"],["🥟","sambusa","sambusa"],["🍩","mahamri","coconut doughnut"],["🫘","mbaazi","pigeon peas in coconut"],["🥥","madafu","young coconut water"]]],
-  ["Matunda · Fruits", [["🍌","ndizi","banana"],["🥭","embe","mango"],["🍊","chungwa","orange"],["🍍","nanasi","pineapple"],["🍉","tikiti","watermelon"],["🥥","nazi","coconut"],["🍇","zabibu","grapes"],["🍎","tufaha","apple"]]],
-  ["Wanyama · Animals", [["🐱","paka","cat"],["🐶","mbwa","dog"],["🐔","kuku","chicken"],["🐮","ng'ombe","cow"],["🐐","mbuzi","goat"],["🐪","ngamia","camel"],["🐦","ndege","bird"],["🐢","kobe","tortoise"]]],
-  ["Mwili · My body", [["👀","macho","eyes"],["👃","pua","nose"],["👄","mdomo","mouth"],["👂","masikio","ears"],["✋","mkono","hand"],["🦶","mguu","foot"]]],
-  ["Namba · Numbers", [["1️⃣","moja","one"],["2️⃣","mbili","two"],["3️⃣","tatu","three"],["4️⃣","nne","four"],["5️⃣","tano","five"],["6️⃣","sita","six"],["7️⃣","saba","seven"],["8️⃣","nane","eight"],["9️⃣","tisa","nine"],["🔟","kumi","ten"]]],
-  ["Rangi · Colours", [["🔴","nyekundu","red"],["🟡","manjano","yellow"],["🟢","kijani","green"],["🔵","samawati","blue"],["⚫","nyeusi","black"],["⚪","nyeupe","white"]]]];
+  ["Matunda", [["🍌","ndizi"],["🥭","embe"],["🍊","chungwa"],["🍍","nanasi"],["🍉","tikiti"],["🥥","nazi"],["🍇","zabibu"],["🍎","tufaha"]]]];
 const swId = w => "sw-" + w.toLowerCase().replace(/[^a-z]+/g, "-").replace(/^-|-$/g, "");
 
 let voice = null, clip0 = null;
@@ -62,9 +54,9 @@ function render(app, back){
 </div>`).join("")}
     <div class="lsec"><h2>👆 Tap and say</h2><p class="muted small">Tap a picture to hear the word. Tap again to hear it slowly.</p>
       ${WORDS.map(([g, L]) => `<h3 style="margin-top:12px">${esc(g)}</h3><div class="sbcards">${L.map(w => `<button class="sbcard" type="button" data-f="${esc(w[1])}" data-w="${esc(w[1])}" data-x="${esc(w[2])}"><span class="e">${w[0]}</span><span>${esc(w[1])}</span></button>`).join("")}</div>`).join("")}</div>
-    <div class="lsec" id="swahili"><h2>🇰🇪 Swahili words from Mombasa</h2>
-      <p class="muted small">Everyday Swahili the way it's spoken at home in Mombasa: greet elders with <b>Shikamoo</b> (they reply <b>Marahaba</b>), say <b>Hodi</b> at the door and hear <b>Karibu</b>, and learn coastal favourites like mahamri, mbaazi and madafu. Tap a card to hear the word and what it means; tap again to hear it slowly. Watch the "Karibu! Swahili words" video above first.</p>
-      ${SWW.map(([g, L]) => `<h3 style="margin-top:12px">${esc(g)}</h3><div class="sbcards sw">${L.map(w => `<button class="sbcard" type="button" data-f="${esc(swId(w[1]))}" data-w="${esc(w[1])}" data-x="${esc(w[2])}"><span class="e">${w[0]}</span><span>${esc(w[1])}</span><small>${esc(w[2])}${w[3] ? ` · reply: <b>${esc(w[3])}</b>` : ""}</small></button>`).join("")}</div>`).join("")}</div>
+    <div class="lsec" id="swahili"><h2>🇰🇪 Swahili fruits</h2>
+      <p class="muted small">Fruit words in Swahili, said the Mombasa way. Watch the "Swahili Fruits" video above, then tap a card to hear the word. Tap again to hear it slowly.</p>
+      ${SWW.map(([g, L]) => `<div class="sbcards">${L.map(w => `<button class="sbcard" type="button" data-f="${esc(swId(w[1]))}" data-w="${esc(w[1])}" data-x="${esc(w[1])}"><span class="e">${w[0]}</span><span>${esc(w[1])}</span></button>`).join("")}</div>`).join("")}</div>
   </div>`;
   app.querySelector("#bk").onclick = () => { hush(); back(); };
   app.querySelectorAll("video").forEach(vd => vd.addEventListener("play", () => { hush(); app.querySelectorAll("video").forEach(o => { if (o !== vd) o.pause(); }); }));
