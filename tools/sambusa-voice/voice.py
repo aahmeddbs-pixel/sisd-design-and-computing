@@ -1,4 +1,4 @@
-"""Sambusa voice: records a warm, natural female voice (Kokoro-82M, Apache-2.0, voice af_heart) for every line
+"""Sambusa voice: records a warm, natural British female voice (Kokoro-82M, Apache-2.0, voice bf_emma) for every line
 of the Sambusa baby videos and mixes it into the mp4s at the exact cue times, over the music and sound effects.
 Also records each picture-card word (normal and slow). Runs on GitHub Actions (.github/workflows/sambusa-voice.yml).
 Safe to run again: the video picture is reused and the music bed comes from tools/sambusa-voice/beds."""
@@ -9,11 +9,13 @@ from kokoro import KPipeline
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BABY = os.path.join(ROOT, "uk", "baby"); BEDS = os.path.join(ROOT, "tools", "sambusa-voice", "beds")
-SR = 44100; VOICE = "af_heart"; BASE_SPEED = 0.82
-pipe = KPipeline(lang_code="a")
+SR = 44100; VOICE = "bf_emma"; BASE_SPEED = 0.85
+pipe = KPipeline(lang_code="b")                               # British English
+NAME = "[Sambusa](/sɑmbˈusɑ/)"                                # Sa-mbu-sa, like the Swahili snack
+def prep(text): return re.sub(r"(?<!\[)\bSambusa\b(?!\])", NAME, text)
 
 def tts(text, speed):
-    parts = [a for _, _, a in pipe(text, voice=VOICE, speed=speed)]
+    parts = [a for _, _, a in pipe(prep(text), voice=VOICE, speed=speed)]
     a = np.concatenate([np.asarray(p, dtype=np.float32) for p in parts]) if parts else np.zeros(100, np.float32)
     a = np.interp(np.arange(int(len(a) * SR / 24000)) * 24000 / SR, np.arange(len(a)), a).astype(np.float32)
     idx = np.where(np.abs(a) > 0.01)[0]                       # trim silence at both ends
@@ -54,13 +56,13 @@ for v in VIDEOS:
     subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", src, "-i", wav, "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "128k", "-shortest", "-movflags", "+faststart", tmp], check=True)
     os.replace(tmp, src); os.remove(wav)
 
-# picture cards: word + short phrase, and the word said slowly twice
+# picture cards: [file name, what to say, what to say slowly] (English words and Mombasa Swahili words)
 WORDS = json.load(open(os.path.join(ROOT, "tools", "sambusa-voice", "words.json"), encoding="utf-8"))
 os.makedirs(os.path.join(BABY, "words"), exist_ok=True)
-for w, phrase in WORDS:
-    for name, text, sp in [(w, f"{w}! {phrase}.", BASE_SPEED), (w + "-slow", f"{w}... {w}.", 0.65)]:
+for fid, normal, slow in WORDS:
+    for name, text, sp in [(fid, normal, BASE_SPEED), (fid + "-slow", slow, 0.62)]:
         a = tts(text, sp); wav = os.path.join(BABY, "words", "_t.wav"); sf.write(wav, a, SR)
         subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", wav, "-ac", "1", "-b:a", "64k", os.path.join(BABY, "words", name + ".mp3")], check=True)
         os.remove(wav)
-json.dump({"voice": "Kokoro " + VOICE, "videos": [v["id"] for v in VIDEOS], "words": len(WORDS)}, open(os.path.join(BABY, "voice.json"), "w"))
+json.dump({"voice": "Kokoro " + VOICE + " (British English)", "videos": [v["id"] for v in VIDEOS], "words": len(WORDS)}, open(os.path.join(BABY, "voice.json"), "w"))
 print("done")
