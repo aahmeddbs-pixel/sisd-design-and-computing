@@ -1,0 +1,75 @@
+OK apple          Judith (London)          En-uk-apple.ogg  [CC BY 3.0 us] Association Shtooka, Judith Franck
+OK banana         Lingua Libre (English)   LL-Q1860 (eng)-Simplificationalizer-banana.wav  [CC0] Speaker: Simplificationalizer
+Recorder: Simplificationalizer
+OK orange         Judith (London)          En-uk-orange.ogg  [CC BY 3.0 us] Association Shtooka, Judith Franck
+OK grapes         Lingua Libre (English)   LL-Q1860 (eng)-Persent101-grapes.wav  [CC BY-SA 4.0] Speaker: Persent101
+Recorder: Persent101
+OK strawberry     Lingua Libre (English)   LL-Q1860 (eng)-Xavier hillier-strawberry.wav  [CC0] Speaker: Xavier hillier
+Recorder: Xavier hillier
+OK mango          Lingua Libre (English)   LL-Q1860 (eng)-Simplificationalizer-mango.wav  [CC0] Speaker: Simplificationalizer
+Recorder: Simplificationalizer
+MISSING watermelon
+OK pear           Judith (London)          En-uk-pear.ogg  [CC BY 3.0 us] Association Shtooka, Judith Franck
+OK cherry         Judith (London)          En-uk-cherry.ogg  [CC BY 3.0 us] Association Shtooka, Judith Franck
+OK pineapple      Lingua Libre (English)   LL-Q1860 (eng)-Louisalphonse28-Pineapple.wav  [CC0] Speaker: Louisalphonse28
+Recorder: Louisalphonse28
+OK kiwi           Lingua Libre (English)   LL-Q1860 (eng)-Wodencafe-kiwi.wav  [CC0] Speaker: Wodencafe
+Recorder: Wodencafe
+OK peach          Lingua Libre (English)   LL-Q1860 (eng)-Louisalphonse28-Peach.wav  [CC0] Speaker: Louisalphonse28
+Recorder: Louisalphonse28
+OK hi             Judith (London)          En-uk-hi.ogg  [CC BY 3.0 us] Association Shtooka, Judith Franck
+OK mama           Lingua Libre (English)   LL-Q1860 (eng)-Grendelkhan-mama.wav  [CC0] Speaker: Grendelkhan
+Recorder: Grendelkhan
+OK dada           Lingua Libre (English)   LL-Q1860 (eng)-Flame, not lame-dada.wav  [CC0] Speaker: Flame, not lame
+Recorder: Flame
+OK baby           Judith (London)          En-uk-baby.ogg  [CC BY 3.0 us] Association Shtooka, Judith Franck
+OK milk           Judith (London)          En-uk-milk.ogg  [CC BY 3.0 us] Association Shtooka, Judith Franck
+OK water          Judith (London)          En-uk-water.ogg  [CC BY 3.0 us] Association Shtooka, Judith Franck
+OK ball           Lingua Libre (English)   LL-Q1860 (eng)-Wodencafe-ball.wav  [CC0] Speaker: Wodencafe
+Recorder: Wodencafe
+OK more           Judith (London)          En-uk-more.ogg  [CC BY 3.0 us] Association Shtooka, Judith Franck
+OK hug            Lingua Libre (English)   LL-Q1860 (eng)-Grendelkhan-hug.wav  [CC0] Speaker: Grendelkhan
+Recorder: Grendelkhan
+OK shoes          Judith (London)          En-uk-shoes.ogg  [CC BY 3.0 us] Association Shtooka, Judith Franck
+OK book           Judith (London)          En-uk-book.ogg  [CC BY 3.0 us] Association Shtooka, Judith Franck
+OK bath           Lingua Libre (English)   LL-Q1860 (eng)-Grendelkhan-bath.wav  [CC0] Speaker: Grendelkhan
+Recorder: Grendelkhan
+OK dog            Judith (London)          En-uk-dog.ogg  [CC BY 3.0 us] Association Shtooka, Judith Franck
+OK cat            Lingua Libre (English)   LL-Q1860 (eng)-Wodencafe-cat.wav  [CC0] Speaker: Wodencafe
+Recorder: Wodencafe
+OK cow            Lingua Libre (English)   LL-Q1860 (eng)-Grendelkhan-cow.wav  [CC0] Speaker: Grendelkhan
+Recorder: Grendelkhan
+OK duck           Lingua Libre (English)   LL-Q1860 (eng)-Grendelkhan-duck.wav  [CC0] Speaker: Grendelkhan
+Recorder: Grendelkhan
+OK sheep          Lingua Libre (English)   LL-Q1860 (eng)-Nattes à chat-sheep.wav  [CC BY-SA 4.0] Speaker: Nattes à chat
+Recorder: Nattes à chat
+OK chicken        Judith (London)          En-uk-chicken.ogg  [CC BY 3.0 us] Association Shtooka, Judith Franck
+OK fish           Judith (London)          En-uk-fish.ogg  [CC BY 3.0 us] Association Shtooka, Judith Franck
+OK bird           Lingua Libre (English)   LL-Q1860 (eng)-Muldoonsamuel55-Bird.wav  [CC0] Speaker: Muldoonsamuel55
+Recorder: Muldoonsamuel55
+MISSING sw:ndizi
+MISSING sw:embe
+MISSING sw:chungwa
+MISSING sw:nanasi
+MISSING sw:tikiti
+MISSING sw:nazi
+MISSING sw:zabibu
+MISSING sw:tufaha
+CRASH
+Traceback (most recent call last):
+  File "/home/runner/work/sisd-design-and-computing/sisd-design-and-computing/tools/sambusa-voice/human.py", line 131, in <module>
+    try: main()
+         ^^^^^^
+  File "/home/runner/work/sisd-design-and-computing/sisd-design-and-computing/tools/sambusa-voice/human.py", line 107, in main
+    VIDEOS = json.loads(js[js.index("= ") + 2: js.rstrip().rindex(";")])
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.18/x64/lib/python3.11/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.18/x64/lib/python3.11/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.18/x64/lib/python3.11/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
