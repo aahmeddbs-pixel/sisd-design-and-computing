@@ -39,13 +39,18 @@ def search(q, limit=50):
     r = api(action="query", list="search", srsearch=q, srnamespace="6", srlimit=str(limit))
     return [x["title"] for x in (r or {}).get("query", {}).get("search", [])]
 
+FEMALE = re.compile(r"female|woman|\bfemme\b", re.I)
 def find_en(w):
     cands = [f"File:En-uk-{w}.ogg", f"File:En-uk-{w}.oga", f"File:En-uk-{w.capitalize()}.ogg", f"File:En-gb-{w}.ogg"]
-    I = info(cands)
-    for t in cands:      # 1. Judith (Shtooka, London, female)
-        if t in I and re.search(r"judith|shtooka", I[t]["author"] + I[t]["desc"], re.I): return t, I[t], "Judith (London)"
-    for t in cands:      # 2. other British recordings described as a female voice
-        if t in I and re.search(r"female", I[t]["desc"], re.I): return t, I[t], "British female"
+    pat = re.compile(r"File:En-(uk|gb|us|au|ca|nz|ie)-" + re.escape(w) + r"\.(ogg|oga|wav|mp3)", re.I)
+    more = [t for q in (f'"Judith Franck" intitle:"{w}"', f'intitle:"En-uk-{w}"', f'intitle:"{w}" "Female voice"') for t in search(q) if pat.fullmatch(t)]
+    allc = list(dict.fromkeys(cands + more)); I = info(allc)
+    for t in allc:       # 1. Judith (Shtooka, London, female)
+        if t in I and re.search(r"judith", I[t]["author"] + I[t]["desc"], re.I): return t, I[t], "Judith (London)"
+    for t in allc:       # 2. other British recordings described as a female voice
+        if t in I and re.match(r"File:En-(uk|gb)", t, re.I) and FEMALE.search(I[t]["desc"]): return t, I[t], "British female"
+    for t in allc:       # 3. any English recording described as a female voice
+        if t in I and FEMALE.search(I[t]["desc"]): return t, I[t], "English female"
     ll = [t for t in search(f'intitle:"LL-Q1860 (eng)" intitle:"{w}"') if re.fullmatch(r"File:LL-Q1860 \(eng\)-[^-]+-" + re.escape(w) + r"\.wav", t, re.I)]
     if ll:
         I = info(ll[:5]); t = next((t for t in ll if t in I), None)
@@ -78,6 +83,9 @@ def main():
   for k in keys:
       w = k[3:] if k.startswith("sw:") else k
       t, I, kind = find_sw(w) if k.startswith("sw:") else find_en(w)
+      fb = os.path.join(TOOLS, "fallback", (("sw-" + w) if k.startswith("sw:") else w) + ".mp3")
+      if not t and os.path.exists(fb):
+          clips[k] = load(fb); report.append(f"NO REAL RECORDING {k}: using the earlier computer voice"); continue
       if not t: report.append(f"MISSING {k}"); continue
       ext = os.path.splitext(t)[1]; local = os.path.join(CLIPS, re.sub(r"[^a-z0-9]+", "_", k.lower()) + ext)
       data = get(I["url"], binary=True)
@@ -104,7 +112,7 @@ def main():
 
   # videos: music bed + the real word recordings at the cue times
   js = open(os.path.join(BABY, "videos.js"), encoding="utf-8").read()
-  VIDEOS = json.loads(js[js.index("= ") + 2: js.rstrip().rindex(";")])
+  m = "window.SAMBUSA_VIDEOS = "; VIDEOS = json.loads(js[js.index(m) + len(m): js.rstrip().rindex(";")])
   for v in VIDEOS:
       raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", os.path.join(BEDS, v["id"] + ".m4a"), "-f", "f32le", "-ac", "1", "-ar", str(SR), "-"], capture_output=True, check=True).stdout
       bed = np.frombuffer(raw, dtype=np.float32).copy() * 0.6
