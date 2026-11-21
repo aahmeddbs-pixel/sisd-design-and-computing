@@ -47,7 +47,7 @@ function render(app, back){
   app.innerHTML = `<button class="back" id="bk">← Home</button>
   <div class="card stack sambusa" style="border-top:6px solid #F0B040">
     <div><div class="eyebrow">Sambusa · for little ones</div><h1>🥟 Sambusa: first words and fruits</h1>
-      <p class="muted">Short, slow, happy videos for a 1-year-old. Sambusa shows a picture, says the word, claps it out, then pauses: <b>"Your turn!"</b> Say the word together, then cheer! Turn the sound up so your little one can hear Sambusa's friendly voice and copy the words.</p></div>
+      <p class="muted">Short, slow, happy videos for a 1-year-old. Sambusa shows a picture, says the word, claps it out, then pauses: <b>"Your turn!"</b> Say the word together, then cheer! Turn the sound up: a real person says each word, so your little one can hear it and copy it.</p></div>
     <div class="sbtips"><b>Tips for grown-ups</b><ul><li>Watch together and copy Sambusa: point, say the word, clap the beats.</li><li>In the "Your turn!" pause, wait and smile. Any sound or babble is a great try: cheer it!</li><li>A few minutes at a time is plenty. Repeat favourites: babies learn by repetition.</li><li>Then use the real thing: hold up a real banana and say "banana".</li></ul></div>
     ${V.map((v, i) => `<div class="sbvid"><h2>${{ "sambusa-fruits":"🍎", "sambusa-first-words":"👋", "sambusa-peekaboo":"🙈", "sambusa-animals":"🐶", "sambusa-swahili":"🇰🇪" }[v.id] || "🎬"} ${esc(v.title)}</h2><p class="muted small">${esc(v.desc)} · ${Math.round(v.dur / 60)} min</p>
       <video controls preload="none" playsinline poster="uk/baby/${esc(v.id)}.jpg" src="uk/baby/${esc(v.id)}.mp4" data-i="${i}"></video>
@@ -57,7 +57,9 @@ function render(app, back){
     <div class="lsec" id="swahili"><h2>🇰🇪 Swahili fruits</h2>
       <p class="muted small">Fruit words in Swahili, said the Mombasa way. Watch the "Swahili Fruits" video above, then tap a card to hear the word. Tap again to hear it slowly.</p>
       ${SWW.map(([g, L]) => `<div class="sbcards">${L.map(w => `<button class="sbcard" type="button" data-f="${esc(swId(w[1]))}" data-w="${esc(w[1])}" data-x="${esc(w[1])}"><span class="e">${w[0]}</span><span>${esc(w[1])}</span></button>`).join("")}</div>`).join("")}</div>
+    <details class="lsec" id="sbcredits"><summary class="small" style="font-weight:800;cursor:pointer">🎙️ Voice credits</summary><p class="muted small">Real people's voices from Wikimedia Commons (Shtooka Project and Lingua Libre), used under their free licences.</p><div class="small" id="sbcredlist">Loading…</div></details>
   </div>`;
+  fetch("uk/baby/credits.json", { cache:"no-cache" }).then(r => r.json()).then(C => { const el = app.querySelector("#sbcredlist"); if (el) el.innerHTML = C.map(c => `<div>${esc(c.word)}: <a href="${esc(c.page)}" target="_blank" rel="noopener">${esc(c.file)}</a> · ${esc(c.author)} · ${esc(c.licence)}</div>`).join(""); }).catch(() => { const el = app.querySelector("#sbcredlist"); if (el) el.textContent = ""; });
   app.querySelector("#bk").onclick = () => { hush(); back(); };
   app.querySelectorAll("video").forEach(vd => vd.addEventListener("play", () => { hush(); app.querySelectorAll("video").forEach(o => { if (o !== vd) o.pause(); }); }));
   const tapped = {}; let clip = null;
