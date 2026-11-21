@@ -33,6 +33,10 @@
 <script src="study/bank-arabic.js?v=20261114a"></script>
 <script src="study/french-verbs.js?v=20261117fr"></script>
 <script src="study/gen.js?v=20261114a"></script>
+<script src="study/g7-maths.js?v=20261121a"></script>
+<script src="study/g7-english.js?v=20261121a"></script>
+<script src="study/g7-science.js?v=20261121a"></script>
+<script src="study/g7-ins.js?v=20261121a"></script>
 <script src="study/bank30.js?v=20261120a"></script>
 <script src="study/expand.js?v=20261120a"></script>
 <style>
@@ -137,6 +141,21 @@ select.big{border:2px solid var(--line);background:var(--card);border-radius:10p
 [dir=auto]{unicode-bidi:plaintext}
 /* knowledge + modal */
 .ideas{margin:10px 0 0 20px;display:grid;gap:6px}
+.vids{border:2px solid var(--line);border-radius:14px;padding:10px 12px;margin-top:12px}.vids>summary{cursor:pointer}
+.vlist{display:grid;gap:10px;margin-top:10px}
+.vcard{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;text-decoration:none;color:inherit}
+.vplay{position:relative;border:0;padding:0;border-radius:10px;overflow:hidden;cursor:pointer;background:#000;aspect-ratio:16/9;width:150px}
+.vplay img{width:100%;height:100%;object-fit:cover;opacity:.85;display:block}.vbig{position:absolute;inset:0;display:grid;place-items:center;font-size:2rem;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.6)}
+.vlink{border:1px solid var(--line);border-radius:10px;padding:8px}.vlink:hover{border-color:var(--navy)}.vicon{font-size:2rem;text-align:center}
+.vframe{grid-column:1 / -1;position:relative;aspect-ratio:16/9;width:100%;border-radius:10px;overflow:hidden;background:#000}.vframe iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.vcard:has(.vframe){grid-template-columns:1fr}
+.trickbox{background:#E9F7EF;border-left:4px solid #1E8A55;border-radius:0 12px 12px 0;padding:10px 14px;margin-top:10px}
+.funbox{background:#FFF8E1;border-left:4px solid #F5B942;border-radius:0 12px 12px 0;padding:10px 14px;margin-top:8px}
+.lmore{border-top:2px dashed var(--line);margin-top:14px;padding-top:10px}.mex{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px}
+.spBox:empty{display:none}.spBox{margin-top:8px;white-space:normal}.spSteps{margin:6px 0 0 20px;display:grid;gap:6px}
+.spSteps li{opacity:0;transform:translateY(6px);transition:opacity .4s,transform .4s;max-height:0;overflow:hidden}
+.spSteps li.on{opacity:1;transform:none;max-height:400px}.spSteps li.cur{background:#FFF3C4;border-radius:6px;padding:2px 6px}
+.spAns{margin-top:8px;padding:8px 10px;border-radius:10px;background:#E9F7EF}.spCtl{margin-top:8px;gap:6px;align-items:center;flex-wrap:wrap}
 .example{background:var(--soft);border-left:4px solid var(--red);border-radius:0 10px 10px 0;padding:12px 14px;white-space:pre-line;font-family:inherit;margin-top:12px}
 .modal-bg{position:fixed;inset:0;background:rgba(8,15,30,.6);display:grid;place-items:center;padding:16px;z-index:60}
 .modal{background:var(--card);border-radius:var(--r);max-width:620px;width:100%;max-height:88vh;overflow:auto;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,.35)}
@@ -404,10 +423,16 @@ $("outBtn").onclick = async () => { stopWork(); await saveNow(); try { sessionSt
 const strip = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "");
 const clean = s => String(s || "").toLowerCase().replace(/[’`]/g, "'").replace(/[−–]/g, "-").replace(/\s+/g, " ").trim().replace(/[.!]$/, "").replace(/\s*([(),])\s*/g, "$1");
 function toNum(v){ const t = String(v || "").trim().replace(/[−–—]/g, "-").replace(/\s/g, "").replace(/,(\d{1,2})$/, ".$1").replace(/,/g, "").replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[a-z%°²³]+$/i, ""); if (!/^-?\d*\.?\d+$/.test(t)) return NaN; return parseFloat(t); }
+/* numbers: also accept fractions (3/8, 1 1/2) and, for probability answers, percentages (37.5%) */
+function numOf(task, given){ const g = String(given || "").trim().replace(/[−–—]/g, "-").replace(/÷/g, "/");
+  let m = /^(-?\d+)\s+(\d+)\s*\/\s*(\d+)$/.exec(g); if (m && +m[3]) return (+m[1] < 0 ? -1 : 1) * (Math.abs(+m[1]) + (+m[2]) / (+m[3]));
+  m = /^(-?\d*\.?\d+)\s*\/\s*(\d*\.?\d+)$/.exec(g); if (m && +m[2]) return (+m[1]) / (+m[2]);
+  if (task.prob){ m = /^(-?\d*\.?\d+)\s*%$/.exec(g); if (m) return (+m[1]) / 100; }
+  return toNum(given); }
 function mark(task, given){
   if (task.k === "mcq") return { ok: given === task.a };
   if (task.k === "tf") return { ok: given === task.a };
-  if (task.k === "num"){ const n = toNum(given); return { ok: !isNaN(n) && Math.abs(n - task.a) <= (task.tol || 1e-9), blank: String(given || "").trim() === "", bad: isNaN(n) }; }
+  if (task.k === "num"){ const n = numOf(task, given); return { ok: !isNaN(n) && Math.abs(n - task.a) <= (task.tol || 1e-9), blank: String(given || "").trim() === "", bad: isNaN(n) }; }
   if (task.k === "text"){
     let g = clean(given); const pre = clean(task.prefix || ""); if (pre && g.startsWith(pre)) g = g.slice(pre.length).trim();
     g = g.replace(/\s*\/\s*/g, "/");
@@ -421,7 +446,7 @@ function mark(task, given){
 function rightText(task){
   if (task.k === "mcq") return task.o[task.a];
   if (task.k === "tf") return task.a ? "True" : "False";
-  if (task.k === "num") return String(task.a);
+  if (task.k === "num") return task.show || String(task.a);
   if (task.k === "text") return (task.prefix || "") + (task.best || task.a[0]);
   return "";
 }
@@ -538,13 +563,20 @@ function setIntro(s, t, X){
 function showKnowledge(s, t, gate){
   const T = topicOf(s, t), rtl = S[s].rtl;
   modal(`<div class="eyebrow">${esc(S[s].name)} · Key knowledge</div><h3 style="margin-top:4px">${esc(T.title)}</h3>
+    ${videoBox(T.learn.videos, true)}
     <ul class="ideas">${T.learn.ideas.map(x => ideaLi(x, s)).join("")}</ul>
-    <div class="example" dir="auto"><b>Worked example</b>${sayBtns(T.learn.example, s)}\n${esc(T.learn.example)}</div>
+    ${T.learn.trick ? `<div class="trickbox"><b>🧠 Memory trick:</b> ${esc(T.learn.trick)}</div>` : ""}${T.learn.fun ? `<div class="funbox"><b>🤩 Did you know?</b> ${esc(T.learn.fun)}</div>` : ""}
+    <div class="example" dir="auto"><b>Worked example</b>${sayBtns(T.learn.example, s)} ${T.learn.more ? `<button class="btn sm ghost spBtn" data-sp="ex">▶ Watch it step by step</button>` : ""}\n${esc(T.learn.example)}</div>
+    ${(T.learn.more || []).length ? `<div class="lmore"><b>✏️ More worked examples</b> <span class="muted small">Press ▶ to watch each solution build up step by step (with narration). Try it yourself first!</span>${T.learn.more.map((m, j) => `<div class="mex"><div dir="auto"><b>${j + 1}.</b> ${esc(m.q)}</div><div class="row" style="margin-top:6px"><button class="btn sm spBtn" data-sp="${j}">▶ Watch the solution</button><button class="btn sm ghost spAll" data-sp="${j}">Show all steps</button></div><div class="spBox" id="sp${j}"></div></div>`).join("")}</div>` : ""}
     ${verbBox(s, t)}${linksBox(s, t)}
     ${gate ? `<label class="agree"><input type="checkbox" id="kRead"> I have read the key knowledge and the worked example.</label>` : ""}
     <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn sm ghost" id="kSay">🔊 Read aloud</button><button class="btn" id="kGo" ${gate ? "disabled" : ""}>${gate ? "Start the tasks →" : "Close"}</button></div>`);
   if (gate) $("kRead").onchange = e => $("kGo").disabled = !e.target.checked;
   $("kSay").onclick = () => say(T.title + ". " + T.learn.ideas.join(" ") + " Worked example. " + T.learn.example, rtl);
+  wireVideos();
+  document.querySelectorAll(".modal .spBtn, .modal .spAll").forEach(b => b.onclick = () => { const j = b.dataset.sp, all = b.classList.contains("spAll");
+    if (j === "ex"){ const L = String(T.learn.example).split("\n"); return stepPlayer(b.closest(".example"), L[0], L.slice(1), "", all, true); }
+    const m = T.learn.more[+j]; stepPlayer($("sp" + j), m.q, m.steps, m.a, all); });
   $("kGo").onclick = () => { hush(); closeModal(); if (gate){ tstate(s, t).read = true; save(); render(); const X = run(s, t); if (X.r > 1 && !Object.keys(X.o.ans).length) setIntro(s, t, X); } };
 }
 function say(text, rtl){ const s = VIEW && VIEW.s; if (window.SPX) return SPX.speak(text, s ? LANG(s) : "en"); try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(String(text).replace(/[→←✓]/g, " ")); u.lang = "en-GB"; u.rate = .95; speechSynthesis.speak(u); } catch(e){} }
@@ -560,6 +592,32 @@ function linksBox(s, t){ return hasSPX() ? SPX.linksHTML(linkCtx(s, t)) : ""; }
 function verbBox(s, t){ const T = topicOf(s, t) || {}, L = T.learn || {}; if (!hasSPX() || !L.verbs) return "";
   return (L.pron ? `<div class="spxpron"><b>👄 Pronunciation help</b><ul class="ideas">${L.pron.map(x => ideaLi(x, s)).join("")}</ul></div>` : "") + SPX.verbsHTML(L.verbs, S[s].verbLevel || "core"); }
 
+/* ---------- videos: YouTube plays inside the page (privacy-enhanced mode, loads only when pressed); other lessons open in a new tab ---------- */
+function videoBox(V, open){ if (!V || !V.length) return "";
+  return `<details class="vids" ${open ? "open" : ""}><summary><b>🎬 Watch and learn</b> <span class="muted small">${V.length} video lesson${V.length > 1 ? "s" : ""} on this topic</span></summary><div class="vlist">${V.map(v => v.yt
+    ? `<div class="vcard"><button class="vplay" data-yt="${esc(v.yt)}" aria-label="Play ${esc(v.title)}"><img src="https://i.ytimg.com/vi/${esc(v.yt)}/mqdefault.jpg" alt="" loading="lazy"><span class="vbig">▶</span></button><div class="vt"><b>${esc(v.title)}</b><br><span class="muted small">${esc(v.by || "")} · plays here</span></div></div>`
+    : `<a class="vcard vlink" href="${esc(v.url)}" target="_blank" rel="noopener"><span class="vicon">🎥</span><span class="vt"><b>${esc(v.title)}</b><br><span class="muted small">${esc(v.by || "")} · opens in a new tab</span></span></a>`).join("")}</div><p class="muted small" style="margin-top:6px">Watch first, then read the key ideas below. Pause and take notes!</p></details>`; }
+function wireVideos(){ document.querySelectorAll(".modal .vplay").forEach(b => b.onclick = () => { const id = b.dataset.yt; b.outerHTML = `<div class="vframe"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?rel=0&modestbranding=1&autoplay=1" title="Video lesson" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`; }); }
+/* ---------- step-by-step solution player: each step appears in turn and is read aloud, like a short video ---------- */
+function solSteps(x){ const L = String(x || "").split("\n").map(v => v.trim()).filter(Boolean); if (L.length > 1) return L; return String(x || "").split(/(?<=[.!?])\s+(?=[A-Z0-9(“"'])/).map(v => v.trim()).filter(Boolean); }
+let SPT = null;
+function stepPlayer(host, title, steps, ans, all, inline){ clearTimeout(SPT); hush(); if (!host) return;
+  let box = inline ? host.querySelector(".spInline") : host; if (inline && !box){ box = document.createElement("div"); box.className = "spInline spBox"; host.appendChild(box); }
+  let i = all ? steps.length : 0, playing = !all;
+  const draw = () => { box.innerHTML = `<ol class="spSteps">${steps.map((st, j) => `<li class="${j < i ? "on" : ""}${j === i - 1 && playing ? " cur" : ""}" dir="auto">${esc(st)}</li>`).join("")}</ol>${i >= steps.length && ans ? `<div class="spAns">✅ Answer: <b dir="auto">${esc(ans)}</b></div>` : ""}
+    <div class="row spCtl"><button class="btn sm ghost" data-a="prev" ${i <= 1 ? "disabled" : ""}>⏮ Back</button><button class="btn sm" data-a="toggle">${playing ? "⏸ Pause" : i >= steps.length ? "↺ Replay" : "▶ Play"}</button><button class="btn sm ghost" data-a="next" ${i >= steps.length ? "disabled" : ""}>Next step ⏭</button><span class="muted small">Step ${Math.min(i, steps.length)} of ${steps.length}</span></div>`;
+    box.querySelectorAll("[data-a]").forEach(b => b.onclick = () => { const a = b.dataset.a;
+      if (a === "prev"){ playing = false; clearTimeout(SPT); hush(); i = Math.max(1, i - 1); }
+      else if (a === "next"){ playing = false; clearTimeout(SPT); hush(); i = Math.min(steps.length, i + 1); say(steps[i - 1]); }
+      else if (playing){ playing = false; clearTimeout(SPT); hush(); }
+      else { if (i >= steps.length) i = 0; playing = true; return tick(); }
+      draw(); }); };
+  const tick = () => { if (!playing) return; if (i >= steps.length){ playing = false; draw(); return; } i++; draw(); const st = steps[i - 1]; say(st);
+    SPT = setTimeout(tick, Math.min(9000, 1800 + st.length * 55)); };
+  if (title && inline === undefined){ /* nothing */ }
+  if (all) draw(); else tick();
+  try { box.scrollIntoView({ block:"nearest", behavior:"smooth" }); } catch(e){}
+}
 function hush(){ try { if (window.SPX) SPX.hush(); else speechSynthesis.cancel(); } catch(e){} }
 
 /* ---------- one task at a time ---------- */
@@ -605,7 +663,7 @@ const lvlTag = t => (t.review ? `<span class="lvl rv" style="margin:0 6px 0 0">�
 function answerUI(task, rtl, r){
   if (task.k === "mcq") return `<div class="opts">${order(task, r).map(j => `<button class="opt" data-o="${j}" aria-pressed="false" dir="auto">${esc(task.o[j])}</button>`).join("")}</div>`;
   if (task.k === "tf") return `<div class="opts" style="grid-template-columns:1fr 1fr"><button class="opt" data-o="t" aria-pressed="false">True</button><button class="opt" data-o="f" aria-pressed="false">False</button></div>`;
-  const ph = task.k === "num" ? "Type a number" : "Type your answer";
+  const ph = task.k === "num" ? (task.prob ? "Type a fraction (3/8), a decimal or a %" : "Type a number") : "Type your answer";
   return `<div class="ans">${task.prefix ? `<span class="pre">${esc(task.prefix)}</span>` : ""}<input id="inp" ${task.k === "num" ? 'inputmode="decimal"' : 'autocapitalize="off"'} autocomplete="off" spellcheck="false" placeholder="${ph}" dir="auto"></div>`;
 }
 function wireAnswer(task){
@@ -688,7 +746,8 @@ function hintsFor(s, t, task){
   }
   return H.concat(h).filter((v, i, a) => v && a.indexOf(v) === i).concat(["Think about what the question is really asking, and try your best answer."]).slice(0, HINTS_MAX);
 }
-function rangeHint(task){ const v = +task.a, w = Math.max(1, Math.abs(v) * 0.25), nice = x => Math.abs(x) >= 10 ? Math.round(x) : Math.round(x * 10) / 10;
+function rangeHint(task){ if (task.prob){ const v = +task.a, lo = Math.max(0, Math.round((v - 0.12) * 100) / 100), hi = Math.min(1, Math.round((v + 0.13) * 100) / 100); return `Check your working: the probability is between ${lo} and ${hi}. Remember it can never be below 0 or above 1.`; }
+  const v = +task.a, w = Math.max(1, Math.abs(v) * 0.25), nice = x => Math.abs(x) >= 10 ? Math.round(x) : Math.round(x * 10) / 10;
   let lo = nice(v - w * (0.4 + (Math.abs(Math.round(v * 7)) % 5) / 10)), hi = nice(v + w * (0.4 + (Math.abs(Math.round(v * 3)) % 5) / 10)); if (lo === v) lo = nice(v - w); if (hi === v) hi = nice(v + w);
   return `Check your working: the answer is between ${String(lo).replace("-", "−")} and ${String(hi).replace("-", "−")}.`; }
 function hintKey(s, t, r, i){ return s + "/" + t + "/" + r + "/" + i; }
@@ -748,10 +807,13 @@ function explain(task, rec, rtl){
     <h3 style="margin-top:4px" dir="auto">${esc(task.q)}</h3>
     ${rec.ok || rec.sol ? "" : `<p style="margin-top:8px"><span class="pill bad">Your answer</span> <span dir="auto">${esc(givenText(task, rec.g)) || "—"}</span></p>`}
     <p style="margin-top:8px"><span class="pill ok">Correct answer</span> <span dir="auto">${esc(rightText(task))}</span>${VIEW && VIEW.s ? sayBtns(rightText(task), VIEW.s) : ""}</p>
-    <div class="example" dir="auto"><b>💡 Explanation and example</b>${VIEW && VIEW.s ? sayBtns(task.x, VIEW.s) : ""}\n${esc(task.x || autoX(task))}</div>
+    <div class="example" dir="auto"><b>💡 Explanation and example</b>${VIEW && VIEW.s ? sayBtns(task.x, VIEW.s) : ""} <button class="btn sm ghost" id="xPlay">▶ Watch the solution step by step</button>\n${esc(task.x || autoX(task))}</div>
+    ${VIEW && VIEW.s && VIEW.t && topicOf(VIEW.s, VIEW.t).learn.videos ? videoBox(topicOf(VIEW.s, VIEW.t).learn.videos, false) : ""}
     ${VIEW && VIEW.s && VIEW.t ? linksBox(VIEW.s, VIEW.t) : ""}
     <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn sm ghost" id="xSay">🔊 Read aloud</button><button class="btn" id="xOk">Got it</button></div>`);
   $("xSay").onclick = () => say(task.x || autoX(task), rtl);
+  $("xPlay").onclick = () => stepPlayer($("xPlay").closest(".example"), "Solution", solSteps(task.x || autoX(task)), rightText(task), false, true);
+  wireVideos();
   $("xOk").onclick = () => { hush(); closeModal(); };
 }
 
@@ -863,7 +925,7 @@ function modal(html){
   $("mClose").onclick = closeModal;
   $("modalRoot").querySelector(".modal-bg").addEventListener("click", e => { if (e.target.classList.contains("modal-bg")) closeModal(); });
 }
-function closeModal(){ hush(); $("modalRoot").innerHTML = ""; }
+function closeModal(){ clearTimeout(SPT); hush(); $("modalRoot").innerHTML = ""; }
 document.addEventListener("keydown", e => { if (e.key === "Escape" && $("modalRoot").innerHTML) closeModal(); });
 function toast(m){ const d = document.createElement("div"); d.className = "toast"; d.textContent = m; document.body.appendChild(d); setTimeout(() => d.remove(), 3200); }
 
