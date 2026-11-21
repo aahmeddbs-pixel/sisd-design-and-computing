@@ -1,0 +1,32 @@
+name: Sambusa voice
+# Records a natural female voice (Kokoro, af_heart) into the Sambusa baby videos and picture cards, then commits them.
+# Only writes inside uk/baby. Runs when the voice script changes, or by hand from the Actions tab.
+on:
+  push:
+    branches: [main]
+    paths: ['tools/sambusa-voice/**']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: sambusa-voice
+jobs:
+  voice:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: sudo apt-get update && sudo apt-get install -y espeak-ng ffmpeg
+      - run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install "kokoro>=0.9.4" soundfile numpy
+      - run: python tools/sambusa-voice/voice.py
+      - run: |
+          git config user.name "sambusa-voice-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add uk/baby
+          git commit -m "Sambusa: natural female voice added to the videos and picture cards" || exit 0
+          git pull --rebase origin main
+          git push origin HEAD:main
