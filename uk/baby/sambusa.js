@@ -11,7 +11,7 @@ const WORDS = [
   ["First words", [["👋","hi","Hi! Wave hi!"],["👩","mama","Mama"],["👨","dada","Dada"],["👶","baby","Baby"],["🥛","milk","Milk"],["💧","water","Water"],["⚽","ball","Ball"],["🍪","more","More, please!"],["🤗","hug","A big hug"],["👟","shoes","Shoes"],["📖","book","Book"],["🛁","bath","Bath time"]]],
   ["Animals", [["🐶","dog","The dog says woof woof"],["🐱","cat","The cat says meow"],["🐮","cow","The cow says moo"],["🦆","duck","The duck says quack quack"],["🐑","sheep","The sheep says baa"],["🐔","chicken","The chicken says cluck cluck"],["🐟","fish","Fish"],["🐦","bird","The bird says tweet tweet"]]]];
 
-let voice = null;
+let voice = null, clip0 = null;
 function pickVoice(){
   try { const L = speechSynthesis.getVoices(); if (!L.length) return;
     const want = ["Google UK English Female", "Samantha", "Serena", "Karen", "Moira", "Tessa", "Microsoft Libby", "Microsoft Sonia", "Microsoft Aria", "Microsoft Jenny", "Google US English"];
@@ -21,7 +21,7 @@ try { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; } catch(e){}
 function speak(text, slow){
   try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); if (voice) u.voice = voice; u.lang = voice ? voice.lang : "en-GB"; u.rate = slow ? .7 : .85; u.pitch = 1.25; speechSynthesis.speak(u); } catch(e){}
 }
-function hush(){ try { speechSynthesis.cancel(); } catch(e){} }
+function hush(){ try { speechSynthesis.cancel(); } catch(e){} try { if (clip0) clip0.pause(); } catch(e){} }
 
 /* speak each cue as the video passes it; skip cues jumped over by seeking */
 function wire(video, cues, toggle){
@@ -42,21 +42,23 @@ function render(app, back){
   app.innerHTML = `<button class="back" id="bk">← Home</button>
   <div class="card stack sambusa" style="border-top:6px solid #F0B040">
     <div><div class="eyebrow">Sambusa · for little ones</div><h1>🥟 Sambusa: first words and fruits</h1>
-      <p class="muted">Short, slow, happy videos for a 1-year-old. Sambusa shows a picture, says the word, claps it out, then pauses: <b>"Your turn!"</b> Say the word together, then cheer! Turn the sound up: Sambusa's voice comes from this device and plays in time with the video.</p></div>
+      <p class="muted">Short, slow, happy videos for a 1-year-old. Sambusa shows a picture, says the word, claps it out, then pauses: <b>"Your turn!"</b> Say the word together, then cheer! Turn the sound up so your little one can hear Sambusa's friendly voice and copy the words.</p></div>
     <div class="sbtips"><b>Tips for grown-ups</b><ul><li>Watch together and copy Sambusa: point, say the word, clap the beats.</li><li>In the "Your turn!" pause, wait and smile. Any sound or babble is a great try: cheer it!</li><li>A few minutes at a time is plenty. Repeat favourites: babies learn by repetition.</li><li>Then use the real thing: hold up a real banana and say "banana".</li></ul></div>
     ${V.map((v, i) => `<div class="sbvid"><h2>${["🍎","👋","🙈","🐶"][i] || "🎬"} ${esc(v.title)}</h2><p class="muted small">${esc(v.desc)} · ${Math.round(v.dur / 60)} min</p>
       <video controls preload="none" playsinline poster="uk/baby/${esc(v.id)}.jpg" src="uk/baby/${esc(v.id)}.mp4" data-i="${i}"></video>
-      <button class="btn sm ghost sbvoice" data-i="${i}" type="button"></button></div>`).join("")}
+</div>`).join("")}
     <div class="lsec"><h2>👆 Tap and say</h2><p class="muted small">Tap a picture to hear the word. Tap again to hear it slowly.</p>
       ${WORDS.map(([g, L]) => `<h3 style="margin-top:12px">${esc(g)}</h3><div class="sbcards">${L.map(w => `<button class="sbcard" type="button" data-w="${esc(w[1])}" data-x="${esc(w[2])}"><span class="e">${w[0]}</span><span>${esc(w[1])}</span></button>`).join("")}</div>`).join("")}</div>
   </div>`;
   app.querySelector("#bk").onclick = () => { hush(); back(); };
-  app.querySelectorAll("video").forEach(vd => { const i = +vd.dataset.i; wire(vd, V[i].cues, app.querySelector(`.sbvoice[data-i="${i}"]`));
-    vd.addEventListener("play", () => app.querySelectorAll("video").forEach(o => { if (o !== vd) o.pause(); })); });
-  const tapped = {};
+  app.querySelectorAll("video").forEach(vd => vd.addEventListener("play", () => { hush(); app.querySelectorAll("video").forEach(o => { if (o !== vd) o.pause(); }); }));
+  const tapped = {}; let clip = null;
   app.querySelectorAll(".sbcard").forEach(b => b.onclick = () => { const w = b.dataset.w, n = tapped[w] = (tapped[w] || 0) + 1;
     b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop");
-    speak(n % 2 ? w + "! " + b.dataset.x + "." : w + ". " + w + ".", n % 2 === 0); });
+    /* the recorded voice (same lady as the videos); the device's voice only if the recording can't play */
+    const slow = n % 2 === 0; hush();
+    clip = clip0 = new Audio("uk/baby/words/" + encodeURIComponent(w) + (slow ? "-slow" : "") + ".mp3");
+    clip.play().catch(() => speak(slow ? w + ". " + w + "." : w + "! " + b.dataset.x + ".", slow)); });
 }
 window.SAMBUSA = { render, hush };
 })();
