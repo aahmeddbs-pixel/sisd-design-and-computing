@@ -10,7 +10,7 @@
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
 <script src="/python-pathways/pp-sync.js?v=20261118sy"></script>
 <script src="/python-pathways/answers-view.js?v=20261112all"></script>
-<script src="sdc.js?v=20261118g10"></script>
+<script src="sdc.js?v=20261123ul"></script>
 <script src="/python-pathways/game-dev-data.js?v=20261116gd"></script>
 <script src="study/maths.js?v=20261110a"></script>
 <script src="study/english.js?v=20261110a"></script>
@@ -160,7 +160,7 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
         <h2><span id="stTitle">Students</span> <span class="n" id="stCount">0</span></h2>
         <p class="muted small" style="margin-top:4px" id="stIntro">Open a student to see their progress and send them feedback. Press <b>🔀 Move teacher / class</b> if a student chose the wrong teacher or class, or <b>✏️ Change course</b> to change their course, grade or level.</p>
         <div id="stWarn"></div>
-        <div id="resetBox"></div>
+        <div id="resetBox"></div><div id="unlockBox"></div>
         <div id="slowBox"></div>
         <div id="vwait"></div>
         <div id="dreq"></div>
@@ -1549,6 +1549,29 @@ function renderResets(){
     ROWS.push({ sdc:1, type:"resetdismiss", when:Date.now(), acct:a }); renderResets(); });
 }
 
+/* ---------- students locked out after too many wrong PINs / passwords, asking to be unlocked now ---------- */
+function renderUnlocks(){
+  const box = $("unlockBox"); if (!box) return;
+  const req = {}, done = {};
+  ROWS.forEach(r => { if (!r.acct || !(r.acct.email || r.acct.name)) return; const cs = (r.acct.course || "") === "cs", k = SDC.keyOf(r.acct.email || "", r.acct.email ? "" : r.acct.name) + (cs ? "#cs" : "#ds");
+    if (r.type === "unlockrequest" && Date.now() - r.when < 86400000 && (!req[k] || req[k].when < r.when)) req[k] = Object.assign({ k, cs }, r);
+    if (r.type === "unlockdone" || r.type === "unlockdismiss") done[k] = Math.max(done[k] || 0, r.when); });
+  const list = Object.values(req).filter(r => !(done[r.k] >= r.when)).filter(r => canSee(r.acct.teacher)).sort((a, b) => b.when - a.when);
+  if (!list.length){ box.innerHTML = ""; return; }
+  box.innerHTML = `<div class="card" style="margin:10px 0;border-left:6px solid #F0C64A;padding:14px 16px"><h3 style="margin:0">🔓 Unlock requests (${list.length})</h3>
+    <p class="small muted" style="margin:4px 0 8px">These students typed a wrong PIN or password too many times and were told to wait. Press <b>Unlock now</b> and they can try again straight away (their sign-in page unlocks by itself within a few seconds). If they've forgotten it, use <b>Reset</b> instead.</p>
+    <div class="scroll"><table class="tbl"><tr><th>Student</th><th>Course</th><th>Asked</th><th></th></tr>${list.map((r, i) => `<tr><td><b>${esc(r.acct.name || r.acct.email)}</b><div class="em">${esc(r.acct.email || "")}${r.acct.teacher ? " · " + esc(r.acct.teacher) : ""}</div></td>
+      <td>${pill(r.cs ? "cs" : (r.acct.course || "design"))} ${r.cs ? "PIN" : "password"}</td><td class="small">${esc(fmtDT(r.when))}</td>
+      <td><div class="acts"><button class="btn sm" data-ul="${i}">🔓 Unlock now</button><button class="btn ghost sm" data-ulx="${i}">Dismiss</button></div></td></tr>`).join("")}</table></div></div>`;
+  box.querySelectorAll("[data-ul]").forEach(b => b.onclick = async () => { const r = list[+b.dataset.ul], a = r.acct; b.disabled = true; b.textContent = "Unlocking…";
+    try { const at = Date.now(); for (const id of await SDC.lockIds(a.email || "", a.name || "")) SDC.sendRow("U", id, await signAssign({ k:id, unlock:true, at }));
+      SDC.flush(); SDC.log("unlockdone", { name:a.name, email:a.email, course:a.course, teacher:a.teacher }, { by: isSuper() ? "(admin)" : (ME && ME.name) || "" });
+      ROWS.push({ sdc:1, type:"unlockdone", when:at, acct:a }); toast("Unlocked: " + (a.name || a.email) + " can try again now."); renderUnlocks();
+    } catch(e){ b.disabled = false; b.textContent = "🔓 Unlock now"; toast(e.message || "Couldn't unlock just now. Try again."); } });
+  box.querySelectorAll("[data-ulx]").forEach(b => b.onclick = () => { const r = list[+b.dataset.ulx], a = r.acct;
+    SDC.log("unlockdismiss", { name:a.name, email:a.email, course:a.course, teacher:a.teacher }, { by: isSuper() ? "(admin)" : (ME && ME.name) || "" });
+    ROWS.push({ sdc:1, type:"unlockdismiss", when:Date.now(), acct:a }); renderUnlocks(); });
+}
 /* ---------------- teachers (super admin) ---------------- */
 let VSTAT = {};
 async function renderTeachers(){
@@ -1851,7 +1874,7 @@ function renderStudy(){
       <div class="scroll" style="margin-top:6px"><table class="tbl"><tr><th>When</th><th>Topic</th><th>Score</th><th>Effort</th><th>Work time</th><th>Strengths and gaps</th></tr>${recent || `<tr><td colspan="6" class="muted">No finished topics yet.</td></tr>`}</table></div>
     </div>`; }).join("");
 }
-function renderAll(){ setTimeout(lessonPopups, 800); setTimeout(purgeNamed, 1500); renderHP(); renderResets(); renderSlow(); renderVerifyWaiting(); renderDesignRequests(); renderStudents(); renderLog(); try { renderStudy(); } catch(e){} try { renderGameDev(); } catch(e){} setTimeout(healDeletes, 1500); }
+function renderAll(){ setTimeout(lessonPopups, 800); setTimeout(purgeNamed, 1500); renderHP(); renderResets(); renderUnlocks(); renderSlow(); renderVerifyWaiting(); renderDesignRequests(); renderStudents(); renderLog(); try { renderStudy(); } catch(e){} try { renderGameDev(); } catch(e){} setTimeout(healDeletes, 1500); }
 /* ---------- students who signed up but can't get in because they haven't verified their email ---------- */
 /* ---------- students who've been stuck on one task for a long time (after two reminders on their screen) ---------- */
 function renderSlow(){

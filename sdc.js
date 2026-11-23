@@ -540,6 +540,48 @@ async function forgot(r){
   let te = ""; try { te = r.teacher ? await teacherEmailFor(r.teacher) : ""; } catch(e){}
   try { const x = await jsonp({ a:"notify", k:"reset-request", e:email, n:name, c, te }, 20000); return { ok:true, emailed: !!(x && x.ok) }; } catch(e){ return { ok:true, emailed:false }; }
 }
+/* ---------- locked out after too many wrong PINs / passwords ----------
+   The student can ask their teacher to unlock now instead of waiting. The request goes to the staff dashboard
+   ("Unlock requests"). The teacher presses Unlock now, which posts a signed unlock; the student's sign-in page
+   checks for it every few seconds and lets them try again straight away. */
+async function lockIds(email, name){ const e = normEmail(email || ""), n = String(name || "").trim(); const ids = new Set();
+  try { ids.add(await idOf(e, n)); } catch(x){} try { if (e) ids.add(await idOf(e, "")); } catch(x){} try { if (n) ids.add(await idOf("", n)); } catch(x){}
+  return [...ids]; }
+function unlockRequest(r){
+  const email = normEmail(r.email || ""), c = r.course === "cs" ? "cs" : r.course === "it" ? "it" : "design";
+  log("unlockrequest", { name:String(r.name || "").slice(0, 80), email, course:c, teacher:r.teacher || "", grade:r.grade || "" }, { unlock:{ course:c } });
+  try { flush(); } catch(e){}
+  return true;
+}
+/* the newest unlock time the teacher has sent for this student (0 = none) */
+async function unlockedAt(email, name){
+  let best = 0;
+  for (const id of await lockIds(email, name)){ let R = []; try { R = await rows("U", id, 5); } catch(e){}
+    for (const r of R){ const o = await verify(r.text); if (o && o.k === id && o.unlock && +o.at > best) best = +o.at; } }
+  return best;
+}
+/* the "ask my teacher to unlock now" box under a lock-out message. o = { course, email, name, teacher, since, onUnlock } */
+function lockHelp(box, o){
+  if (!box) return; o = o || {}; const prev = box.querySelector(".sdcUnlock"); if (prev) prev.remove();
+  const d = document.createElement("div"); d.className = "sdcUnlock";
+  d.style.cssText = "margin-top:10px;padding:12px 14px;border-radius:12px;background:#FFF7E0;border:1.5px solid #F0C64A;color:#16223A;font-size:14.5px;line-height:1.45;text-align:left";
+  const key = "sdc_unlockreq_" + normEmail(o.email || o.name || ""); let asked = 0; try { asked = +sessionStorage.getItem(key) || 0; } catch(e){}
+  const draw = () => {
+    d.innerHTML = asked ? `⏳ <b>Request sent to your teacher.</b> When they press <b>Unlock now</b>, you can try again straight away. Keep this page open: it unlocks by itself.`
+      : `<b>Don't want to wait?</b> Ask your teacher to unlock your account now, so you can try again straight away.<br><button type="button" class="sdcUnlockGo" style="margin-top:8px;background:#1B2D4E;color:#fff;border:0;border-radius:10px;padding:9px 16px;font:inherit;font-weight:800;cursor:pointer">🔓 Ask my teacher to unlock now</button>`;
+    const b = d.querySelector(".sdcUnlockGo"); if (b) b.onclick = () => { unlockRequest(o); asked = Date.now(); try { sessionStorage.setItem(key, String(asked)); } catch(e){} draw(); };
+  };
+  draw(); box.appendChild(d);
+  const since = +o.since || Date.now() - 15 * 60000;
+  const tick = async () => {
+    if (!d.isConnected) return;
+    if (asked){ let t = 0; try { t = await unlockedAt(o.email, o.name); } catch(e){}
+      if (t > since){ d.style.background = "#E7F6EE"; d.style.borderColor = "#1E8A55"; d.innerHTML = "✅ <b>Your teacher has unlocked your account.</b> Try again now.";
+        try { sessionStorage.removeItem(key); } catch(e){} try { o.onUnlock && o.onUnlock(t); } catch(e){} return; } }
+    setTimeout(tick, asked ? 8000 : 4000);
+  };
+  setTimeout(tick, 1500);
+}
 async function resetDone(r){
   if (!VERIFY.url || offline()) return false;
   try { const x = await jsonp({ a:"notify", k:"reset-done", e:normEmail(r.email), n:String(r.name || "").slice(0, 80), c:r.course || "design", s:String(r.secret || "") }, 20000); return !!(x && x.ok); } catch(e){ return false; }
@@ -1516,7 +1558,7 @@ const watch = (() => {
   return { on: f => { fn = f; setTimeout(check, 20000); }, check };
 })();
 return { jsonp, PORTAL, COURSES, g10Pair, studyPlusOK, studyPlusEmail, studyReport, STUDY_PLUS, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
-  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, forgot, forgotDialog, resetDone, emailCode, checkCode, usernameOf, isUsername, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, gloss, listen, stopReading, speak, slow, live, watchAssign: f => watch.on(f), rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
+  log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, forgot, forgotDialog, resetDone, unlockRequest, unlockedAt, lockHelp, lockIds, emailCode, checkCode, usernameOf, isUsername, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, gloss, listen, stopReading, speak, slow, live, watchAssign: f => watch.on(f), rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();
 
 /* ---------- Readable everywhere: light mode, dark mode, any screen ----------
