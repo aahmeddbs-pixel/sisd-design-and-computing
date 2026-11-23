@@ -1668,3 +1668,33 @@ return { jsonp, PORTAL, COURSES, g10Pair, studyPlusOK, studyPlusEmail, studyRepo
   window.SDC_INK = { rescan: () => queue(null, true) };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
 })();
+/* ---------- show password: an eye button in every password / PIN box (all pages, pop-ups too) ----------
+   Pressing the eye shows what was typed for 2 seconds, then hides it again. */
+(function(){
+  const EYE = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const EYE_OFF = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 19C5 19 1 12 1 12a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+  function add(inp){
+    if (inp.dataset.sdcEye || inp.dataset.noeye != null || !inp.parentNode) return; inp.dataset.sdcEye = "1";
+    const cs = getComputedStyle(inp), wrap = document.createElement("span"), full = cs.display === "block" || /^100%$/.test(inp.style.width) || inp.offsetWidth >= (inp.parentNode.clientWidth || 1) - 4;
+    wrap.className = "sdcEyeWrap"; wrap.style.cssText = "position:relative;display:" + (full ? "block" : "inline-block") + ";" + (full ? "width:100%;" : "") + "margin:" + cs.marginTop + " " + cs.marginRight + " " + cs.marginBottom + " " + cs.marginLeft;
+    inp.parentNode.insertBefore(wrap, inp); wrap.appendChild(inp);
+    inp.style.margin = "0"; if (full) inp.style.width = "100%";
+    inp.style.paddingRight = Math.max(parseFloat(cs.paddingRight) || 0, 42) + "px";
+    const b = document.createElement("button"); b.type = "button"; b.className = "sdcEye"; b.tabIndex = 0;
+    b.setAttribute("aria-label", "Show password for 2 seconds"); b.title = "Show password for 2 seconds"; b.innerHTML = EYE;
+    b.style.cssText = "position:absolute;right:6px;top:50%;transform:translateY(-50%);width:34px;height:34px;display:flex;align-items:center;justify-content:center;border:0;border-radius:8px;background:transparent;color:#5B6782;cursor:pointer;padding:0;z-index:2";
+    let t = null;
+    const hide = () => { clearTimeout(t); t = null; if (inp.type === "text") inp.type = "password"; b.innerHTML = EYE; b.style.color = "#5B6782"; b.setAttribute("aria-label", "Show password for 2 seconds"); };
+    b.onmousedown = e => e.preventDefault();   // keep the cursor in the box
+    b.onclick = e => { e.preventDefault(); e.stopPropagation(); if (t){ hide(); return; }
+      inp.type = "text"; b.innerHTML = EYE_OFF; b.style.color = "#DC2B3E"; b.setAttribute("aria-label", "Hide password"); t = setTimeout(hide, 2000); };
+    if (inp.form) inp.form.addEventListener("submit", hide, true);
+    wrap.appendChild(b);
+  }
+  const scan = root => { try { (root.querySelectorAll ? root : document).querySelectorAll('input[type="password"]').forEach(add); if (root.matches && root.matches('input[type="password"]')) add(root); } catch(e){} };
+  function start(){ scan(document);
+    new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1) scan(n); }))).observe(document.documentElement, { childList:true, subtree:true });
+    document.addEventListener("focusin", e => { if (e.target && e.target.matches && e.target.matches('input[type="password"]')) add(e.target); });   // boxes switched to password later
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
+})();
