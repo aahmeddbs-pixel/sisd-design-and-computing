@@ -61,3 +61,7 @@ One sign-in page for SISD's Computer Science (Python Pathways), Design and IT co
 - Once signed in, **Change course ▾** shows **Switch to IT** / **Switch to Design**. Switching saves and sends the current work first and does not ask for a new sign-in.
 - Each course keeps its own units and work; the unit last open in each course is remembered. Every switch is logged to the teacher log (`switchcourse`), and the staff dashboard shows "also IT" / "also Design".
 - Applies to Grade 10 only (`g10Pair` in `sdc.js`, `g10Both` / `g10Switch` in the Design course). Other grades are unchanged.
+
+## Targeted practice from student reports (23 Nov 2026)
+- `study/fix-gaps.js` and `uk/fix-gaps.js` add worked examples and extra questions aimed at the mistakes in the latest Study Plus reports: Forces and motion (multiply vs divide, mass vs weight, Hooke's law), Probability basics (adding balls to reach a probability), Elements, compounds and mixtures (spotting mixtures, separation methods), Punctuation (plural possession, semicolons in lists), Year 8 Digestion (enzyme products, large intestine) and Density (volume = mass ÷ density, g/cm³ → kg/m³).
+- Both load after `study/expand.js`, so new questions go on the end of each pool and saved sets keep pointing at the right questions.
