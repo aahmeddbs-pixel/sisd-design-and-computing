@@ -8,7 +8,7 @@
 <meta name="color-scheme" content="light dark">
 <meta name="robots" content="noindex">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
-<script src="/python-pathways/pp-sync.js?v=20261118sy"></script>
+<script src="/python-pathways/pp-sync.js?v=20261123fast"></script>
 <script src="/python-pathways/answers-view.js?v=20261112all"></script>
 <script src="sdc.js?v=20261123eye"></script>
 <script src="/python-pathways/game-dev-data.js?v=20261116gd"></script>
@@ -1508,20 +1508,25 @@ function resetDesignPw(s){
   q("#dpGo").onclick = async () => {
     const p = q("#dpPw").value.trim(); if (!/^(TEMP-[A-Z0-9]{4}-[A-Z0-9]{4}|[A-Za-z0-9]{8,40})$/.test(p)) return q("#dpMsg").innerHTML = `<div class="notice bad">Use 8 to 40 letters and numbers, with no spaces or symbols.</div>`;
     if (!PPSync.design || !PPSync.design.enabled()) return q("#dpMsg").innerHTML = `<div class="notice bad">Design sync isn't connected.</div>`;
-    q("#dpGo").disabled = true; q("#dpMsg").innerHTML = `<div class="notice ok">Working… (up to a minute)</div>`;
+    q("#dpGo").disabled = true; q("#dpMsg").innerHTML = `<div class="notice ok">Working… (a few seconds)</div>`;
     try {
-      const ok = await PPSync.design.resetWithKey(em, p, RKEY);
+      const ok = await PPSync.design.resetWithKey(em, p, RKEY, { background:true });
       if (!ok){ q("#dpMsg").innerHTML = `<div class="notice warn">No Design account was found online for <b>${esc(em)}</b>. They may never have signed in since saving went online. Ask them to sign up again with this email, or to sign in once on the device they used before.</div>`; q("#dpGo").disabled = false; return; }
-      try { await PPSync.design.escrowSecret(em, p); } catch(e){}
-      try { await markTemp(em, p); } catch(e){}   // so the student is asked to choose their own password, whatever was typed
+      // the password works now: show it straight away; the email, the backup copy and the "must change" note go out together in the background
       SDC.log("pwreset", { name:s.name, email:em, course:s.course || "design", grade:s.grade, teacher:s.teacher }, { by: isSuper() ? "(admin)" : (ME && ME.name) || "" });
       ROWS.push({ sdc:1, type:"pwreset", when:Date.now(), acct:{ name:s.name, email:em, teacher:s.teacher, course:s.course || "design" } });
       PIN_DONE[s.key + "#pw"] = Date.now();
       const gb = q("#dpGo"); gb.textContent = "✓ Done"; gb.className = "btn ok"; gb.style.background = "#1E8A55";
-      const sent = isUser ? false : await SDC.resetDone({ email:em, name:s.name, course:s.course || "design", secret:p });
-      q("#dpMsg").innerHTML = `<div class="notice ok"><b>Done.</b> Temporary password for ${esc(s.name)}: <b style="font-size:1.15em;font-family:Consolas,monospace">${esc(p)}</b>. ${isUser ? `They sign in with the username <b>${esc(s.uname || em)}</b> and this, then create their own password.` : "They sign in with it, then create their own password."}</div>` +
-        (isUser ? `<div class="notice warn">Give the temporary password to the student yourself (no email is kept for username accounts).</div>` : sent ? `<div class="notice ok">📧 Emailed to ${esc(em)}.</div>` : `<div class="notice warn">The email to the student couldn't be sent. Please give them the password yourself.</div>`);
-      renderStudents(); renderResets();
+      let sent = null;   // null = still sending
+      const show = () => { if (!bg.isConnected) return;
+        q("#dpMsg").innerHTML = `<div class="notice ok"><b>Done.</b> Temporary password for ${esc(s.name)}: <b style="font-size:1.15em;font-family:Consolas,monospace">${esc(p)}</b>. ${isUser ? `They sign in with the username <b>${esc(s.uname || em)}</b> and this, then create their own password.` : "They sign in with it, then create their own password."}</div>` +
+        (isUser ? `<div class="notice warn">Give the temporary password to the student yourself (no email is kept for username accounts).</div>` : sent === null ? `<div class="notice">📧 Emailing it to ${esc(em)}…</div>` : sent ? `<div class="notice ok">📧 Emailed to ${esc(em)}.</div>` : `<div class="notice warn">The email to the student couldn't be sent. Please give them the password yourself.</div>`);
+        q("#dpMsg").insertAdjacentHTML("beforeend", `<div id="dpChk" class="small muted" style="margin-top:6px">${CHK}</div>`); };
+      let CHK = "⏳ Checking it has reached every device (usually under a minute). They can try signing in now.";
+      show(); renderStudents(); renderResets();
+      Promise.all([PPSync.design.escrowSecret(em, p).catch(() => {}), markTemp(em, p).catch(() => {})]);
+      if (!isUser) SDC.resetDone({ email:em, name:s.name, course:s.course || "design", secret:p }).then(x => { sent = !!x; show(); }, () => { sent = false; show(); });
+      (ok.confirmed || Promise.resolve(true)).then(c => { CHK = c ? "✅ Confirmed: it works on every device." : "⚠️ Google Sheets is slow to update today. If it doesn't work for the student in a few minutes, press Reset password again."; show(); });
     } catch(e){ q("#dpMsg").innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; q("#dpGo").disabled = false; }
   };
 }
