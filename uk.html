@@ -272,7 +272,7 @@ setTimeout(() => { try { (last ? $("lu") : $("lu")).focus(); } catch(e){} }, 50)
 (function(){
 "use strict";
 const $ = id => document.getElementById(id), esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const S = window.UK || {}, ORDER = ["y8revmaths","y8revscience","y8revenglish","y8revhistory","y8revgeography","y8revfrench","y8revmscs","y8revarabic","y8revislamic","y8maths","y8biology","y8chemistry","y8physics","y8english","y8history","y8geography","y8computing","y8french","y10maths","y10biology","y10chemistry","y10physics","y10english","y10history","y10geography","y10computing","y10ict","y10psychology","y10french"].filter(k => S[k]);
+const S = window.UK || {}, ORDER = ["y8revmaths","y8revscience","y8revenglish","y8revhistory","y8revgeography","y8revfrench","y8revmscs","y8revarabic","y8revislamic","y8maths","y8biology","y8chemistry","y8physics","y8english","y8history","y8geography","y8computing","y8french","y10maths","y10biology","y10chemistry","y10physics","y10english","y10ict","y10psychology"].filter(k => S[k]);
 const YEARS = [8, 10], STAGE = { 8:"Key Stage 3", 10:"IGCSE (Edexcel and Cambridge)" }, subjLabel = s => S[s].name;
 ORDER.forEach(k => { if (!S[k].short){ S[k].short = S[k].name; S[k].name = "Year " + S[k].year + " " + S[k].name; } });
 const IDLE_MS = 60000, FOCUS_SEC_PER_TASK = 40, SET_SIZE = 15;
