@@ -1034,14 +1034,16 @@ function pySummary(snap){
   Object.values(snap.paths).forEach(P => { solved += P.solved || 0; house += P.week === wk ? (P.houseWeek || 0) : 0; lessons += Object.keys(P.lessons || {}).length; });
   return { solved, house, lessons };
 }
-/* exercises solved out of the total in each Python level (practice questions not counted): what the certificate needs */
+/* each Python level: lessons finished (submitted, or every exercise solved) out of 10 (what the certificate needs), plus exercises solved */
 function pyLevels(snap){
   if (!snap || !snap.paths) return [];
-  return Object.keys(PATHS).filter(k => snap.paths[k]).map(k => { const P = snap.paths[k];
-    const done = P.coreDone != null ? P.coreDone : Object.values(P.lessons || {}).reduce((t, L) => t + ((L.core || []).filter(x => x.ok).length), 0);
-    return { k, name: PATHS[k], done, total: P.coreTotal || 30 }; });
+  return Object.keys(PATHS).filter(k => snap.paths[k]).map(k => { const P = snap.paths[k], L = Object.values(P.lessons || {});
+    const done = P.coreDone != null ? P.coreDone : L.reduce((t, x) => t + ((x.core || []).filter(c => c.ok).length), 0);
+    const ldone = L.filter(x => (x.subs || 0) > 0 || ((x.core || []).length && x.core.every(c => c.ok))).length;
+    return { k, name: PATHS[k], done, total: P.coreTotal || 30, ldone, ltotal: 10 }; });
 }
-const pyLevelPills = snap => pyLevels(snap).map(l => `<span class="pill ${l.done >= l.total ? "ok" : ""}" title="${esc(l.name)}: ${l.done} of ${l.total} exercises solved${l.done >= l.total ? " (certificate unlocked)" : ""}">${esc(l.name)} ${l.done}/${l.total}${l.done >= l.total ? " ✓" : ""}</span>`).join(" ");
+const pyLevelPills = snap => pyLevels(snap).map(l => { const ok = l.ldone >= l.ltotal;
+  return `<span class="pill ${ok ? "ok" : ""}" title="${esc(l.name)}: ${l.ldone} of ${l.ltotal} lessons finished, ${l.done} of ${l.total} exercises solved${ok ? " (certificate unlocked)" : ""}">${esc(l.name)} ${l.ldone}/${l.ltotal} lessons${ok ? " ✓" : ""} · ${l.done}/${l.total} ex</span>`; }).join(" ");
 function dsSummary(d){
   if (!d) return null; const out = {};
   ["A","B","C","D"].forEach(c => { const w = d.work[c] && d.work[c].w, ev = d.events.filter(e => e.crit === c);
