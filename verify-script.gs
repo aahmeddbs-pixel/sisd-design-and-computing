@@ -389,7 +389,7 @@ function study_(p){
   const advHtml = adv ? '<h3 style="color:#1B2D4E;font-size:16px;margin:16px 0 6px">Feedback</h3><p>' + h(adv.feedback) + '</p><h3 style="color:#1B2D4E;font-size:16px;margin:16px 0 6px">How to improve</h3><ul style="padding-left:18px;margin:0">' + adv.next.map(x => '<li style="margin-bottom:4px">' + h(x) + '</li>').join("") + '</ul>' : "";
   const body = mailBox_(uk ? "Study Plus UK report · Year " + (+d.year) : "Study Plus report",
     '<p><b>' + h(name) + '</b> ' + (d.retry ? 'fixed mistakes in' : 'finished') + ' <b>' + h(d.subject) + ': ' + h(d.topic) + '</b> <span style="color:#5B6782">(' + h(d.strand || "MYP 2") + ')</span>.</p>' +
-    '<table style="width:100%;border-collapse:separate;border-spacing:6px"><tr>' + cell("Active work", mins + " min") + cell("Score", score + "%", col) + cell("Right first time", num(d.right) + "/" + num(d.n)) + cell("Effort", effort + "%") + '</tr></table>' +
+    '<table style="width:100%;border-collapse:separate;border-spacing:6px"><tr>' + cell("Active work", mins + " min") + cell("Score", score + "%", col) + cell(d.paper ? "Marks" : "Right first time", num(d.right) + "/" + num(d.n)) + cell("Effort", effort + "%") + '</tr></table>' +
     (d.retry ? '<p>On the retry they fixed <b>' + num(d.fixed) + '</b> of their mistakes.</p>' : '') +
     '<p style="color:#5B6782;font-size:13px">Self-rating: 😀 got it ' + num(d.got) + ' · 🤔 partly ' + num(d.unsure) + ' · 😟 need help ' + num(d.need) + '. Focus ' + num(d.focus) + '% (real working time compared with about 40 seconds a task). Total Study Plus work time so far: ' + num((+d.totalMs || 0) / 60000) + ' min.</p>' +
     '<h3 style="color:#1E8A55;font-size:16px;margin:16px 0 6px">What went well</h3>' + (well ? '<ul style="padding-left:18px;margin:0">' + well + '</ul>' : '<p style="color:#5B6782">No tasks were both correct and rated "I\'ve got it" this time.</p>') +
@@ -404,7 +404,7 @@ function study_(p){
     const who = String(d.student || "").slice(0, 40) || name;
     const pbody = mailBox_("Study Plus UK progress · Year " + (+d.year),
       '<p><b>' + h(who) + '</b> ' + (d.retry ? 'fixed mistakes in' : 'finished') + ' <b>' + h(d.subject) + ': ' + h(d.topic) + '</b>.</p>' +
-      '<table style="width:100%;border-collapse:separate;border-spacing:6px"><tr>' + cell("Score", score + "%", col) + cell("Right first time", num(d.right) + "/" + num(d.n)) + cell("Work time", mins + " min") + cell("Effort", effort + "%") + '</tr></table>' +
+      '<table style="width:100%;border-collapse:separate;border-spacing:6px"><tr>' + cell("Score", score + "%", col) + cell(d.paper ? "Marks" : "Right first time", num(d.right) + "/" + num(d.n)) + cell("Work time", mins + " min") + cell("Effort", effort + "%") + '</tr></table>' +
       advHtml +
       '<h3 style="color:#C0283A;font-size:16px;margin:16px 0 6px">Questions to look at again</h3>' + (imp ? '<ul style="padding-left:18px;margin:0">' + imp + '</ul>' : '<p style="color:#5B6782">None: brilliant!</p>') +
       progressTable_(d));
@@ -414,7 +414,7 @@ function study_(p){
     const who = String(d.student || "").slice(0, 40) || "there";
     const sbody = mailBox_("Your Study Plus results",
       '<p>Hi ' + h(who) + ', well done for finishing <b>' + h(d.subject) + ': ' + h(d.topic) + '</b>.</p>' +
-      '<table style="width:100%;border-collapse:separate;border-spacing:6px"><tr>' + cell("Score", score + "%", col) + cell("Right first time", num(d.right) + "/" + num(d.n)) + cell("Work time", mins + " min") + cell("Hints used", num(d.hints)) + '</tr></table>' +
+      '<table style="width:100%;border-collapse:separate;border-spacing:6px"><tr>' + cell("Score", score + "%", col) + cell(d.paper ? "Marks" : "Right first time", num(d.right) + "/" + num(d.n)) + cell("Work time", mins + " min") + cell("Hints used", num(d.hints)) + '</tr></table>' +
       advHtml +
       '<h3 style="color:#1E8A55;font-size:16px;margin:16px 0 6px">What went well</h3>' + (well ? '<ul style="padding-left:18px;margin:0">' + well + '</ul>' : '<p style="color:#5B6782">Keep going: next time aim to get some right and rate them "I\'ve got it".</p>') +
       '<h3 style="color:#C0283A;font-size:16px;margin:16px 0 6px">Questions to look at again</h3>' + (imp ? '<ul style="padding-left:18px;margin:0">' + imp + '</ul>' : '<p style="color:#5B6782">None: brilliant!</p>') +

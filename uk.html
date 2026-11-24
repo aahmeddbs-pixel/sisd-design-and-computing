@@ -20,6 +20,9 @@
 <script src="uk/y10-igcse.js?v=20261114d"></script>
 <script src="uk/y8-revision.js?v=20261114d"></script>
 <script src="uk/y8-revision2.js?v=20261121d"></script>
+<script src="uk/exam.js?v=20261124b"></script>
+<script src="uk/exam-y8.js?v=20261124b"></script>
+<script src="uk/exam-y10.js?v=20261124b"></script>
 <script src="uk/baby/videos.js?v=20261121d"></script>
 <script src="uk/baby/sambusa.js?v=20261121e"></script>
 <script src="uk/french.js?v=20261117fr"></script>
@@ -177,6 +180,11 @@ select.big{border:2px solid var(--line);background:var(--card);border-radius:10p
 .trickbox{background:#E9F7EF;border-left:4px solid #1E8A55;border-radius:0 12px 12px 0;padding:10px 14px;margin-top:8px}
 .pill.star{background:#F5B942;color:#3A2A00}
 .lsec{border-top:1px solid var(--line);padding-top:14px}
+.exq{border-top:1px solid var(--line);padding-top:14px}.exa{width:100%;font:inherit;font-size:1rem;padding:10px;border:2px solid var(--line);border-radius:10px;resize:vertical;box-sizing:border-box}
+.exsrc{margin:8px 0;padding:10px 14px;background:#F6F7FB;border-left:4px solid var(--navy,#1B2D4E);border-radius:8px;font-style:italic}
+.exfb{margin-top:10px;padding:12px 14px;border-radius:12px;background:#F6F7FB;border-left:6px solid #999}.exfb.ok{border-color:var(--ok);background:var(--okbg)}.exfb.warn{border-color:var(--warn);background:var(--warnbg)}.exfb.bad{border-color:var(--bad);background:var(--badbg)}
+.exscore{display:flex;align-items:center;gap:10px}.exscore .bar{flex:1}.exl{margin:4px 0 0 18px;display:grid;gap:3px;font-size:.92rem}
+.exsum{border-top:2px solid var(--line);padding-top:14px}.extab{border-collapse:collapse;margin-top:8px;font-size:.92rem}.extab td,.extab th{padding:5px 10px;border-bottom:1px solid var(--line);text-align:left}
 .vid{margin:10px 0 0}.vid video,.vid iframe{width:100%;aspect-ratio:16/9;border:0;border-radius:12px;background:#000;display:block}.vid figcaption{font-size:.85rem;font-weight:700;margin-top:4px}
 .vlinkx{display:block;margin-top:8px;font-weight:700}
 .sbtips{background:#FFF6DC;border-radius:14px;padding:12px 16px}.sbtips ul{margin:6px 0 0;padding-left:18px}
@@ -381,7 +389,9 @@ function set1Refs(s, t, st, T){
   const base = T.tasks.map((_, i) => ({ s:"b", i }));
   if (!st.n15 && (st.done || Object.keys(st.ans || {}).length)) return base;
   st.n15 = true;
-  if (base.length >= SET_SIZE) return base;
+  if (st.ty1 == null) st.ty1 = !Object.keys(st.ans || {}).length;   // typed answers only for a Set 1 not yet started
+  const typed = L => st.ty1 ? L.map(r => Object.assign({}, r, { ty:1 })) : L;
+  if (base.length >= SET_SIZE) return typed(base);
   const lvOf = x => (x && x.d) || 1, cnt = { 1:0, 2:0, 3:0 }; T.tasks.forEach(x => cnt[lvOf(x)]++);
   const pool = T.pool || [], used = new Set(), extra = [], gk = s + "/" + t, hasGen = GEN.has(gk);
   let h = 7; for (const ch of gk) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
@@ -394,7 +404,7 @@ function set1Refs(s, t, st, T){
     used.add(i); extra.push({ s:"p", i }); cnt[lvOf(pool[i])]++;
   }
   const lvl = ref => ref.s === "g" ? ref.d : lvOf(ref.s === "p" ? pool[ref.i] : T.tasks[ref.i]);
-  return base.concat(extra).map((r, n) => ({ r, n })).sort((a, b) => lvl(a.r) - lvl(b.r) || a.n - b.n).map(x => x.r);
+  return typed(base.concat(extra).map((r, n) => ({ r, n })).sort((a, b) => lvl(a.r) - lvl(b.r) || a.n - b.n).map(x => x.r));
 }
 function resolve(s, t, ref){
   const T = topicOf(s, t); let b = null;
@@ -405,7 +415,25 @@ function resolve(s, t, ref){
     const j = ref.v === 1 ? b.a : (ref.j != null && ref.j !== b.a && b.o[ref.j] != null ? ref.j : (b.a + 1) % b.o.length), yes = j === b.a;
     return { d: b.d || 1, k:"tf", q:`True or false?\n${b.q}\nAnswer: ${b.o[j]}`, a: yes, x: (yes ? "True. " : "False. The right answer is: " + b.o[b.a] + ". ") + b.x, review: !!ref.rv };
   }
+  if (ref.ty) b = typify(b);
   return ref.rv ? Object.assign({}, b, { review:true }) : b;
+}
+/* a multiple-choice question with a short answer becomes "type the answer" (no options to pick from) */
+function typify(b){
+  if (!b || b.k !== "mcq" || !b.o || b.a == null) return b;
+  const ans = String(b.o[b.a]), core = ans.replace(/\s*\([^)]*\)/g, "").trim();
+  if (/which (of these|of the following|one|word|sentence|statement|answer|option|line|phrase|is (correct|right|best|true))|choose|select|best (describes|example|answer|opening)|odd one out|correct form|correct (verb|order|sentence|spelling)|true or false|fact or opinion|___.*___|^which (is|are) (a|an|one|some)\b|^which .* (is|are) (a|an) |example of|^give an? /i.test(b.q)) return b;
+  if (/[₀-₉⁰-⁹+→=×÷<>\u0600-\u06ff\u0900-\u097f]/.test(ans) || /\b(is|are) (correct|right|best|true)\??$|^which \w+ (is|are) (correct|right|best)/i.test(b.q)) return b;
+  if (/\bmeans?\b|meaning|translate/i.test(b.q) && ans.trim().split(/\s+/).length > 2) return b;
+  if (/\b(a|one|an) (leading|famous|key|main|important|major|common|good|typical|possible)\b|\bone of\b|\bname (a|one)\b|\bsome\b|\bexample\b/i.test(b.q)) return b;
+  if (!core || core.length > 24 || core.split(/\s+/).length > 3 || /^(true|false|yes|no|fact|opinion|both|neither|all of|none|verse \d)/i.test(core)) return b;
+  const alts = new Set([ans, core]);
+  (ans.match(/\(([^)]*)\)/g) || []).forEach(p => p.slice(1, -1).split(/[\/,;]| or /).forEach(x => { x = x.trim(); if (x && x.length <= 30) alts.add(x); }));
+  core.split(/\s*\/\s*/).forEach(x => alts.add(x.trim()));
+  core.split(/,\s*/).forEach(x => { if (x.trim().length >= 4) alts.add(x.trim()); });
+  if (/^[A-Z][a-z]+ [A-Z][a-z]+$/.test(core)) alts.add(core.split(" ")[1]);
+  [...alts].forEach(x => alts.add(x.replace(/^['"‘“]|['"’”]$/g, "").replace(/^(the|a|an)\s+/i, "")));
+  return Object.assign({}, b, { k:"text", a:[...alts].filter(Boolean), best: core, typed:true });
 }
 function rnd(seed){ let a = seed >>> 0 || 1; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 /* how many Core / Extended / Challenge questions for a target level between 1 and 3 */
@@ -447,6 +475,7 @@ function buildRound(s, t){
   /* easiest first, so each set climbs in challenge; review questions open the set */
   const lvl = ref => ref.s === "g" ? ref.d : lvOf(((ref.s === "p" ? pool : T.tasks) || [])[ref.i] || {});
   const ordered = refs.filter(r => r.rv).concat(refs.filter(r => !r.rv).sort((a, b) => lvl(a) - lvl(b)));
+  ordered.forEach(r => { if (!r.v) r.ty = 1; });   // short-answer questions are typed rather than chosen
   const o = { n: st.rounds.length + 2, seed, lv, refs: ordered, ans:{}, retry:{}, i:0, done:false, ms:0, at: Date.now(), sess: SESS.id, from: sc };
   st.rounds.push(o); return o;
 }
@@ -494,10 +523,13 @@ function mark(task, given){
     const acc = task.a.map(clean);
     if (acc.indexOf(g) >= 0) return { ok:true };
     if (acc.map(strip).indexOf(strip(g)) >= 0) return { ok:true, accent:true };
+    if (task.typed && g){ const G = strip(g).replace(/^(the|a|an) /, ""); if (acc.some(x => { const A = strip(x).replace(/^(the|a|an) /, ""); return A.length >= 5 && lev(A, G) <= (A.length >= 9 ? 2 : 1); })) return { ok:true, typo:true }; }
     return { ok:false, blank: g === "" };
   }
   return { ok:false };
 }
+function lev(a, b){ if (Math.abs(a.length - b.length) > 2) return 9; const d = Array.from({ length:b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++){ let p = d[0]; d[0] = i; for (let j = 1; j <= b.length; j++){ const t = d[j]; d[j] = Math.min(d[j] + 1, d[j - 1] + 1, p + (a[i - 1] === b[j - 1] ? 0 : 1)); p = t; } } return d[b.length]; }
 function rightText(task){
   if (task.k === "mcq") return task.o[task.a];
   if (task.k === "tf") return task.a ? "True" : "False";
@@ -547,6 +579,7 @@ function render(){
   if (VIEW.v === "sets") return renderSets();
   if (VIEW.v === "review") return renderReview();
   if (VIEW.v === "learn") return renderLearn();
+  if (VIEW.v === "paper") return window.UK_EXAM ? UK_EXAM.render($("app"), VIEW.s, VIEW.p, { DB, S, save, back: () => go({ v:"subject", s:VIEW.s }), report: paperReport }) : go({ v:"subject", s:VIEW.s });
   if (VIEW.v === "sambusa") return window.SAMBUSA ? SAMBUSA.render($("app"), () => go({ v:"home" })) : go({ v:"home" });
 }
 
@@ -592,10 +625,30 @@ function renderSubject(){
       else if (X.o.done) meta = `<span class="pill ${sc.score >= 70 ? "ok" : sc.score >= 50 ? "warn" : "bad"}">${X.r > 1 ? "Set " + X.r + ": " : ""}${sc.score}%</span><br>${fmt(topicMs(s, t.id))}`;
       else meta = sc.answered ? `<span class="pill warn">In progress</span><br>${sc.answered}/${sc.n}` : `${X.tasks.length} questions`;
       return `<button class="topic ${st.done ? "done" : ""}" data-t="${t.id}"><span class="n">${st.done ? "✓" : i + 1}</span><span><b>${esc(t.title)}</b>${t.focus ? ` <span class="pill star">⭐ Highlighted</span>` : ""}<br><span class="muted small">${esc(t.strand)}${runsOf(s, t.id) > 1 ? " · " + runsOf(s, t.id) + " sets" : ""}</span></span><span class="meta">${meta}</span></button>`; }).join("")}</div>
+    ${paperBand(s)}
   </div>`;
   $("bk").onclick = () => go({ v:"home" });
+  $("app").querySelectorAll("[data-paper]").forEach(b => b.onclick = () => go({ v:"paper", s, p:b.dataset.paper }));
   $("topicSel").onchange = e => { if (e.target.value) openTopic(s, e.target.value); };
   $("app").querySelectorAll("[data-t]").forEach(b => b.onclick = () => openTopic(s, b.dataset.t));
+}
+/* exam practice papers for this subject */
+function paperBand(s){
+  const L = window.UK_EXAM ? UK_EXAM.list(s) : []; if (!L.length) return "";
+  return `<div class="lsec"><h2>📄 Exam practice papers</h2><p class="muted small">Original exam-style papers in the format of your exam. Type your answers and press <b>Assess</b> after each question for instant marks and feedback.</p>
+    <div class="topics">${L.map(P => { const st = DB.topics[UK_EXAM.key(s, P.id)] || {}, res = st.res || {}, done = P.qs.filter(q => res[q.id]), got = done.reduce((a, q) => a + res[q.id].got, 0), max = P.qs.reduce((a, q) => a + q.m, 0), dm = done.reduce((a, q) => a + q.m, 0);
+      return `<button class="topic ${done.length === P.qs.length ? "done" : ""}" data-paper="${P.id}"><span class="n">📄</span><span><b>${esc(P.title)}</b><br><span class="muted small">${esc(P.info)} · ${P.qs.length} questions · ${max} marks</span></span><span class="meta">${done.length ? `<span class="pill ${got / dm >= .7 ? "ok" : got / dm >= .4 ? "warn" : "bad"}">${got}/${dm}</span><br>${done.length}/${P.qs.length} assessed` : "Start"}</span></button>`; }).join("")}</div></div>`;
+}
+function paperReport(P, st, U, byT){
+  const s = VIEW.s, score = U.max ? Math.round(U.got / U.max * 100) : 0;
+  const lost = P.qs.filter(q => st.res[q.id] && st.res[q.id].got < q.m).map(q => ({ q: ("Q" + q.n + " (" + q.t + ", " + st.res[q.id].got + "/" + q.m + "): " + q.q).slice(0, 120), right: String((st.res[q.id].miss || []).slice(0, 3).join("; ")).slice(0, 160), given: String(st.ans[q.id] || "").slice(0, 80), unsure:false, fixed:false }));
+  const data = { course:"uk", year: S[s].year, revision: !!S[s].revision, student: AUTHD.name, subject: S[s].name, sid: s, topic: "Exam practice · " + P.title, tid: "paper-" + P.id, round: 1, level: "", strand: P.info,
+    score, right: U.got, n: U.max, lv: 0, effort: 100, focus: 100, mins: Math.max(1, Math.round((st.ms || 0) / 60000)), secs: Math.round((st.ms || 0) / 1000), got: 0, unsure: 0, need: 0, retry: false, fixed: 0,
+    well: P.qs.filter(q => st.res[q.id] && st.res[q.id].got === q.m).map(q => ("Q" + q.n + " " + q.t + ": full marks").slice(0, 120)), improve: lost.slice(0, 8),
+    hints: 0, solutions: 0, totalMs: totals().ms, progress: progressAll(), paper: true, topics: Object.entries(byT).map(([t, b]) => t + " " + b.got + "/" + b.m) };
+  DB.reports.push(Object.assign({ at: Date.now() }, data)); if (DB.reports.length > 300) DB.reports.shift(); save();
+  try { SDC.log("studyplus", ACCT, { study: data }); } catch(e){}
+  try { SDC.studyReport(ACCT, data); } catch(e){}
 }
 function allRated(X){ return X.tasks.every((_, i) => X.o.ans[i] && X.o.ans[i].rate); }
 function openTopic(s, t){
@@ -738,7 +791,7 @@ function check(s, t, r, i, task, isRetry, list, pos){
   const m = mark(task, pick);
   if (task.k === "num" && m.bad) return toast("Type a number only, for example 12 or -3.5");
   stopHints(); if ($("hintBtn")) $("hintBtn").remove();
-  const o = run(s, t, r).o, rec = { g: pick, ok: m.ok, accent: !!m.accent, h: hintsUsed(o, i), at: Date.now() };
+  const o = run(s, t, r).o, rec = { g: pick, ok: m.ok, accent: !!m.accent, typo: !!m.typo, h: hintsUsed(o, i), at: Date.now() };
   if (isRetry){ o.retry = o.retry || {}; o.retry[i] = rec; } else { o.ans[i] = rec; o.i = i; }
   save(); showAfter(s, t, r, i, task, rec, isRetry, list, pos); explain(task, rec, S[s].rtl);
 }
@@ -747,7 +800,7 @@ function showAfter(s, t, r, i, task, rec, isRetry, list, pos){
   $("answerBox").querySelectorAll(".opt").forEach(b => { b.disabled = true; const v = task.k === "tf" ? b.dataset.o === "t" : +b.dataset.o; if (v === task.a) b.classList.add("right"); else if (v === rec.g) b.classList.add("wrong"); });
   const inp = $("inp"); if (inp){ inp.value = rec.g; inp.disabled = true; inp.classList.add(rec.ok ? "right" : "wrong"); }
   const rate = rec.rate || 0;
-  $("after").innerHTML = `<div class="verdict ${rec.ok ? "ok" : "bad"}">${rec.sol ? "📖 Solution shown. The answer is: <span dir='auto'>" + esc(rightText(task)) + "</span>" : rec.ok ? "✓ Correct!" + (rec.h ? " (with " + rec.h + " hint" + (rec.h > 1 ? "s" : "") + ")" : "") + (rec.accent ? " Watch the accent: " + esc(rightText(task)) : "") : "✗ Not quite. The answer is: <span dir='auto'>" + esc(rightText(task)) + "</span>"} <button class="btn sm ghost" id="whyBtn" style="margin-left:8px">💡 Why?</button></div>
+  $("after").innerHTML = `<div class="verdict ${rec.ok ? "ok" : "bad"}">${rec.sol ? "📖 Solution shown. The answer is: <span dir='auto'>" + esc(rightText(task)) + "</span>" : rec.ok ? "✓ Correct!" + (rec.h ? " (with " + rec.h + " hint" + (rec.h > 1 ? "s" : "") + ")" : "") + (rec.accent ? " Watch the accent: " + esc(rightText(task)) : "") + (rec.typo ? " Check the spelling: " + esc(rightText(task)) : "") : "✗ Not quite. The answer is: <span dir='auto'>" + esc(rightText(task)) + "</span>"} <button class="btn sm ghost" id="whyBtn" style="margin-left:8px">💡 Why?</button></div>
     <div style="margin-top:12px"><b>Rate your answer</b> <span class="muted small">How well do you understand this now?</span>
       <div class="rate" style="margin-top:8px"><button data-r="1" aria-pressed="${rate === 1}">😀 I've got it</button><button data-r="2" aria-pressed="${rate === 2}">🤔 Partly</button><button data-r="3" aria-pressed="${rate === 3}">😟 I need help</button></div></div>`;
   $("whyBtn").onclick = () => explain(task, rec, S[s].rtl);
