@@ -1034,6 +1034,14 @@ function pySummary(snap){
   Object.values(snap.paths).forEach(P => { solved += P.solved || 0; house += P.week === wk ? (P.houseWeek || 0) : 0; lessons += Object.keys(P.lessons || {}).length; });
   return { solved, house, lessons };
 }
+/* exercises solved out of the total in each Python level (practice questions not counted): what the certificate needs */
+function pyLevels(snap){
+  if (!snap || !snap.paths) return [];
+  return Object.keys(PATHS).filter(k => snap.paths[k]).map(k => { const P = snap.paths[k];
+    const done = P.coreDone != null ? P.coreDone : Object.values(P.lessons || {}).reduce((t, L) => t + ((L.core || []).filter(x => x.ok).length), 0);
+    return { k, name: PATHS[k], done, total: P.coreTotal || 30 }; });
+}
+const pyLevelPills = snap => pyLevels(snap).map(l => `<span class="pill ${l.done >= l.total ? "ok" : ""}" title="${esc(l.name)}: ${l.done} of ${l.total} exercises solved${l.done >= l.total ? " (certificate unlocked)" : ""}">${esc(l.name)} ${l.done}/${l.total}${l.done >= l.total ? " ✓" : ""}</span>`).join(" ");
 function dsSummary(d){
   if (!d) return null; const out = {};
   ["A","B","C","D"].forEach(c => { const w = d.work[c] && d.work[c].w, ev = d.events.filter(e => e.crit === c);
@@ -1046,7 +1054,7 @@ function dsSummary(d){
 const taskCell = s => s.done && s.done.size ? `<b>${s.done.size}</b> task${s.done.size === 1 ? "" : "s"} completed<div class="em">Last: ${esc((s.lastTask && s.lastTask.t) || "")}</div>` : "<span class='muted'>no work yet</span>";
 function progressCell(s){
   if (s.course === "cs"){ const p = pySummary(s.py); if (!p || (!p.solved && s.done && s.done.size)) return taskCell(s);
-    return `<b>${p.solved}</b> exercises · <b>${p.house}</b> 🏠 this week<div class="em">${p.lessons} lesson${p.lessons === 1 ? "" : "s"} started</div>`; }
+    return `<b>${p.solved}</b> exercises · <b>${p.house}</b> 🏠 this week<div class="em">${p.lessons} lesson${p.lessons === 1 ? "" : "s"} started</div><div style="margin-top:4px">${pyLevelPills(s.py)}</div>`; }
   const d = dsSummary(s.ds); if (!d || !Object.keys(d).length) return taskCell(s);
   return Object.keys(d).map(c => `<span class="pill ${d[c].sub ? "ok" : ""}" title="Criterion ${c}">${c}: ${d[c].done}/4${d[c].sub ? " ✓" : ""}</span>`).join(" ");
 }
