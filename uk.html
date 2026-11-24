@@ -20,7 +20,7 @@
 <script src="uk/y10-igcse.js?v=20261114d"></script>
 <script src="uk/y8-revision.js?v=20261114d"></script>
 <script src="uk/y8-revision2.js?v=20261121d"></script>
-<script src="uk/exam.js?v=20261124b"></script>
+<script src="uk/exam.js?v=20261124c"></script>
 <script src="uk/exam-y8.js?v=20261124b"></script>
 <script src="uk/exam-y10.js?v=20261124b"></script>
 <script src="uk/baby/videos.js?v=20261121d"></script>
@@ -377,11 +377,19 @@ function mergeIn(R){
    and the question generators, levelled up or down from how the student did in the set before. ---------- */
 const TC = {};   // built tasks for each set (not saved: rebuilt from the set's recipe)
 function runsOf(s, t){ const st = tstate(s, t); return 1 + ((st.rounds && st.rounds.length) || 0); }
+/* every other unanswered question allows a written answer; the choice is saved so the question never changes once answered */
+function typeRefs(o, refs){
+  o.tyx = o.tyx || {}; let changed = false;
+  const out = refs.map((ref, i) => {
+    if (o.tyx[i] == null && !ref.v && !(o.ans && o.ans[i])){ o.tyx[i] = i % 2 ? 2 : 1; changed = true; }
+    return o.tyx[i] != null && !ref.v ? Object.assign({}, ref, { ty: o.tyx[i] }) : ref; });
+  return { refs: out, sig: Object.keys(o.tyx).length, changed };
+}
 function run(s, t, r){
   const st = tstate(s, t), T = topicOf(s, t); r = r || runsOf(s, t);
-  if (r <= 1 || !st.rounds || !st.rounds[r - 2]){ const refs = set1Refs(s, t, st, T), ck = s + "/" + t + "/1/" + refs.length; return { r:1, o:st, tasks: TC[ck] = TC[ck] || refs.map(ref => resolve(s, t, ref)), refs }; }
-  const o = st.rounds[r - 2], ck = s + "/" + t + "/" + r + "/" + o.seed;
-  return { r, o, tasks: TC[ck] = TC[ck] || o.refs.map(ref => resolve(s, t, ref)), refs:o.refs };
+  if (r <= 1 || !st.rounds || !st.rounds[r - 2]){ const R = typeRefs(st, set1Refs(s, t, st, T)), ck = s + "/" + t + "/1/" + R.refs.length + "/" + R.sig; return { r:1, o:st, tasks: TC[ck] = TC[ck] || R.refs.map(ref => resolve(s, t, ref)), refs:R.refs }; }
+  const o = st.rounds[r - 2], R = typeRefs(o, o.refs), ck = s + "/" + t + "/" + r + "/" + o.seed + "/" + R.sig;
+  return { r, o, tasks: TC[ck] = TC[ck] || R.refs.map(ref => resolve(s, t, ref)), refs:R.refs };
 }
 /* Set 1: the topic's own questions topped up to 15, with a spread of Core, Extended and Challenge, easiest first.
    A Set 1 already started before this change keeps its original questions so saved answers still line up. */
@@ -415,25 +423,48 @@ function resolve(s, t, ref){
     const j = ref.v === 1 ? b.a : (ref.j != null && ref.j !== b.a && b.o[ref.j] != null ? ref.j : (b.a + 1) % b.o.length), yes = j === b.a;
     return { d: b.d || 1, k:"tf", q:`True or false?\n${b.q}\nAnswer: ${b.o[j]}`, a: yes, x: (yes ? "True. " : "False. The right answer is: " + b.o[b.a] + ". ") + b.x, review: !!ref.rv };
   }
-  if (ref.ty) b = typify(b);
+  if (ref.ty) b = typify(b, ref.ty);
   return ref.rv ? Object.assign({}, b, { review:true }) : b;
 }
 /* a multiple-choice question with a short answer becomes "type the answer" (no options to pick from) */
-function typify(b){
+/* Typed questions. mode 1: a short answer (word, name, number) is typed instead of chosen.
+   mode 2: also, if the answer is a phrase or sentence, the student writes it in their own words and it is checked for the key ideas. */
+const STOP = new Set("a an the of to in on at for by with and or but is are was were be been it its this that these those as from into than then so such their there they he she his her him we our you your i me my do does did can could will would should may might has have had which who what when where why how also very more most much many some any each other about over under up down out off just".split(" "));
+const stem = w => w.length > 5 ? w.slice(0, w.length > 8 ? 6 : 5) : w;
+const keyWords = t => [...new Set(strip(String(t || "").toLowerCase()).replace(/\([^)]*\)/g, " ").match(/[a-z0-9]+/g) || [])].filter(w => !STOP.has(w) && (w.length > 2 || /\d/.test(w))).map(stem);
+function typify(b, mode){
   if (!b || b.k !== "mcq" || !b.o || b.a == null) return b;
   const ans = String(b.o[b.a]), core = ans.replace(/\s*\([^)]*\)/g, "").trim();
-  if (/which (of these|of the following|one|word|sentence|statement|answer|option|line|phrase|is (correct|right|best|true))|choose|select|best (describes|example|answer|opening)|odd one out|correct form|correct (verb|order|sentence|spelling)|true or false|fact or opinion|___.*___|^which (is|are) (a|an|one|some)\b|^which .* (is|are) (a|an) |example of|^give an? /i.test(b.q)) return b;
-  if (/[₀-₉⁰-⁹+→=×÷<>\u0600-\u06ff\u0900-\u097f]/.test(ans) || /\b(is|are) (correct|right|best|true)\??$|^which \w+ (is|are) (correct|right|best)/i.test(b.q)) return b;
-  if (/\bmeans?\b|meaning|translate/i.test(b.q) && ans.trim().split(/\s+/).length > 2) return b;
-  if (/\b(a|one|an) (leading|famous|key|main|important|major|common|good|typical|possible)\b|\bone of\b|\bname (a|one)\b|\bsome\b|\bexample\b/i.test(b.q)) return b;
-  if (!core || core.length > 24 || core.split(/\s+/).length > 3 || /^(true|false|yes|no|fact|opinion|both|neither|all of|none|verse \d)/i.test(core)) return b;
-  const alts = new Set([ans, core]);
-  (ans.match(/\(([^)]*)\)/g) || []).forEach(p => p.slice(1, -1).split(/[\/,;]| or /).forEach(x => { x = x.trim(); if (x && x.length <= 30) alts.add(x); }));
-  core.split(/\s*\/\s*/).forEach(x => alts.add(x.trim()));
-  core.split(/,\s*/).forEach(x => { if (x.trim().length >= 4) alts.add(x.trim()); });
-  if (/^[A-Z][a-z]+ [A-Z][a-z]+$/.test(core)) alts.add(core.split(" ")[1]);
-  [...alts].forEach(x => alts.add(x.replace(/^['"‘“]|['"’”]$/g, "").replace(/^(the|a|an)\s+/i, "")));
-  return Object.assign({}, b, { k:"text", a:[...alts].filter(Boolean), best: core, typed:true });
+  const needsOptions = /which (of these|of the following|one|word|sentence|statement|answer|option|line|phrase|is (correct|right|best|true))|choose|select|best (describes|example|answer|opening)|odd one out|correct form|correct (verb|order|sentence|spelling)|true or false|fact or opinion|___.*___|\b(is|are) (correct|right|best|true)\??$|^which \w+ (is|are) (correct|right|best)/i.test(b.q);
+  const manyAnswers = /^which (is|are) (a|an|one|some)\b|^which .* (is|are) (a|an) |example of|^give an? |\b(a|one|an) (leading|famous|key|main|important|major|common|good|typical|possible)\b|\bone of\b|\bname (a|one)\b|\bsome\b|\bexample\b/i.test(b.q);
+  const script = /[؀-ۿऀ-ॿ]/.test(ans);
+  if (needsOptions || manyAnswers || script) return b;
+  const shortOk = core && core.length <= 24 && core.split(/\s+/).length <= 3 && !/^(true|false|yes|no|fact|opinion|both|neither|all of|none|verse \d)/i.test(core)
+    && !/[₀-₉⁰-⁹+→=×÷<>]/.test(ans) && !(/\bmeans?\b|meaning|translate/i.test(b.q) && ans.trim().split(/\s+/).length > 2);
+  if (shortOk){
+    const alts = new Set([ans, core]);
+    (ans.match(/\(([^)]*)\)/g) || []).forEach(p => p.slice(1, -1).split(/[\/,;]| or /).forEach(x => { x = x.trim(); if (x && x.length <= 30) alts.add(x); }));
+    core.split(/\s*\/\s*/).forEach(x => alts.add(x.trim()));
+    core.split(/,\s*/).forEach(x => { if (x.trim().length >= 4) alts.add(x.trim()); });
+    if (/^[A-Z][a-z]+ [A-Z][a-z]+$/.test(core)) alts.add(core.split(" ")[1]);
+    [...alts].forEach(x => alts.add(x.replace(/^['"‘“]|['"’”]$/g, "").replace(/^(the|a|an)\s+/i, "")));
+    return Object.assign({}, b, { k:"text", a:[...alts].filter(Boolean), best: core, typed:true });
+  }
+  if (mode !== 2) return b;
+  /* written answer, checked for its key ideas */
+  const kw = keyWords(ans); if (kw.length < 1 || ans.length > 160 || /^(true|false|yes|no|both|neither|all of|none)\b/i.test(core)) return b;
+  if (/[0-9×÷+=<>→−^²³⁴⁵⁶⁷⁸⁹₀-₉]/.test(ans) || /\bin order\b|\border of\b|\bsequence\b|\bcorrect order\b|\bequation\b|\bformula\b/i.test(b.q)) return b;   // order, signs and numbers matter: keep it multiple choice
+  const sub = (A, B) => A.every(w => B.indexOf(w) >= 0);   // one option's key words all inside another's: too close to check fairly
+  if (b.o.some((o, j) => { if (j === b.a) return false; const L = keyWords(o); return sub(L, kw) || sub(kw, L); })) return b;
+  if (/translate|how do you say|in french|in arabic|in hindi|in swahili/i.test(b.q)) return b;
+  return Object.assign({}, b, { k:"text", open:true, a:[ans], best: ans, kw, wk: b.o.filter((_, j) => j !== b.a).map(keyWords), typed:true });
+}
+/* how well a written answer covers the key ideas of the right answer (and not those of the wrong ones) */
+function openMark(task, given){
+  const g = new Set(keyWords(given)), cov = L => L.length ? L.filter(w => g.has(w)).length / L.length : 0;
+  const hit = cov(task.kw), wrong = Math.max(0, ...(task.wk || []).map(cov));
+  const need = task.kw.length <= 2 ? 1 : task.kw.length <= 4 ? .6 : .5;
+  return { ok: hit >= need && (hit === 1 || hit > wrong), part: hit > 0 && (hit < need || hit <= wrong), hit };
 }
 function rnd(seed){ let a = seed >>> 0 || 1; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 /* how many Core / Extended / Challenge questions for a target level between 1 and 3 */
@@ -523,6 +554,7 @@ function mark(task, given){
     const acc = task.a.map(clean);
     if (acc.indexOf(g) >= 0) return { ok:true };
     if (acc.map(strip).indexOf(strip(g)) >= 0) return { ok:true, accent:true };
+    if (task.open){ const M = openMark(task, given); return { ok: M.ok, part: M.part, open:true, blank: g === "" }; }
     if (task.typed && g){ const G = strip(g).replace(/^(the|a|an) /, ""); if (acc.some(x => { const A = strip(x).replace(/^(the|a|an) /, ""); return A.length >= 5 && lev(A, G) <= (A.length >= 9 ? 2 : 1); })) return { ok:true, typo:true }; }
     return { ok:false, blank: g === "" };
   }
@@ -777,7 +809,7 @@ const lvlTag = t => (t.review ? `<span class="lvl rv" style="margin:0 6px 0 0">�
 function answerUI(task, rtl, r){
   if (task.k === "mcq") return `<div class="opts">${order(task, r).map(j => `<button class="opt" data-o="${j}" aria-pressed="false" dir="auto">${esc(task.o[j])}</button>`).join("")}</div>`;
   if (task.k === "tf") return `<div class="opts" style="grid-template-columns:1fr 1fr"><button class="opt" data-o="t" aria-pressed="false">True</button><button class="opt" data-o="f" aria-pressed="false">False</button></div>`;
-  const ph = task.k === "num" ? "Type a number" : "Type your answer";
+  const ph = task.k === "num" ? "Type a number" : task.open ? "Write your answer in your own words" : "Type your answer";
   return `<div class="ans">${task.prefix ? `<span class="pre">${esc(task.prefix)}</span>` : ""}<input id="inp" ${task.k === "num" ? 'inputmode="decimal"' : 'autocapitalize="off"'} autocomplete="off" spellcheck="false" placeholder="${ph}" dir="auto"></div>`;
 }
 function wireAnswer(task){
@@ -791,7 +823,7 @@ function check(s, t, r, i, task, isRetry, list, pos){
   const m = mark(task, pick);
   if (task.k === "num" && m.bad) return toast("Type a number only, for example 12 or -3.5");
   stopHints(); if ($("hintBtn")) $("hintBtn").remove();
-  const o = run(s, t, r).o, rec = { g: pick, ok: m.ok, accent: !!m.accent, typo: !!m.typo, h: hintsUsed(o, i), at: Date.now() };
+  const o = run(s, t, r).o, rec = { g: pick, ok: m.ok, accent: !!m.accent, typo: !!m.typo, part: !!m.part, h: hintsUsed(o, i), at: Date.now() };
   if (isRetry){ o.retry = o.retry || {}; o.retry[i] = rec; } else { o.ans[i] = rec; o.i = i; }
   save(); showAfter(s, t, r, i, task, rec, isRetry, list, pos); explain(task, rec, S[s].rtl);
 }
@@ -800,7 +832,7 @@ function showAfter(s, t, r, i, task, rec, isRetry, list, pos){
   $("answerBox").querySelectorAll(".opt").forEach(b => { b.disabled = true; const v = task.k === "tf" ? b.dataset.o === "t" : +b.dataset.o; if (v === task.a) b.classList.add("right"); else if (v === rec.g) b.classList.add("wrong"); });
   const inp = $("inp"); if (inp){ inp.value = rec.g; inp.disabled = true; inp.classList.add(rec.ok ? "right" : "wrong"); }
   const rate = rec.rate || 0;
-  $("after").innerHTML = `<div class="verdict ${rec.ok ? "ok" : "bad"}">${rec.sol ? "📖 Solution shown. The answer is: <span dir='auto'>" + esc(rightText(task)) + "</span>" : rec.ok ? "✓ Correct!" + (rec.h ? " (with " + rec.h + " hint" + (rec.h > 1 ? "s" : "") + ")" : "") + (rec.accent ? " Watch the accent: " + esc(rightText(task)) : "") + (rec.typo ? " Check the spelling: " + esc(rightText(task)) : "") : "✗ Not quite. The answer is: <span dir='auto'>" + esc(rightText(task)) + "</span>"} <button class="btn sm ghost" id="whyBtn" style="margin-left:8px">💡 Why?</button></div>
+  $("after").innerHTML = `<div class="verdict ${rec.ok ? "ok" : "bad"}">${rec.sol ? "📖 Solution shown. The answer is: <span dir='auto'>" + esc(rightText(task)) + "</span>" : rec.ok ? "✓ Correct!" + (rec.h ? " (with " + rec.h + " hint" + (rec.h > 1 ? "s" : "") + ")" : "") + (rec.accent ? " Watch the accent: " + esc(rightText(task)) : "") + (rec.typo ? " Check the spelling: " + esc(rightText(task)) : "") + (task.open ? " Compare with the model answer: <span dir='auto'>" + esc(rightText(task)) + "</span>" : "") : task.open ? (rec.part ? "◐ Nearly: you have some of the key ideas. " : "✗ Not quite. ") + "Model answer: <span dir='auto'>" + esc(rightText(task)) + "</span>" : "✗ Not quite. The answer is: <span dir='auto'>" + esc(rightText(task)) + "</span>"} <button class="btn sm ghost" id="whyBtn" style="margin-left:8px">💡 Why?</button></div>
     <div style="margin-top:12px"><b>Rate your answer</b> <span class="muted small">How well do you understand this now?</span>
       <div class="rate" style="margin-top:8px"><button data-r="1" aria-pressed="${rate === 1}">😀 I've got it</button><button data-r="2" aria-pressed="${rate === 2}">🤔 Partly</button><button data-r="3" aria-pressed="${rate === 3}">😟 I need help</button></div></div>`;
   $("whyBtn").onclick = () => explain(task, rec, S[s].rtl);
@@ -853,7 +885,7 @@ function hintsFor(s, t, task){
   } else if (task.k === "text"){
     const ans = String(task.best || (task.a || [])[0] || "");
     h = [sents.length ? "Think about this: " + maskAns(task, sents[0]) : "Look back at the key knowledge for this topic.",
-         ans ? `The answer has ${ans.replace(/\s/g, "").length} characters (not counting spaces) and starts with "${ans.trim()[0]}".` : "Check your spelling and format."];
+         task.open ? `Your answer should mention ${task.kw.length} key idea${task.kw.length > 1 ? "s" : ""}. Key words start with: ${task.kw.slice(0, 4).map(w => '"' + w[0] + '…"').join(", ")}.` : ans ? `The answer has ${ans.replace(/\s/g, "").length} characters (not counting spaces) and starts with "${ans.trim()[0]}".` : "Check your spelling and format."];
   } else {
     h = [sents.length ? "Think about this: " + maskAns(task, sents[0]) : "Look at each word in the statement: one detail decides whether it's true.",
          sents.length > 1 ? maskAns(task, sents.slice(1).join(" ")) : "Is EVERY part of the statement correct? If one part is wrong, the whole statement is false."];
