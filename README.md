@@ -61,3 +61,9 @@ One sign-in page for SISD's Computer Science (Python Pathways), Design and IT co
 - Once signed in, **Change course ▾** shows **Switch to IT** / **Switch to Design**. Switching saves and sends the current work first and does not ask for a new sign-in.
 - Each course keeps its own units and work; the unit last open in each course is remembered. Every switch is logged to the teacher log (`switchcourse`), and the staff dashboard shows "also IT" / "also Design".
 - Applies to Grade 10 only (`g10Pair` in `sdc.js`, `g10Both` / `g10Switch` in the Design course). Other grades are unchanged.
+
+## Students see only their own grade and course (Nov 2026)
+- Grade 10 Design/IT students: **Change course** offers only Design ⇄ IT (never Computer Science, Study Plus or anything else).
+- Computer Science is only for Grades 6–8 and 11–12: a Grade 9 or 10 account is stopped at sign-in and logged (`wronggrade`), both in `SDC.confirm` and straight away in Python Pathways.
+- Design/IT: "See what other grades are learning" is gone for students (test student only); a student can't open a unit outside their own grade and course, and the year group is never shown as a fallback.
+- Voice Studio opens only for 12 hours after a staff sign-in on the Staff dashboard (cleared by **Lock**).

@@ -527,6 +527,7 @@ $("rGo").onclick = async () => {
 };
 
 function enter(){
+  try { localStorage.setItem("sdc_staff_until", String(Date.now() + 12 * 3600e3)); } catch(e){}   // staff-only pages (Voice Studio) open for 12 hours after a staff sign-in
   $("locked").classList.add("hidden"); $("app").classList.remove("hidden"); $("outBtn").classList.remove("hidden");
   document.querySelectorAll("[data-super]").forEach(e => e.classList.toggle("hidden", !isSuper()));
   $("whoTitle").textContent = isSuper() ? "Super admin" : "Teacher dashboard";
@@ -534,7 +535,7 @@ function enter(){
   $("stTitle").textContent = isSuper() ? "Students" : "My students";
   start();
 }
-$("outBtn").onclick = () => location.reload();
+$("outBtn").onclick = () => { try { localStorage.removeItem("sdc_staff_until"); } catch(e){} location.reload(); };
 
 /* ---------------- tabs ---------------- */
 const TABS = ["hp","students","log","answers","teachers","switches","setup","study","gamedev"];

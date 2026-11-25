@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="en-GB">
 <head>
+<script>/* staff only: opens after a staff sign-in on the Staff dashboard (12 hours) */
+(function(){ let t = 0; try { t = +localStorage.getItem("sdc_staff_until") || 0; } catch(e){}
+  if (t < Date.now()){ document.documentElement.style.display = "none"; location.replace("admin.html"); } })();</script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Voice Studio · SISD Design and Computing</title>
