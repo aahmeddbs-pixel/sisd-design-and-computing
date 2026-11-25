@@ -559,7 +559,7 @@ const isUsername = v => /^[a-z][a-z0-9]{2,40}$/i.test(String(v || "").trim());
    The student asks for a reset: their teacher and the super admin are emailed and see it on the staff dashboard
    ("Reset requests"); the student gets an email saying what happens next. After the reset, resetDone() emails the
    student their new PIN / password. */
-const BASE_TEACHERS = ["Mr. Ahmed", "Ms. Abdelaziz", "Mr. French", "Ms. Miyakawa"];
+const BASE_TEACHERS = ["Mr. Ahmed", "Ms. Abdelaziz", "Mr. French"];
 async function forgot(r){
   const email = normEmail(r.email), c = r.course === "cs" ? "cs" : r.course === "it" ? "it" : "design";
   const uname = !email.includes("@") && isUsername(email);
