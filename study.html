@@ -3,42 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SISD Study Plus</title>
+<title>SISD Study Plus (IB)</title>
 <meta name="referrer" content="no-referrer">
 <meta name="color-scheme" content="light dark">
 <meta name="robots" content="noindex,nofollow">
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
 <script src="sdc.js?v=20261123eye"></script>
 <script src="study/lang.js?v=20261117fr"></script>
-<script src="study/maths.js?v=20261110d"></script>
-<script src="study/english.js?v=20261110d"></script>
-<script src="study/science.js?v=20261110d"></script>
-<script src="study/ins.js?v=20261110d"></script>
-<script src="study/islamic.js?v=20261110d"></script>
-<script src="study/french.js?v=20261110d"></script>
-<script src="study/arabic.js?v=20261110d"></script>
-<script src="study/plus-maths.js?v=20261110d"></script>
-<script src="study/plus-english.js?v=20261110d"></script>
-<script src="study/plus-science.js?v=20261110d"></script>
-<script src="study/plus-ins.js?v=20261110d"></script>
-<script src="study/plus-islamic.js?v=20261110d"></script>
-<script src="study/plus-french.js?v=20261110d"></script>
-<script src="study/plus-arabic.js?v=20261110d"></script>
-<script src="study/bank-maths.js?v=20261114a"></script>
-<script src="study/bank-english.js?v=20261114a"></script>
-<script src="study/bank-science.js?v=20261114a"></script>
-<script src="study/bank-ins.js?v=20261114a"></script>
-<script src="study/bank-islamic.js?v=20261114a"></script>
-<script src="study/bank-french.js?v=20261114a"></script>
-<script src="study/bank-arabic.js?v=20261114a"></script>
-<script src="study/french-verbs.js?v=20261117fr"></script>
-<script src="study/gen.js?v=20261114a"></script>
-<script src="study/g7-maths.js?v=20261121a"></script>
-<script src="study/g7-english.js?v=20261121a"></script>
-<script src="study/g7-science.js?v=20261121a"></script>
-<script src="study/g7-ins.js?v=20261121a"></script>
-<script src="study/bank30.js?v=20261120a"></script>
-<script src="study/expand.js?v=20261120a"></script>
+<script src="seal-core.js?v=20261125a"></script>
+<script src="sp-boot.js?v=20261125a"></script>
+<script src="study/sealed.js?v=20261125a"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -192,7 +166,7 @@ select.big{border:2px solid var(--line);background:var(--card);border-radius:10p
 </head>
 <body>
 <header class="top"><div class="in">
-  <span class="logo">SISD</span><span class="brand">Study Plus<small id="whoLine"></small></span>
+  <span class="logo">SISD</span><span class="brand">Study Plus (IB)<small id="whoLine"></small></span>
   <span class="sp"></span>
   <span class="clock hidden" id="sync" aria-live="polite"></span>
   <span class="clock hidden" id="clock" title="Active work time on this topic">⏱ 00:00</span>
@@ -200,11 +174,11 @@ select.big{border:2px solid var(--line);background:var(--card);border-radius:10p
   <button class="ghost" id="outBtn">Sign out</button>
 </div></header>
 <main id="app"></main>
-<p class="foot">Swiss International Scientific School Dubai · Study Plus</p>
+<p class="foot">Swiss International Scientific School Dubai · Study Plus (IB)</p>
 <div id="modalRoot"></div>
 
 <script>
-(function(){
+window.STUDY_MAIN = function(){
 "use strict";
 const $ = id => document.getElementById(id), esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const S = window.STUDY || {}, ORDER = ["maths","english","science","ins","islamic","french","arabic"].filter(k => S[k]);
@@ -213,10 +187,11 @@ const GEN = window.STUDY_GEN || { make(){ return null; }, has(){ return false; }
 
 /* ---------- who is signed in: only the chosen student (and the test account) may stay ---------- */
 const G = window.SDC ? SDC.gate() : null;
-const WHO = G && (G.acct || G.who);
-if (!window.SDC || !WHO || !SDC.studyPlusOK(WHO)){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg:"Choose your course to sign in.", kind:"warn" })); } catch(e){} location.replace(window.SDC ? SDC.PORTAL : "./"); return; }
-const ACCT = Object.assign({ course:"study" }, G.acct || {}, { name: WHO.name || "", email: WHO.email || "" });
-const FIRST = String(ACCT.name || "").split(/\s+/)[0] || "there";
+const FAM = window.SP_FAMILY || null;   // signed in with the family login on Study Plus UK
+const WHO = FAM ? { name: "Mahaira20 · " + FAM.name, email: "" } : G && (G.acct || G.who);
+if (!window.SDC || !WHO || (!FAM && !SDC.studyPlusOK(WHO))){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg:"Choose your course to sign in.", kind:"warn" })); } catch(e){} location.replace(window.SDC ? SDC.PORTAL : "./"); return; }
+const ACCT = Object.assign({ course:"study" }, (!FAM && G && G.acct) || {}, { name: WHO.name || "", email: WHO.email || "" });
+const FIRST = String((FAM ? FAM.name : ACCT.name) || "").split(/\s+/)[0] || "there";
 $("whoLine").textContent = ACCT.name || ACCT.email;
 
 /* ---------- a "session" = one sign-in. Coming back after signing out (or after 4 hours away) starts a new one,
@@ -259,6 +234,7 @@ const Cloud = (() => {
     const dk = (L.cs && L.cs.dk) || (G && G.acct && G.acct.dk) || "";
     if (dk && em) out.push("cs" + hex(await sha("sdc-cs-design|" + em + "|" + dk)).slice(0, 40));   // the same secret Design uses for this student
     if (L.design && L.design.pw) out.push(String(L.design.pw));
+    if (FAM) out.push("fam" + hex(await sha("sdc-study-fam|" + FAM.key + "|" + FAM.pin)).slice(0, 40));   // family-login students: their own name and PIN
     return out.filter((v, i) => out.indexOf(v) === i);
   }
   async function idFor(sec){ const raw = await sha("sdc-study-key|" + sec);
@@ -454,18 +430,21 @@ async function saveNow(){ save(); try { await Promise.race([Cloud.push(), new Pr
 /* ---------- switcher: Computer Science, Design, Other subjects ---------- */
 function paintSwitcher(){
   const C = SDC.COURSES;
-  $("switcher").innerHTML = `<option value="">Switch ▾</option><option value="cs">${esc(C.cs.name)}</option><option value="design">${esc(C.design.name)}</option><option value="home">Other subjects</option>`;
+  $("switcher").innerHTML = `<option value="">Switch ▾</option><option value="cs">${esc(C.cs.name)}</option><option value="design">${esc(C.design.name)}</option><option value="home">Other subjects</option><option value="uk">Study Plus UK</option>`;
+  if (FAM) $("switcher").innerHTML = `<option value="">Switch ▾</option><option value="home">Study Plus (IB)</option><option value="uk">Study Plus UK</option>`;
   $("switcher").value = "";
 }
 $("switcher").onchange = async e => {
   const to = e.target.value; e.target.value = ""; if (!to) return;
   if (to === "home") return go({ v:"home" });
   stopWork(); await saveNow();
+  if (to === "uk"){ location.href = "uk.html"; return; }
   const g = SDC.gate() || {};
   SDC.setGate({ mode: g.link ? "link" : "signin", course: to, link: g.link || null, studyFrom: true });
   location.href = SDC.COURSES[to].app;
 };
-$("outBtn").onclick = async () => { stopWork(); await saveNow(); try { sessionStorage.removeItem(SESS_KEY); } catch(e){} SDC.leave("out"); };
+$("outBtn").onclick = async () => { stopWork(); await saveNow(); try { sessionStorage.removeItem(SESS_KEY); } catch(e){} try { SEAL.forget(SPBOOT.SITE); } catch(e){}
+  if (FAM){ try { sessionStorage.removeItem("uk_auth"); } catch(e){} location.href = "uk.html"; return; } SDC.leave("out"); };
 
 /* ---------- marking ---------- */
 const strip = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -550,15 +529,16 @@ function renderHome(){
   $("app").innerHTML = `
   <section class="hero">
     <div><div class="eyebrow" style="color:#FFB3BC">Your personal space</div><h1>Hi ${esc(FIRST)}, what will you work on?</h1>
-      <p>Choose Computer Science or Design to carry on with your courses, or pick <b>Other subjects</b> to practise MYP 2 Maths, English, Science, Individuals and Societies, Islamic Education, French and Arabic.</p></div>
+      <p>${FAM ? `Switch to <b>Study Plus UK</b> at any time, or practise` : `Choose Computer Science or Design to carry on with your courses, or pick <b>Other subjects</b> to practise`} MYP 2 Maths, English, Science, Individuals and Societies, Islamic Education, French and Arabic.</p></div>
     <div class="stats"><div class="stat"><b>${fmt(T.ms)}</b><span>Work time</span></div><div class="stat"><b>${T.done}</b><span>Topics done</span></div><div class="stat"><b>${T.sets}</b><span>Sets done</span></div></div>
   </section>
   ${T.waiting.length ? `<div class="card newsets" style="margin-top:14px"><div class="row" style="justify-content:space-between"><div><h2>✦ ${T.waiting.length} new challenge set${T.waiting.length > 1 ? "s are" : " is"} ready</h2>
     <p class="muted small" style="margin-top:2px">New questions on topics you've finished, set at the right level for you. Your earlier sets are saved and you can review them any time.</p></div></div>
     <div class="row" style="margin-top:10px">${T.waiting.slice(0, 12).map(w => `<button class="btn sm ghost" data-w="${w.s}|${w.t}" style="border-left:5px solid ${S[w.s].colour}">${esc(S[w.s].icon)} ${esc(topicOf(w.s, w.t).title)} · Set ${w.r}</button>`).join("")}${T.waiting.length > 12 ? `<span class="muted small">and ${T.waiting.length - 12} more in your subjects</span>` : ""}</div></div>` : ""}
   <div class="pick">
-    <button class="choice" data-go="cs"><span class="ic">&lt;/&gt;</span><span><b>Computer Science</b><span class="muted small">Python Pathways</span></span></button>
+    ${FAM ? `<button class="choice" data-go="uk"><span class="ic">🇬🇧</span><span><b>Study Plus UK</b><span class="muted small">Year 8 and Year 10</span></span></button>` : `<button class="choice" data-go="cs"><span class="ic">&lt;/&gt;</span><span><b>Computer Science</b><span class="muted small">Python Pathways</span></span></button>
     <button class="choice" data-go="design"><span class="ic">✎</span><span><b>Design</b><span class="muted small">MYP Design, Criteria A to D</span></span></button>
+    <button class="choice" data-go="uk"><span class="ic">🇬🇧</span><span><b>Study Plus UK</b><span class="muted small">Year 8 and Year 10</span></span></button>`}
     <button class="choice here" data-go="other"><span class="ic">✦</span><span><b>Other subjects</b><span class="muted small">7 MYP 2 subjects below</span></span></button>
   </div>
   <div class="card" style="margin-top:18px" id="otherCard">
@@ -999,6 +979,21 @@ let READY = false;
   if (Cloud.on) Cloud.push();
 })();
 window.__study = { hintsFor, mark, topicScore, runScore, run, buildRound, ensureRounds, mergeIn, DB: () => DB, SESS, ready: () => READY, Cloud };   // used by the self-test
+};
+</script>
+<script>
+/* open the locked questions, then start Study Plus (IB) */
+(async function(){
+  var home = function(msg){ try { sessionStorage.setItem("sdc_msg", JSON.stringify({ msg: msg || "Choose your course to sign in.", kind:"warn" })); } catch(e){} location.replace(window.SDC ? SDC.PORTAL : "./"); };
+  if (!window.SEAL || !SEAL.ok) return home("Open Study Plus in an up-to-date browser (Chrome, Edge, Safari or Firefox).");
+  var fam = null; try { fam = JSON.parse(sessionStorage.getItem("uk_auth") || "null"); } catch(e){}
+  var K = null;
+  if (SPBOOT.mik()) K = await SPBOOT.mikKey(window.SEAL_STUDY.w);
+  else if (fam && fam.key && fam.pin){ K = SEAL.kept(SPBOOT.SITE); if (K) window.SP_FAMILY = fam; else { location.replace("uk.html"); return; } }
+  else return home();
+  if (!K) return home("Study Plus is locked. Sign in again and type the family login to open it.");
+  if (!(await SPBOOT.load(window.SEAL_STUDY, K))) return home("Study Plus could not be opened. Sign in again.");
+  window.STUDY_MAIN();
 })();
 </script>
 </body>

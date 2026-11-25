@@ -1,0 +1,2 @@
+/* Study Plus (IB): subject names and how many topics each has (for the staff dashboard; no questions) */
+window.STUDY={"maths":{"name":"Mathematics","topics":[{},{},{},{},{},{},{},{}]},"english":{"name":"English","topics":[{},{},{},{},{},{},{}]},"science":{"name":"Science","topics":[{},{},{},{},{},{},{}]},"ins":{"name":"Individuals and Societies","topics":[{},{},{},{},{},{},{}]},"islamic":{"name":"Islamic Education","topics":[{},{},{},{},{},{},{}]},"french":{"name":"French","topics":[{},{},{},{},{},{},{}]},"arabic":{"name":"Arabic","topics":[{},{},{},{},{},{},{}]}};

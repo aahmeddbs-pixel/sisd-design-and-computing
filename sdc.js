@@ -1350,7 +1350,7 @@ function paintStrip(){
     sel.innerHTML = STRIP.signedIn ? `<option value="">Change course ▾</option>` + opts.map(k => `<option value="${k}">Switch to ${esc(COURSES[k].name)}</option>`).join("")
       : `<option value="">Change course ▾</option>` + Object.keys(COURSES).filter(k => k !== STRIP.c).map(k => `<option value="${k}">Sign in to ${esc(COURSES[k].name)}</option>`).join("") + `<option value="__portal">＋ Sign up for a course</option>`;
     const g1 = gate() || {}, sp = STRIP.signedIn && studyPlusOK(g1.acct || g1.who || (g1.link && g1.link.cs));
-    if (sp) sel.innerHTML += `<option value="__study">✦ Other subjects (Study Plus)</option>`;
+    if (sp) sel.innerHTML += `<option value="__study">✦ Study Plus (IB)</option><option value="__uk">✦ Study Plus UK</option>`;
     sel.value = ""; sel.style.display = STRIP.signedIn && !opts.length && !sp ? "none" : ""; }
 }
 function setSignedIn(on){ if (STRIP){ STRIP.signedIn = !!on; paintStrip(); } }
@@ -1388,6 +1388,7 @@ function strip(c, onSignOut, noLang, mainSel, onSignIn){
     if (was && onSignOut){ try { onSignOut(true); } catch(x){} }   // save this course first (the link to the other course is kept)
     if (to === "__portal"){ leave(""); return; }
     if (to === "__study"){ location.href = PORTAL + "study.html"; return; }
+    if (to === "__uk"){ location.href = PORTAL + "uk.html"; return; }
     setGate({ mode: link && was ? "link" : "signin", course:to, link: was ? link : null }); location.href = COURSES[to].app;
   };
 }

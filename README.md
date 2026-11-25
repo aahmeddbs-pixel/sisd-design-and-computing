@@ -12,6 +12,8 @@ One sign-in page for SISD's Computer Science (Python Pathways), Design and IT co
 - Dark mode: `sdc.js` checks every page and switches any text that is too close in colour to its box to dark or light ink, so everything stays readable.
 
 ## Study Plus (private)
+> **Locked (Nov 2026):** see "Study Plus (IB) and Study Plus UK are locked" at the end.
+
 - A private "Other subjects" space (`study.html`) seen only by the student(s) named in `sdc.js → STUDY_PLUS` (currently Mikaeel Ahmed: first and last name, or mikaeel.ahmed@sisd.ae). He signs in once, in Computer Science, and switches to Design and Study Plus without signing in again.
 - In Computer Science or Design, the **Change course** menu shows **✦ Other subjects (Study Plus)** for that student only. Study Plus has a switcher back to Computer Science and Design.
 - 7 MYP 2 subjects (Maths, English, Science, I&S, Islamic, French, Arabic), 50 topics, 572 auto-marked tasks (Core, Extended, Challenge) in `study/*.js` and `study/plus-*.js`. Each topic: key knowledge pop-up, tasks, Check, explanation pop-up (even when right), self-rating, corrections and "Fix my mistakes".
@@ -67,3 +69,13 @@ One sign-in page for SISD's Computer Science (Python Pathways), Design and IT co
 - Computer Science is only for Grades 6–8 and 11–12: a Grade 9 or 10 account is stopped at sign-in and logged (`wronggrade`), both in `SDC.confirm` and straight away in Python Pathways.
 - Design/IT: "See what other grades are learning" is gone for students (test student only); a student can't open a unit outside their own grade and course, and the year group is never shown as a fallback.
 - Voice Studio opens only for 12 hours after a staff sign-in on the Staff dashboard (cleared by **Lock**).
+
+## Study Plus (IB) and Study Plus UK are locked (Nov 2026)
+- The questions, learn pages and generators are no longer readable files. They are scrambled (AES-256) in `study/sealed.js` and `uk/sealed.js` and only open after an allowed sign-in (`seal-core.js`, `sp-boot.js`). Viewing the page code shows nothing readable.
+- **Who can open them (both sites):** the family login **Mahaira20** (typed on the Study Plus UK sign-in, then name + PIN as before), and **Mikaeel** through his normal Computer Science / Design sign-in.
+- Mikaeel types the family login **once** the first time; the key is then saved online, locked with his own Computer Science secret, so after that Study Plus opens by itself on any computer.
+- Switching: Mikaeel moves between Computer Science, Design, Study Plus (IB) and Study Plus UK from the course menus without signing in again. Family-login students switch between Study Plus (IB) and Study Plus UK.
+- The key is kept only in the open browser tab; signing out or closing the tab locks it again.
+- The staff dashboard reads only `study/summary.js` (subject names and topic counts, no questions).
+- Still plain: the Sambusa baby videos and pictures (`uk/baby`, used by the voice workflow) and the images in `uk/keys`.
+- To change locked content, ask Claude: it opens the bundle with the family login, edits and locks it again with the same key.

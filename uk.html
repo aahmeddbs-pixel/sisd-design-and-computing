@@ -10,29 +10,11 @@
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
 <script src="sdc.js?v=20261123eye"></script>
 <script src="study/lang.js?v=20261117fr"></script>
-<script src="study/gen.js?v=20261114c"></script>
-<script src="uk/gen.js?v=20261117fr"></script>
-<script src="uk/y8.js?v=20261114c"></script>
-<script src="uk/y10.js?v=20261114c"></script>
-<script src="uk/y8-more.js?v=20261114c"></script>
-<script src="uk/y10-more.js?v=20261114c"></script>
-<script src="uk/learn-extra.js?v=20261114d"></script>
-<script src="uk/y10-igcse.js?v=20261114d"></script>
-<script src="uk/y8-revision.js?v=20261114d"></script>
-<script src="uk/y8-revision2.js?v=20261121d"></script>
-<script src="uk/exam.js?v=20261124c"></script>
-<script src="uk/exam-y8.js?v=20261124b"></script>
-<script src="uk/exam-y10.js?v=20261124b"></script>
+<script src="seal-core.js?v=20261125a"></script>
+<script src="sp-boot.js?v=20261125a"></script>
+<script src="uk/sealed.js?v=20261125a"></script>
 <script src="uk/baby/videos.js?v=20261121d"></script>
 <script src="uk/baby/sambusa.js?v=20261121e"></script>
-<script src="uk/french.js?v=20261117fr"></script>
-<script src="uk/ks-extra.js?v=20261117fr"></script>
-<script src="uk/bank30-sci.js?v=20261120a"></script>
-<script src="uk/bank30-hum.js?v=20261120a"></script>
-<script src="uk/bank30-tech.js?v=20261120a"></script>
-<script src="uk/bank30-fr.js?v=20261120a"></script>
-<script src="uk/explain-fill.js?v=20261117fr"></script>
-<script src="study/expand.js?v=20261121b"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -224,7 +206,15 @@ const AUTH = "uk_auth", LOGIN_HASH = "755ccb1541fd4f6f2eefd7ba703d45bba156e836aa
 const $ = id => document.getElementById(id), TE = new TextEncoder();
 const hex = async t => [...new Uint8Array(await crypto.subtle.digest("SHA-256", TE.encode(t)))].map(v => v.toString(16).padStart(2, "0")).join("");
 let a = null; try { a = JSON.parse(sessionStorage.getItem(AUTH) || "null"); } catch(e){}
-if (a && a.key && a.pin){ window.UK_AUTH = a; return; }
+if (a && a.key && a.pin && window.SEAL && SEAL.kept(SPBOOT.SITE)){ window.UK_AUTH = a; return; }
+if (a && a.mik && window.SPBOOT && SPBOOT.mik()){ window.UK_AUTH = a; return; }   // Mikaeel: his key is checked below
+try { sessionStorage.removeItem(AUTH); } catch(e){}
+if (window.SPBOOT && SPBOOT.mik()){   // Mikaeel, signed in through Computer Science or Design: no class login needed
+  const m = SPBOOT.mik(), nm = String(m.W.name || "Mikaeel").trim(), first = nm.split(/\s+/)[0];
+  const L = m.G.link || {}, dk = (L.cs && L.cs.dk) || (m.G.acct && m.G.acct.dk) || (L.design && L.design.pw) || nm;
+  hex("uk-mik|" + dk).then(h => { sessionStorage.setItem(AUTH, JSON.stringify({ name: first, key: nm.toLowerCase(), pin: h.slice(0, 16), mik: true, full: nm, at: Date.now() })); location.reload(); });
+  return;
+}
 window.UK_AUTH = null;
 $("switcher").classList.add("hidden"); $("outBtn").classList.add("hidden");
 let last = ""; try { last = (JSON.parse(localStorage.getItem("uk_last") || "{}").name) || ""; } catch(e){}
@@ -249,6 +239,8 @@ $("lf").onsubmit = async e => {
   const name = $("ln").value.trim().replace(/\s+/g, " "), pin = $("lk").value.trim();
   if (!(window.crypto && crypto.subtle)) return err("Open this page from its https:// link to sign in.");
   if ((await hex("uk-login|" + u + "|" + p)) !== LOGIN_HASH) return err("That username or password isn't right. Check with your teacher.");
+  const SK = await SEAL.unwrapAny(window.SEAL_UK.w, SEAL.secret(u, p));
+  if (!SK) return err("That username or password isn't right. Check with your teacher.");
   if (!/^[\p{L}' -]{2,30}$/u.test(name)) return err("Type your first name (letters only).");
   if (!/^\d{4}$/.test(pin)) return err("Your PIN must be exactly 4 digits.");
   const b = $("loginBtn"); b.disabled = true; b.textContent = "Checking…";
@@ -262,6 +254,7 @@ $("lf").onsubmit = async e => {
   if (!hashes.length && window.SDC && SDC.sendRow){ try { SDC.sendRow("Z", pid, ph); SDC.flush(); } catch(e){} }
   known[key] = ph; try { localStorage.setItem("uk_pins", JSON.stringify(known)); localStorage.setItem("uk_last", JSON.stringify({ name })); } catch(e){}
   sessionStorage.setItem(AUTH, JSON.stringify({ name, key, pin, at: Date.now() }));
+  SEAL.keep(SPBOOT.SITE, SK, false);
   try { sessionStorage.removeItem("uk_study_sess"); } catch(e){}
   location.reload();
 };
@@ -269,7 +262,7 @@ setTimeout(() => { try { (last ? $("lu") : $("lu")).focus(); } catch(e){} }, 50)
 })();
 </script>
 <script>
-(function(){
+window.UK_MAIN = function(){
 "use strict";
 const $ = id => document.getElementById(id), esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const S = window.UK || {}, ORDER = ["y8revmaths","y8revscience","y8revenglish","y8revhistory","y8revgeography","y8revfrench","y8revmscs","y8revarabic","y8revislamic","y8maths","y8biology","y8chemistry","y8physics","y8english","y8history","y8geography","y8computing","y8french","y10maths","y10biology","y10chemistry","y10physics","y10english","y10ict","y10psychology"].filter(k => S[k]);
@@ -281,7 +274,7 @@ const GEN = window.UK_GEN || { make(){ return null; }, has(){ return false; } };
 /* ---------- who is signed in (the sign-in script above set UK_AUTH) ---------- */
 const AUTHD = window.UK_AUTH; if (!AUTHD) return;
 const G = null;
-const ACCT = { course:"uk", name: "Mahaira20 · " + AUTHD.name, email:"" };
+const ACCT = { course:"uk", name: AUTHD.mik ? (AUTHD.full || AUTHD.name) : "Mahaira20 · " + AUTHD.name, email:"" };
 const FIRST = AUTHD.name.split(/\s+/)[0];
 $("whoLine").textContent = AUTHD.name + " · Year 8 and Year 10";
 
@@ -536,9 +529,14 @@ window.addEventListener("online", () => Cloud.push());
 async function saveNow(){ save(); try { await Promise.race([Cloud.push(), new Promise(r => setTimeout(r, 2500))]); } catch(e){} }
 
 /* ---------- switcher: home, Year 8, Year 10 ---------- */
-function paintSwitcher(){ $("switcher").innerHTML = `<option value="">Go to ▾</option><option value="home">Home</option><option value="8">Year 8 subjects</option><option value="10">Year 10 subjects</option><option value="sambusa">🥟 Sambusa (little ones)</option>`; $("switcher").value = ""; }
-$("switcher").onchange = e => { const to = e.target.value; e.target.value = ""; if (!to) return; if (to === "sambusa") return go({ v:"sambusa" }); go({ v:"home" }); if (to !== "home") setTimeout(() => { const el = $("year" + to); if (el) el.scrollIntoView({ behavior:"smooth" }); }, 50); };
-$("outBtn").onclick = async () => { stopWork(); await saveNow(); try { sessionStorage.removeItem(SESS_KEY); sessionStorage.removeItem("uk_auth"); } catch(e){} location.reload(); };
+function paintSwitcher(){ $("switcher").innerHTML = `<option value="">Go to ▾</option><option value="home">Home</option><option value="8">Year 8 subjects</option><option value="10">Year 10 subjects</option><option value="sambusa">🥟 Sambusa (little ones)</option><option value="ib">Study Plus (IB)</option>${AUTHD.mik ? '<option value="cs">Computer Science</option><option value="design">Design</option>' : ""}`; $("switcher").value = ""; }
+$("switcher").onchange = async e => { const to = e.target.value; e.target.value = ""; if (!to) return;
+  if (to === "ib" || to === "cs" || to === "design"){ stopWork(); await saveNow();
+    if (to === "ib"){ location.href = "study.html"; return; }
+    const g = SDC.gate() || {}; SDC.setGate({ mode: g.link ? "link" : "signin", course: to, link: g.link || null, studyFrom: true }); location.href = SDC.COURSES[to].app; return; }
+  if (to === "sambusa") return go({ v:"sambusa" }); go({ v:"home" }); if (to !== "home") setTimeout(() => { const el = $("year" + to); if (el) el.scrollIntoView({ behavior:"smooth" }); }, 50); };
+$("outBtn").onclick = async () => { stopWork(); await saveNow(); try { sessionStorage.removeItem(SESS_KEY); sessionStorage.removeItem("uk_auth"); } catch(e){} try { SEAL.forget(SPBOOT.SITE); } catch(e){}
+  if (AUTHD.mik){ SDC.leave("out"); return; } location.reload(); };
 
 /* ---------- marking ---------- */
 const strip = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -1095,6 +1093,17 @@ let READY = false;
   if (Cloud.on) Cloud.push();
 })();
 window.__study = { hintsFor, mark, topicScore, runScore, run, buildRound, ensureRounds, mergeIn, DB: () => DB, SESS, ready: () => READY, Cloud };   // used by the self-test
+};
+</script>
+<script>
+/* open the locked questions, then start Study Plus UK */
+(async function(){
+  if (!window.UK_AUTH) return;   // the sign-in form is showing
+  var K = window.UK_AUTH.mik ? await SPBOOT.mikKey(window.SEAL_UK.w) : SEAL.kept(SPBOOT.SITE);
+  var back = function(){ try { sessionStorage.removeItem("uk_auth"); } catch(e){} if (window.UK_AUTH.mik){ SDC.leave("blocked"); } else location.reload(); };
+  if (!K) return back();
+  if (!(await SPBOOT.load(window.SEAL_UK, K))) return back();
+  window.UK_MAIN();
 })();
 </script>
 </body>
