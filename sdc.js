@@ -1065,7 +1065,7 @@ function textOf(el){
 }
 /* ---------- taking a long time on one task ----------
    1st message: encouragement. 2nd: encouragement + "this is taking longer than expected".
-   Still stuck after that: their teacher is told (a "needs help" alert in the staff dashboard, and an email to the admin).
+   Still stuck after that: their own teacher is told (a "needs help" alert in the staff dashboard, and an email to that teacher only).
    Only active minutes count (typing, clicking, scrolling in the last 2 minutes), not time sitting idle. */
 const slow = (() => {
   let cur = null, lastAct = Date.now(), tick = null;
@@ -1090,7 +1090,7 @@ const slow = (() => {
     else if (cur.stage < 3 && m >= cur.t[2]){ cur.stage = 3;
       log("slowalert", Object.assign({}, cur.who || {}), { task:{ t:String(cur.label || "").slice(0, 120) }, mins:Math.round(m) });
       const W = cur.who || {}, L = cur.label;
-      teacherEmailFor(W.teacher).then(te => jsonp({ a:"notify", k:"slow-student", te, e:normEmail(W.email || ""), n:String(W.name || "").slice(0, 80), w:(courseLabel(W.course || "") + (W.grade ? ", Grade " + W.grade : "") + (W.teacher ? " · " + W.teacher : "") + " · " + String(L || "") + " · " + Math.round(m) + " min").slice(0, 160) }, 20000)).catch(() => {});
+      teacherEmailFor(W.teacher).then(te => jsonp({ a:"notify", k:"slow-student", te, t:String(W.teacher || "").slice(0, 60), e:normEmail(W.email || ""), n:String(W.name || "").slice(0, 80), w:(courseLabel(W.course || "") + (W.grade ? ", Grade " + W.grade : "") + (W.teacher ? " · " + W.teacher : "") + " · " + String(L || "") + " · " + Math.round(m) + " min").slice(0, 160) }, 20000)).catch(() => {});
       box(`<div style="font-size:2rem">🙋</div><h2 style="margin:6px 0 8px">Your teacher is on the way</h2><p style="margin:0">This task is taking a long time, so we've let your teacher know. They'll help you get moving again. Keep trying in the meantime!</p>`, "warn"); }
   }
   return {
@@ -1518,6 +1518,10 @@ const live = (() => {
       bg.querySelector("#sdcHgo").disabled = true;
       try { await post("H", p); } catch(e){}
       log("helpask", Object.assign({ course: g.course }, g.acct), { task:{ t:String(on).slice(0, 120) }, kind, ver:p.at });
+      /* 25 Nov 2026: also email the student's own teacher (never the super admin or one shared inbox) */
+      const A = g.acct || {};
+      teacherEmailFor(A.teacher).then(te => jsonp({ a:"notify", k:"help-ask", te, t:String(A.teacher || "").slice(0, 60), e:normEmail(A.email || ""), n:String(A.name || "").slice(0, 80),
+        w:(courseLabel(g.course || A.course || "") + (A.grade ? ", Grade " + A.grade : "") + (A.teacher ? " · " + A.teacher : "") + " · " + String(on || "")).slice(0, 160), kt:p.kt, msg:p.msg.slice(0, 300) }, 20000)).catch(() => {});
       setHelp({ ver:p.at, at:Date.now(), on, st:"wait" }); send(true);
       bg.querySelector(".in").innerHTML = `<div style="font-size:2rem">✅</div><h2 style="margin:4px 0 8px">Your teacher has been told</h2><p style="margin:0">${esc(g.acct.teacher || "Your teacher")} can see you need help with <b>${esc(on)}</b>. Keep trying while you wait: read the task again and look back at the example.</p><button type="button" class="b" style="margin-top:14px;background:#1B2D4E;color:#fff">OK</button>`;
       bg.querySelector("button").onclick = () => bg.remove();

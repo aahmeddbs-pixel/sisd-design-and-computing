@@ -169,7 +169,7 @@ function start_(email, kind){
 /* a teacher asked for staff access: email the owner of this script (you) straight away */
 function notify_(p){
   const kind = String(p.k || "");
-  if (kind === "slow-student") return slow_(p);
+  if (kind === "slow-student" || kind === "help-ask") return slow_(p);
   if (kind === "reset-request") return resetRequest_(p);
   if (kind === "reset-done") return resetDone_(p);
   if (kind !== "teacher-request" && kind !== "student-request") return { ok: false, reason: "unknown" };
@@ -235,30 +235,49 @@ function studentMail_(to, subject, html, o){
   if (o.trash){ try { Utilities.sleep(1500); GmailApp.search('in:sent subject:"' + subject + '"', 0, 5).forEach(t => t.moveToTrash()); } catch(err){} }
   return true;
 }
-/* where every "student needs help" email goes (as well as the class teacher) */
+/* Mr. Ahmed's school address: used for reset requests, and for "needs help" emails ONLY when he is the student's own teacher */
 const SLOW_TO = "abdulaziz.ahmed@sisd.ae";
-/* a student has been stuck on one task for a long time: email their class teacher (and you) */
+/* the student's own teacher: the email the page found, otherwise from the teacher's name they picked at sign-up */
+function teacherEmail_(te, tname){
+  te = String(te || "").trim().toLowerCase();
+  if (te && DOMAIN.test(te)) return te;
+  const n = String(tname || "").toLowerCase();
+  if (/ahmed/.test(n)) return SLOW_TO;
+  for (const k in STAFF_EMAILS) if (n.indexOf(k) >= 0) return STAFF_EMAILS[k];
+  return "";
+}
+/* 25 Nov 2026: a student needs help (stuck on a task a long time, or pressed "Need help"). The email goes to THAT
+   student's own teacher only: not to the super admin and not to one shared account. You get it only when you are
+   the student's teacher. If the teacher's email can't be found, or the platform's Gmail can't send, you get a short
+   note saying which student and teacher, so no request is ever lost. */
 function slow_(p){
-  const email = String(p.e || "").trim().toLowerCase().slice(0, 120), te = String(p.te || "").trim().toLowerCase().slice(0, 120);
+  const email = String(p.e || "").trim().toLowerCase().slice(0, 120), tname = String(p.t || "").slice(0, 60);
+  const te = teacherEmail_(String(p.te || "").slice(0, 120), tname), asked = String(p.k || "") === "help-ask";
   const who = email || String(p.n || "").trim().toLowerCase().slice(0, 80);
   if (!who) return { ok: false, reason: "who" };
-  const cache = CacheService.getScriptCache(), n = +(cache.get("slow-count") || 0);
-  if (n >= 40) return { ok: false, reason: "wait" };                      // at most 40 of these an hour
-  if (cache.get("slow:" + who)) return { ok: true, already: true };       // one per student per 45 minutes
-  cache.put("slow-count", String(n + 1), 3600); cache.put("slow:" + who, "1", 2700);
+  const cache = CacheService.getScriptCache(), n = +(cache.get("slow-count") || 0), ck = (asked ? "help:" : "slow:") + who;
+  if (n >= 60) return { ok: false, reason: "wait" };                      // at most 60 of these an hour
+  if (cache.get(ck)) return { ok: true, already: true };                  // one per student per 45 min (stuck) / 5 min (button)
+  cache.put("slow-count", String(n + 1), 3600); cache.put(ck, "1", asked ? 300 : 2700);
   const h = s => String(s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const name = String(p.n || "").slice(0, 80), where = String(p.w || "").slice(0, 160), me = SLOW_TO;
+  const name = String(p.n || "").slice(0, 80), where = String(p.w || "").slice(0, 160);
+  const need = String(p.kt || "").slice(0, 80), msg = String(p.msg || "").slice(0, 500);
   const body = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#16223A;max-width:520px">' +
     '<div style="background:#1B2D4E;color:#fff;padding:14px 18px;border-bottom:4px solid #E0A100;font-weight:bold">SISD Design and Computing · Student needs help</div>' +
-    '<p><b>' + h(name || email) + '</b> has been on the same task for a long time and has already had two reminders on screen.</p>' +
+    (asked ? '<p><b>' + h(name || email) + '</b> pressed <b>Need help</b> and is asking you for help.</p>'
+           : '<p><b>' + h(name || email) + '</b> has been on the same task for a long time and has already had two reminders on screen.</p>') +
     '<p style="background:#FFF6DA;border-radius:8px;padding:10px 12px">' + h(where) + '</p>' +
+    (need ? '<p><b>What they need:</b> ' + h(need) + '</p>' : '') + (msg ? '<p><b>They wrote:</b> ' + h(msg) + '</p>' : '') +
     '<p>Please check in with them in class. It also shows in the staff dashboard under Students &amp; progress → "Needs help".</p>' +
     '<p><a href="' + SITE + 'admin.html" style="display:inline-block;background:#DC2B3E;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Open the staff dashboard</a></p></div>';
   const subject = "Student needs help: " + (name || email);
-  let teacherSent = false;
-  if (te && DOMAIN.test(te) && te !== me) teacherSent = staffMail_(te, subject, body);   // from the platform's Gmail, not this one
-  MailApp.sendEmail({ to: me, name: "SISD Design and Computing", subject: subject + (te === me ? "" : te ? (teacherSent ? " (also sent to " + te + ")" : " (could not email " + te + ")") : " (teacher email unknown)"), htmlBody: body });
-  return { ok: true, sent: true, teacher: teacherSent };
+  if (te === SLOW_TO){ MailApp.sendEmail({ to: SLOW_TO, name: "SISD Design and Computing", subject: subject, htmlBody: body }); return { ok: true, sent: true, teacher: true }; }
+  const sent = !!te && staffMail_(te, subject, body);                     // from the platform's Gmail, so your Gmail is never shown
+  if (!sent) MailApp.sendEmail({ to: SLOW_TO, name: "SISD Design and Computing",
+    subject: "Could not reach the teacher: " + subject,
+    htmlBody: '<p style="font-family:Arial">This help request could not be emailed to the student\'s own teacher (' + h(tname || "teacher not chosen") + (te ? ", " + h(te) : ", email not known") + '). ' +
+      (te ? 'The platform\'s Gmail did not send it: run checkMailer to test it.' : 'Add the teacher\'s school email in the staff dashboard → Teachers.') + ' Please pass it on.</p>' + body });
+  return { ok: true, sent: true, teacher: sent };
 }
 
 /* ---------- forgot PIN / password ----------
