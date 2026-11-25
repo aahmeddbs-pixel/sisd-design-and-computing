@@ -12,7 +12,6 @@
 <script src="/python-pathways/answers-view.js?v=20261112all"></script>
 <script src="sdc.js?v=20261123eye"></script>
 <script src="/python-pathways/game-dev-data.js?v=20261116gd"></script>
-<script src="study/summary.js?v=20261125a"></script>
 <style>
 :root{
   --navy:#1B2D4E; --navy-d:#101d35; --red:#DC2B3E; --bg:#F3F5F9; --card:#fff; --ink:#16223A; --muted:#5B6782; --line:#D8DEEA; --soft:#E9EDF5;
@@ -712,6 +711,15 @@ $("testMail").onclick = async () => {
 };
 
 /* ---------------- reading the log sheet ---------------- */
+/* rows only the super admin may see: Study Plus (IB), Study Plus UK, the family login and the private pilot course */
+function privateRow(d){
+  const a = d.acct || {}, c = String(a.course || d.course || "").toLowerCase(), t = String(d.type || "");
+  if (/^study/.test(t) || t === "studyplus" || t === "studyopen") return true;
+  if (c === "study" || c === "uk" || c === "jpa") return true;
+  if (/mahaira20/i.test(String(a.name || "")) || d.study) return true;
+  if (t === "switchcourse" && /study|uk/i.test(String(d.to || "") + String(d.from || ""))) return true;
+  return false;
+}
 let ROWS = [], PYACCTS = {}, PYSNAP = {}, DS = {}, PINS = {};   // PINS: the latest known PIN of each CS student (sign-up or reset)
 const notePin = (k, pin, when) => { if (/^\d{4}$/.test(String(pin || "")) && (!PINS[k] || PINS[k].when <= when)) PINS[k] = { pin:String(pin), when }; };
 function parseCSV(t){
@@ -737,6 +745,7 @@ async function refresh(){
     if (seen.has(r[di])) return; seen.add(r[di]);
     let d = null; try { d = JSON.parse(r[di] || ""); } catch(e){ return; }
     if (!d || !d.acct) return;
+    if (!isSuper() && privateRow(d)) return;   // Study Plus, Study Plus UK and private courses: super admin only
     if (d.sdc){ d.when = Date.parse(d.at) || 0; ROWS.push(d); if (d.type === "pinreset" && d.pin) notePin(SDC.keyOf(d.acct.email, d.acct.name), d.pin, d.when); return; }
     const a = d.acct, k = SDC.keyOf(a.email, a.name), when = Date.parse(d.at) || 0;   // older Python Pathways rows: known CS students
     if (d.pin) notePin(k, d.pin, when);
@@ -1839,7 +1848,7 @@ $("lgF").onchange = renderLog;
 /* ---------------- Study Plus (super admin only) ---------------- */
 function renderStudy(){
   if (!isSuper() || !$("spBody")) return;
-  const ST = window.STUDY || {}, total = Object.keys(ST).reduce((n, k) => n + ST[k].topics.length, 0);
+  const ST = {"maths":{"name":"Mathematics","topics":[{},{},{},{},{},{},{},{}]},"english":{"name":"English","topics":[{},{},{},{},{},{},{}]},"science":{"name":"Science","topics":[{},{},{},{},{},{},{}]},"ins":{"name":"Individuals and Societies","topics":[{},{},{},{},{},{},{}]},"islamic":{"name":"Islamic Education","topics":[{},{},{},{},{},{},{}]},"french":{"name":"French","topics":[{},{},{},{},{},{},{}]},"arabic":{"name":"Arabic","topics":[{},{},{},{},{},{},{}]}}, total = Object.keys(ST).reduce((n, k) => n + ST[k].topics.length, 0);
   const reps = ROWS.filter(r => r.type === "studyplus" && r.study), opens = ROWS.filter(r => r.type === "studyopen");
   const by = {};
   const rec = a => { const k = SDC.keyOf(a.email, a.name); return by[k] = by[k] || { name:a.name || a.email, email:a.email || "", reps:[], opens:0, last:0 }; };
