@@ -180,27 +180,44 @@ function gviz(tq, sheet, src){
 }
 let COL = null;
 /* every tab that holds sync rows: the linked tab plus any "Form responses N" tab (a re-linked form writes to a new tab) */
+/* 25 Nov 2026: sign-in was slow because the 10 tabs were checked one after another on every page. Now they are all
+   checked at the same time, and the answer is remembered on this computer for 12 hours. */
+const COL_KEY = "sdc_col_v2", COL_HOURS = 12;
+let COL_P = null;
 async function column(){
   if (COL) return COL;
-  const locs = [];
-  for (const src of [SYNC].concat(SYNC_OLD)){   // the new sheet first, then the old, full one (its linked tab only)
-    const mine = [];
-    for (const sheet of src === SYNC ? ["", ...[1,2,3,4,5,6].map(n => "Form responses " + n), "Form Responses 1", "Form Responses 2"] : [""]){
-      let r; try { r = await gviz("select * limit 30", sheet, src); } catch(e){ if (!sheet && src === SYNC) throw e; continue; }
-      const cols = (r.table && r.table.cols) || [], rws = (r.table && r.table.rows) || [];
-      let i = cols.findIndex((x, j) => rws.some(row => String(((row.c || [])[j] || {}).v || "").startsWith("PPS2|")));
-      if (i < 0) i = cols.findIndex(x => /^\s*data\s*$/i.test(x.label || ""));
-      if (i >= 0) mine.push({ col: cols[i].id, time: cols[0].id, sheet, src });
-    }
-    if (!mine.length) mine.push({ col: "B", time: "A", sheet: "", src });
-    locs.push(...mine);
-  }
-  return (COL = locs);
+  try { const c = JSON.parse(localStorage.getItem(COL_KEY) || "null"), srcs = [SYNC].concat(SYNC_OLD);
+    if (c && Date.now() - c.at < COL_HOURS * 3600000 && Array.isArray(c.locs) && c.locs.length)
+      return (COL = c.locs.map(l => Object.assign({}, l, { src: srcs.find(x => x.id === l.id) || SYNC }))); } catch(e){}
+  if (COL_P) return COL_P;
+  COL_P = (async () => {
+    const jobs = [];
+    [SYNC].concat(SYNC_OLD).forEach((src, si) => (src === SYNC ? ["", ...[1,2,3,4,5,6].map(n => "Form responses " + n), "Form Responses 1", "Form Responses 2"] : [""])
+      .forEach((sheet, ti) => jobs.push(gviz("select * limit 30", sheet, src).then(r => ({ src, si, ti, sheet, r }), e => ({ src, si, ti, sheet, e })))));
+    const got = await Promise.all(jobs), main = got.find(x => x.src === SYNC && !x.sheet);
+    if (main && main.e) throw main.e;
+    const locs = [];
+    [SYNC].concat(SYNC_OLD).forEach(src => {
+      const mine = [];
+      got.filter(x => x.src === src && !x.e).sort((a, b) => a.ti - b.ti).forEach(({ sheet, r }) => {
+        const cols = (r.table && r.table.cols) || [], rws = (r.table && r.table.rows) || [];
+        let i = cols.findIndex((x, j) => rws.some(row => String(((row.c || [])[j] || {}).v || "").startsWith("PPS2|")));
+        if (i < 0) i = cols.findIndex(x => /^\s*data\s*$/i.test(x.label || ""));
+        if (i >= 0) mine.push({ col: cols[i].id, time: cols[0].id, sheet, src });
+      });
+      if (!mine.length) mine.push({ col: "B", time: "A", sheet: "", src });
+      locs.push(...mine);
+    });
+    try { localStorage.setItem(COL_KEY, JSON.stringify({ at: Date.now(), locs: locs.map(l => ({ col:l.col, time:l.time, sheet:l.sheet, id:l.src.id })) })); } catch(e){}
+    return (COL = locs);
+  })();
+  try { return await COL_P; } finally { COL_P = null; }
 }
 async function rows(kind, id, limit){
-  const out = [], seen = new Set();
-  for (const c of await column()){
-    let r; try { r = await gviz(`select ${c.col} where ${c.col} starts with 'PPS2|${kind}|${id}|' order by ${c.time} desc limit ${limit || 30}`, c.sheet, c.src); } catch(e){ if (!c.sheet && c.src === SYNC) throw e; continue; }
+  const out = [], seen = new Set(), locs = await column();
+  const got = await Promise.all(locs.map(c => gviz(`select ${c.col} where ${c.col} starts with 'PPS2|${kind}|${id}|' order by ${c.time} desc limit ${limit || 30}`, c.sheet, c.src).then(r => ({ c, r }), e => ({ c, e }))));   // every sheet at once
+  for (const { c, r, e } of got){
+    if (e){ if (!c.sheet && c.src === SYNC) throw e; continue; }
     ((r.table && r.table.rows) || []).forEach(row => { const v = String(((row.c || [])[0] || {}).v || ""); if (seen.has(v)) return; seen.add(v);
       const p = v.split("|"); if (p.length >= 7) out.push({ ver:+p[3], text:p.slice(6).join("|") }); });
   }
@@ -238,7 +255,15 @@ async function verify(text){
   } catch(e){ return null; }
 }
 /* Look up one student: their registered course (first registration wins) and the admin's latest assignment. */
-async function lookup(email, name){
+const LOOK = {};
+function lookup(email, name){
+  const k = keyOf(email, name) + "|" + ((gate() || {}).course || ""), hit = LOOK[k];
+  if (hit && Date.now() - hit.at < 60000) return hit.p;
+  const p = lookup0(email, name); LOOK[k] = { at: Date.now(), p };
+  p.catch(() => { if (LOOK[k] && LOOK[k].p === p) delete LOOK[k]; });
+  return p;
+}
+async function lookup0(email, name){
   const id = await idOf(email, name);
   const [S, G] = await Promise.all([rows("S", id, 20), rows("G", id, 50)]);
   let assign = null;
@@ -422,7 +447,7 @@ async function confirm(a, signup){
   let L = null;
   try { L = await lookup(a.email, a.name); } catch(e){ L = null; }
   if (!L){ // sheet unreachable: let them in, it is checked again next time (new sign-ups must still verify)
-    const made0 = createdMs(a), vm = c === "cs" || a.viaCS || a.viaCode ? null : await verifyGate(a.email, "student", !!signup || (made0 ? made0 >= sinceMs() : false), a);   // new accounts must verify even when the online register can't be read if (vm){ log("unverified", Object.assign({}, a, { course:c }), { signup:!!signup }); return { ok:false, verify:true, msg:vm }; }
+    const made0 = createdMs(a), vm = c === "cs" || a.viaCS || a.viaCode ? null : await verifyGate(a.email, "student", !!signup || (made0 ? made0 >= sinceMs() : false), a, !!signup);   // new accounts must verify even when the online register can't be read if (vm){ log("unverified", Object.assign({}, a, { course:c }), { signup:!!signup }); return { ok:false, verify:true, msg:vm }; }
     patchGate({ who:{ email:normEmail(a.email), name:a.name }, acct: acctOf(Object.assign({}, a, { course:c })) });   // acct: the course menu needs the grade (Grade 10 Design ⇄ IT)
     if (!(g && g.logged)) { log("signin", Object.assign({}, a, { course:c }), { gate:g && g.mode, unchecked:true }); patchGate({ logged:true }); }
     return { ok:true, assign:null };
@@ -446,7 +471,7 @@ async function confirm(a, signup){
   // only accounts made after verification was switched on must verify (judged by when the account was made,
   // not by when it first reached the online register). Computer Science students never need to verify.
   const made = createdMs(a), isNew = !!signup || (made ? made >= sinceMs() : (!!L.reg && L.reg.ver >= sinceMs()));
-  const vm = c === "cs" || a.viaCS || a.viaCode ? null : await verifyGate(a.email, "student", isNew, a);
+  const vm = c === "cs" || a.viaCS || a.viaCode ? null : await verifyGate(a.email, "student", isNew, a, !!signup);
   if (vm){ log("unverified", Object.assign({}, a, { course:c }), { signup:!!signup }); return { ok:false, verify:true, msg:vm }; }
   patchGate({ who:{ email:normEmail(a.email), name:a.name }, acct: acctOf(Object.assign({}, a, { course: c })) }); work(); setTimeout(showFeedbackButton, 800);
   if (!(g && g.logged)){ log(signup ? "signup" : "signin", Object.assign({}, a, { course:c }), { gate:g && g.mode }); patchGate({ logged:true }); }
@@ -470,9 +495,9 @@ function jsonp(params, timeout){
   });
 }
 const VKEY = e => "sdc_ver_" + normEmail(e);
-async function isVerified(email){
+async function isVerified(email, timeout){
   try { if (localStorage.getItem(VKEY(email)) === "1") return true; } catch(e){}
-  const r = await jsonp({ a:"status", e:normEmail(email) });
+  const r = await jsonp({ a:"status", e:normEmail(email) }, timeout);
   if (r && r.verified){ try { localStorage.setItem(VKEY(email), "1"); } catch(e){} return true; }
   return false;
 }
@@ -496,9 +521,9 @@ function verifyMsg0(email, r){
 }
 /* returns null when the person may continue, or a message explaining what to do */
 /* a teacher or the super admin let this student in by hand (e.g. the verification email never arrived) */
-async function adminVerified(email){
+async function adminVerified(email, rethrow){
   try { const id = await idOf(email, "");
-    for (const r of await rows("V", id, 10)){ const o = await verify(r.text); if (o && o.k === id && o.verified){ try { localStorage.setItem(VKEY(email), "1"); } catch(e){} return true; } } } catch(e){}
+    for (const r of await rows("V", id, 10)){ const o = await verify(r.text); if (o && o.k === id && o.verified){ try { localStorage.setItem(VKEY(email), "1"); } catch(e){} return true; } } } catch(e){ if (rethrow) throw e; }
   return false;
 }
 /* ---------- Grade 10 sign-up: confirm the SISD email with a 6-digit code, then forget the email ----------
@@ -623,13 +648,18 @@ function notifyStudent(email, a){
   jsonp({ a:"notify", k:"student-request", e:normEmail(email), n:String((a && a.name) || "").slice(0, 80), w:courseLabel((a && a.course) || "") + ((a && a.grade) ? ", Grade " + a.grade : "") + ((a && a.teacher) ? " · " + a.teacher : "") }, 20000).catch(() => {});
 }
 const approveMsg = () => `⏳ <b>Your account is waiting for your teacher's approval.</b> We've let them know. Once they approve it, come back here and sign in with your email and password.`;
-async function verifyGate(email, kind, isNew, a){
+async function verifyGate(email, kind, isNew, a, strict){
   if (!verifyOn() || !isNew) return null;
   if (VERIFY.mode === "approve" && kind === "staff") return null;   // teachers are approved by the super admin anyway
   if (!/@sisd\.ae$/i.test(normEmail(email))) return verifyMsg(email, { reason:"domain" });
-  let v = false; try { v = await isVerified(email); } catch(e){ v = false; }
-  if (!v) v = await adminVerified(email);
+  /* 25 Nov 2026: the two checks run at the same time. If neither could be reached (slow school Wi-Fi, the email
+     script waking up), an existing account is let in and checked again at the next sign-in, instead of being
+     sent back to the sign-in page with "waiting for approval". A brand-new sign-up must still be approved. */
+  let reachErr = 0;
+  const v1 = isVerified(email, 9000).catch(() => { reachErr++; return false; }), v2 = adminVerified(email, true).catch(() => { reachErr++; return false; });
+  const v = await new Promise(res => { let n = 0; [v1, v2].forEach(p => p.then(x => { if (x) res(true); else if (++n === 2) res(false); })); });
   if (v) return null;
+  if (reachErr && !strict){ try { log("verifyunchecked", Object.assign({}, a || {}, { email:normEmail(email) }), { errors:reachErr }); } catch(e){} return null; }
   if (VERIFY.mode === "approve"){ notifyStudent(email, a); return approveMsg(); }
   return verifyMsg(email, await startVerify(email, kind));
 }
@@ -1439,8 +1469,12 @@ const live = (() => {
   function css(){
     if (document.getElementById("sdcHelpCss")) return;
     const s = document.createElement("style"); s.id = "sdcHelpCss";
-    s.textContent = `.sdcHelpTab{position:fixed;right:0;top:46%;z-index:2147483000;background:#E0A100;color:#1B2D4E;border:0;border-radius:12px 0 0 12px;padding:10px 12px 10px 14px;font:800 15px/1.2 Arial,Helvetica,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.25);cursor:pointer;max-width:200px;text-align:left}
+    s.textContent = `.sdcHelpTab{position:fixed;right:0;top:46%;z-index:2147483000;background:#E0A100;color:#1B2D4E;border:0;border-radius:12px 0 0 12px;padding:10px 14px 10px 12px;font:800 15px/1.2 Arial,Helvetica,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.25);cursor:pointer;width:210px;text-align:left;display:flex;gap:10px;align-items:center;transform:translateX(calc(100% - 44px));transition:transform .28s ease}
+.sdcHelpTab:hover,.sdcHelpTab:focus-visible,.sdcHelpTab.open{transform:translateX(0)}
+.sdcHelpTab .ic{font-size:20px;flex:none;width:22px;text-align:center}.sdcHelpTab .tx{flex:1;min-width:0}
+.sdcHelpTab.wait,.sdcHelpTab.come{transform:translateX(0)}
 .sdcHelpTab.wait{background:#1B2D4E;color:#fff}.sdcHelpTab.come{background:#1E8A55;color:#fff}.sdcHelpTab small{display:block;font-weight:600;font-size:12px;margin-top:3px;opacity:.9}
+.sdcHelpBtn{display:none!important}
 .sdcHelpBtn{display:inline-flex;align-self:flex-start;width:auto;max-width:max-content;align-items:center;gap:6px;background:#FFF4D6;color:#5A3D00;border:2px solid #E0A100;border-radius:999px;padding:6px 14px;font:700 14px/1.2 Arial,Helvetica,sans-serif;cursor:pointer;margin:6px 0}
 .sdcHelpBtn:hover{background:#FFE8A3}
 .sdcHelpBox{position:fixed;inset:0;background:rgba(14,26,48,.6);z-index:2147483600;display:flex;align-items:center;justify-content:center;padding:16px;font:16px/1.5 Arial,Helvetica,sans-serif}
@@ -1480,10 +1514,12 @@ const live = (() => {
     if (!g || !document.body){ if (b) b.remove(); return; }
     css(); if (!b){ b = document.createElement("button"); b.type = "button"; b.id = "sdcHelpTab"; b.className = "sdcHelpTab notranslate-auto"; document.body.appendChild(b); }
     const h = getHelp();
-    if (!h){ b.className = "sdcHelpTab"; b.innerHTML = "🙋 Need help?"; b.title = "Ask your teacher for help with this task"; b.onclick = () => ask(); return; }
-    if (h.st === "coming"){ b.className = "sdcHelpTab come"; b.innerHTML = `🏃 ${esc(h.by || "Your teacher")} is coming<small>to help you. Press to cancel</small>`; }
-    else if (h.st === "done"){ b.className = "sdcHelpTab come"; b.innerHTML = `✅ Helped<small>Press to ask again</small>`; }
-    else { b.className = "sdcHelpTab wait"; b.innerHTML = `🙋 Help asked<small>Waiting for your teacher. Press to cancel</small>`; }
+    const set = (cls, html) => { const open = b.classList.contains("open"); if (b.dataset.h !== cls + html){ b.dataset.h = cls + html; b.innerHTML = html; } b.className = "sdcHelpTab " + cls + (open ? " open" : ""); };
+    if (!h){ set("", `<span class="ic">🙋</span><span class="tx">Need help?<small>Ask your teacher</small></span>`); b.title = "Ask your teacher for help with this task"; b.setAttribute("aria-label", "Need help? Ask your teacher");
+      b.onclick = () => { if (matchMedia("(hover: none)").matches && !b.classList.contains("open")){ b.classList.add("open"); clearTimeout(b._t); b._t = setTimeout(() => b.classList.remove("open"), 4000); return; } b.classList.remove("open"); ask(); }; return; }   // touch screens: the first tap slides it out, the second asks
+    if (h.st === "coming") set("come", `<span class="ic">🏃</span><span class="tx">${esc(h.by || "Your teacher")} is coming<small>to help you. Press to cancel</small></span>`);
+    else if (h.st === "done") set("come", `<span class="ic">✅</span><span class="tx">Helped<small>Press to ask again</small></span>`);
+    else set("wait", `<span class="ic">🙋</span><span class="tx">Help asked<small>Waiting for your teacher. Press to cancel</small></span>`);
     b.onclick = () => { if (getHelp() && getHelp().st === "done"){ setHelp(null); ask(); return; } if (window.confirm("Cancel your request for help?")) cancel(); };
   }
   async function poll(){
@@ -1497,8 +1533,10 @@ const live = (() => {
   setInterval(poll, 20000); setInterval(paintChip, 5000);
   if (document.body) setTimeout(paintChip, 1500); else document.addEventListener("DOMContentLoaded", () => setTimeout(paintChip, 1500));
   /* an inline "Need help with this task?" button for a course page to put on each task */
-  function button(task){ css(); const b = document.createElement("button"); b.type = "button"; b.className = "sdcHelpBtn"; b.innerHTML = "🙋 Need help with this task?"; b.onclick = () => ask(task); return b; }
-  const buttonHtml = task => { css(); return `<button type="button" class="sdcHelpBtn" data-sdc-help="${esc(task || "")}">🙋 Need help with this task?</button>`; };
+  /* 25 Nov 2026: help is only the sliding tab on the right-hand side. These no longer put a button on the page: they
+     just tell the tab which task the student is on (the course pages still call them). */
+  function button(task){ css(); if (task) where = String(task).slice(0, 160); const b = document.createElement("span"); b.className = "sdcHelpBtn"; b.hidden = true; return b; }
+  const buttonHtml = task => { css(); if (task) where = String(task).slice(0, 160); return `<span class="sdcHelpBtn" hidden></span>`; };
   document.addEventListener("click", e => { const b = e.target && e.target.closest && e.target.closest("[data-sdc-help]"); if (b){ e.preventDefault(); ask(b.dataset.sdcHelp || ""); } });
 
   /* ---- staff dashboard: reading the notes back ---- */
