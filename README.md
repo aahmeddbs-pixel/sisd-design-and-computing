@@ -11,6 +11,12 @@ One sign-in page for SISD's Computer Science (Python Pathways), Design and IT co
 - The top 5 House Points of every lesson are emailed automatically to aahmed.dbs@gmail.com by the email script (`verify-script.gs`, a 10-minute timer), about 15 minutes after the class goes quiet, even when nobody has the admin page open. The admin page switches the timer on by itself once the script has been redeployed (or run `setupHousePoints` once in Apps Script).
 - Dark mode: `sdc.js` checks every page and switches any text that is too close in colour to its box to dark or light ink, so everything stays readable.
 
+## Sync sheet (26 Nov 2026)
+- Students' saved work, accounts and keys go to a Google Form whose linked sheet is read back by the site. A sheet stops taking rows once it is full: **SDC Sync 1** filled on 16 Nov, **SDC Sync 2** on 24 Nov at 11:54 (no work was saved online after that).
+- New rows now go to **SDC Sync 3** (form and sheet owned by sisd.design.computing1@gmail.com; the sheet is "anyone with the link can view", and everything in it is scrambled). Sync 1 and Sync 2 are still read, so nothing saved before is lost.
+- To use a new sheet later, change it in three places: `SYNC`/`SYNC_OLD` in `sdc.js`, `CFG` in `python-pathways/pp-sync.js`, and `syncForm`/`syncSheet`/`syncOld`/`OLD_SYNC_IDS` in the Design course's `index.html`.
+- Design and IT now send a full copy of a student's work at most once a minute while they type (it was every 10 seconds plus every time they left a box), and always straight away when they leave or switch away from the page. This keeps the sheet from filling up so fast.
+
 ## Private sections
 - Some private, locked sections exist for named users only. They are visible to the super admin only; details are not kept in this public file.
 
