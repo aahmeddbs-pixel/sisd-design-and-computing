@@ -54,7 +54,7 @@ One sign-in page for SISD's Computer Science (Python Pathways), Design and IT co
 - The super admin sees every class; a teacher sees only the students who chose them.
 
 ## Criterion feedback and the integrity check, Design and IT (Nov 2026)
-- **Send feedback** stays in every Design and IT student's window, all grades (Computer Science unchanged).
+- **Send feedback** is for Computer Science only. Design and IT (all grades) use the criterion feedback PDF instead.
 - Strengths, Improvements and Student developments are written **strand by strand**: each line names the strand and the exact part of the task, says what the student did or still needs to do, and quotes their own words where it helps. Practice ("Exercise") questions are never assessed.
 - **Grades 10–11:** in depth, with MYP command terms (justify, evaluate, judgement, the level 7–8 descriptor). **Grades 6–9:** detailed, in easy words.
 - **Before every criterion feedback PDF** (one student or a whole class) an **academic integrity check** runs on the assessed work and its brief is printed at the bottom, marked teacher only. It is also in the student's feedback window (🔎).

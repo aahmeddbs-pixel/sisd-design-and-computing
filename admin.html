@@ -1097,10 +1097,10 @@ function renderClassFeedback(list){
   if (!cr && !cs){ box.innerHTML = `<p class="small muted" style="margin:10px 0 0">👉 Now choose a <b>criterion</b> to see ${esc(classLabel(list[0] || {}))}'s feedback.</p>`; return; }
   const lines = t => String(t || "").split("\n").filter(Boolean).map(x => `<li>${esc(x)}</li>`).join("") || `<li class="muted">Nothing yet</li>`;
   box.innerHTML = `<div class="card" style="margin:12px 0 0;padding:14px 16px;border-left:6px solid #1B2D4E"><h3 style="margin:0">Class feedback: ${esc(classLabel(list[0] || {}))}${cs ? "" : " · Criterion " + esc(cr)} <span class="n">${list.length}</span></h3>
-    <p class="small muted" style="margin:4px 0 10px">Made from each student's saved work. Press <b>Open &amp; send</b> to check it, edit it and send it to the student. The level is a guide for you only: it isn't sent.</p>
+    <p class="small muted" style="margin:4px 0 10px">Made from each student's saved work. Press <b>Open</b> to check and edit it${cs ? " and send it to the student" : " and download the criterion feedback PDF"}. The level is a guide for you only: it isn't sent.</p>
     <div style="display:grid;gap:10px">${list.map((s, i) => { const c = s.course === "cs" ? "" : cr, a = autoNotes(s, c ? "Criterion " + c : ""), L = c ? levelFor(s, c) : null;
       const has = s.course === "cs" ? !!(a.s || a.i) : !!(s.ds && s.ds.work[c]);
-      return `<div style="border:1px solid #DCE2EE;border-radius:12px;padding:10px 12px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>${esc(s.name)}</b>${L ? `<span class="pill" style="background:#EEF0F4;color:#6B7486" title="A guide from the work so far: not sent to the student">Level ${L.level} / 8${L.complete ? "" : " (working)"}</span>` : ""}${has ? "" : `<span class="pill warn">No work saved for this yet</span>`}<button class="btn ghost sm" data-cf="${i}" style="margin-left:auto">Open &amp; send</button></div>
+      return `<div style="border:1px solid #DCE2EE;border-radius:12px;padding:10px 12px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>${esc(s.name)}</b>${L ? `<span class="pill" style="background:#EEF0F4;color:#6B7486" title="A guide from the work so far: not sent to the student">Level ${L.level} / 8${L.complete ? "" : " (working)"}</span>` : ""}${has ? "" : `<span class="pill warn">No work saved for this yet</span>`}<button class="btn ghost sm" data-cf="${i}" style="margin-left:auto">${s.course === "cs" ? "Open &amp; send" : "Open"}</button></div>
         ${has ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:6px" class="small"><div><b style="color:#1E8A55">Strengths</b><ul style="margin:4px 0 0;padding-left:18px">${lines(a.s)}</ul></div><div><b style="color:#B5651D">Improvements</b><ul style="margin:4px 0 0;padding-left:18px">${lines(a.i)}</ul></div><div><b style="color:#1B2D4E">Student developments</b><ul style="margin:4px 0 0;padding-left:18px">${lines(a.n)}</ul></div></div>` : ""}</div>`; }).join("")}</div></div>`;
   box.querySelectorAll("[data-cf]").forEach(b => b.onclick = () => openProgress(list[+b.dataset.cf]));
 }
@@ -1623,8 +1623,8 @@ async function openProgress(s){
     <div class="row" style="justify-content:space-between"><div><h2>${esc(s.name)} ${pill(s.course)} ${s.course === "cs" ? `<button class="btn ghost sm" id="pinBtn">🔑 Reset PIN</button>` : ""}</h2><div class="em">${esc([s.email, s.grade ? "Grade " + s.grade : "", s.course === "cs" ? levelName("cs", s.level) : s.cls, s.teacher].filter(Boolean).join(" · "))}</div></div><button class="btn ghost sm" data-x>Close</button></div>
     <div style="margin-top:10px">${s.course === "cs" ? pyDetail(s) + `<h2 style="margin-top:18px">Exercises and exact answers</h2><p class="muted small">Each exercise as this student sees it, their latest code, and the exact answer to their own version.</p>` + (window.PPAnswerView ? PPAnswerView.render(s.py, window.PPAnswers) : "") : dsDetail(s)}</div>
     <div class="card fbform" style="margin:18px 0 0;background:var(--soft)">
-      <h2>Send feedback to ${esc(s.name.split(" ")[0])}</h2>
-      <p class="muted small" style="margin-top:4px">${esc(s.name.split(" ")[0])} sees it in their course (a red <b>Feedback from your teacher</b> button at the top) the next time they sign in.</p>
+      <h2>${s.course === "cs" ? "Send feedback to " : "Feedback for "}${esc(s.name.split(" ")[0])}</h2>
+      <p class="muted small" style="margin-top:4px">${s.course === "cs" ? `${esc(s.name.split(" ")[0])} sees it in their course (a red <b>Feedback from your teacher</b> button at the top) the next time they sign in.` : "Check and edit the feedback, then download the criterion feedback PDF."}</p>
       <div class="grid2"><label class="f">About<select class="t" id="fAbout">${about}</select></label>
         ${s.course !== "cs" ? `<label class="f">Current MYP level (automatic)<select class="t" id="fLvl" disabled title="Worked out from the student's work against the criterion expectations. It changes as they add work."><option value="">Not started</option>${[0,1,2,3,4,5,6,7,8].map(n => `<option value="${n}">${n} / 8</option>`).join("")}</select><span class="em" id="fLvlWhy"></span></label>` : `<div></div>`}</div>
       <label class="f">Strengths<textarea id="fS">${esc(a0.s)}</textarea></label>
@@ -1632,7 +1632,7 @@ async function openProgress(s){
       <label class="f">Student developments<textarea id="fN">${esc(a0.n)}</textarea></label>
       <p class="muted small" id="fAuto" style="margin-top:4px">${s.course === "cs" ? "" : "Filled in automatically from the work saved for this criterion, and updated when new work arrives (until you edit a box). Check and edit before sending."}</p>
       <label class="f">From<input class="t" id="fFrom" value="${esc(isSuper() ? (s.teacher || "Your teacher") : ME.name)}"></label>
-      <div class="row" style="margin-top:12px"><button class="btn red" id="fGo">Send feedback</button>${s.course !== "cs" ? `<button class="btn ghost" id="fPdf" disabled title="Available once all four strands of this criterion are complete">⬇ Download criterion feedback (PDF)</button>` : ""}</div><div id="fMsg"></div>
+      <div class="row" style="margin-top:12px">${s.course === "cs" ? `<button class="btn red" id="fGo">Send feedback</button>` : ""}${s.course !== "cs" ? `<button class="btn ghost" id="fPdf" disabled title="Available once all four strands of this criterion are complete">⬇ Download criterion feedback (PDF)</button>` : ""}</div><div id="fMsg"></div>
       ${s.course !== "cs" ? `<details id="fIntW" style="margin-top:12px"><summary style="cursor:pointer;font-weight:700">🔎 Academic integrity check (teacher only): <span id="fIntO"></span></summary><div id="fInt" class="small" style="margin-top:6px;white-space:pre-wrap"></div></details>` : ""}
       <h3 style="margin-top:16px">Feedback already sent</h3><div id="fHist" class="small muted">Loading…</div>
     </div></div>`;
@@ -1661,7 +1661,7 @@ async function openProgress(s){
       q("#fHist").innerHTML = l.length ? l.map(f => `<div style="border-left:3px solid var(--red);padding:4px 10px;margin-top:8px"><b>${esc(f.about || "")}</b> · ${esc(fmtDT(f.at || f.ver))}${f.from ? " · " + esc(f.from) : ""}${f.lvl ? " · level " + esc(f.lvl) : ""}<div style="white-space:pre-wrap;color:var(--ink)">${esc([f.s && "Strengths: " + f.s, f.i && "Improvements: " + f.i, f.n && "Next steps: " + f.n].filter(Boolean).join("\n"))}</div></div>`).join("") : "None yet.";
     } catch(e){ q("#fHist").textContent = "Couldn't load (no connection)."; } };
   hist();
-  q("#fGo").onclick = async () => {
+  if (q("#fGo")) q("#fGo").onclick = async () => {   // Send feedback: Computer Science only (Design and IT use the criterion feedback PDF)
     const fb = { course: s.course, about: q("#fAbout").value, s: q("#fS").value.trim(), i: q("#fI").value.trim(), n: q("#fN").value.trim(), from: q("#fFrom").value.trim().slice(0, 60) };
     // the automatic level is for staff only: it is not sent to the student
     if (!fb.s && !fb.i && !fb.n) return q("#fMsg").innerHTML = `<div class="notice bad">Write at least one section first.</div>`;
