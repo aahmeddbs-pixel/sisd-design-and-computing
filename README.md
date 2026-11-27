@@ -52,3 +52,10 @@ One sign-in page for SISD's Computer Science (Python Pathways), Design and IT co
 - It shows where every student is working (criterion and strand), a count of students at each place, and a grid of Criteria A–D, strands i–iv: ✓ complete, ● started, 📍 the strand they are on.
 - 🟢 means the student has that strand open right now (from live view); otherwise the place comes from their latest saved work. It refreshes by itself every 30 seconds.
 - The super admin sees every class; a teacher sees only the students who chose them.
+
+## Criterion feedback and the integrity check, Design and IT (Nov 2026)
+- **Send feedback** stays in every Design and IT student's window, all grades (Computer Science unchanged).
+- Strengths, Improvements and Student developments are written **strand by strand**: each line names the strand and the exact part of the task, says what the student did or still needs to do, and quotes their own words where it helps. Practice ("Exercise") questions are never assessed.
+- **Grades 10–11:** in depth, with MYP command terms (justify, evaluate, judgement, the level 7–8 descriptor). **Grades 6–9:** detailed, in easy words.
+- **Before every criterion feedback PDF** (one student or a whole class) an **academic integrity check** runs on the assessed work and its brief is printed at the bottom, marked teacher only. It is also in the student's feedback window (🔎).
+- Methods: typed vs pasted characters per answer (the Design course records this from 27 Nov 2026), typing volume vs saved work, AI-typical wording, formatting from other tools (markdown, em dashes, smart quotes, US spellings), sentence rhythm, vocabulary for the grade, style shift, similarity with classmates' answers to the same task (names the student and quotes the shared words), and copied task wording. Indicators, not proof.

@@ -1360,31 +1360,98 @@ function fieldState(f){
   if (Array.isArray(f.value) || (f.value && typeof f.value === "object")) return wordsIn(f.value) ? "ok" : "empty";
   const w = wordsIn(f.value); return !w ? "empty" : w < 20 ? "thin" : "ok";
 }
+const isExF = f => /^Exercise\b/i.test(String(f.label || "")) || /ex\d*$/.test(String(f.id || ""));
+const assessed = x => (x.fields || []).filter(f => !isExF(f));
+const taskName = l => { let t = String(l || "").replace(/^Task\s*·\s*/i, "").replace(/\s+/g, " ").trim();
+  t = t.split(/(?<=\S)\s*(?::\s|\?\s|\.\s|\(|;)/)[0].replace(/[:.?]+$/, "").trim(); return t.length > 64 ? t.slice(0, 61).replace(/\s+\S*$/, "") + "…" : t; };
+const fText = f => f.t === "table" ? (Array.isArray(f.value) ? f.value.filter(Array.isArray).map(r => r.slice(f.rowLabels ? 1 : 0).join(" ")).join(" ") : "")
+  : Array.isArray(f.value) ? f.value.filter(x => typeof x === "string" && x !== "IMAGE").join(" ") : f.value && typeof f.value === "object" ? Object.values(f.value).join(" ") : /^(IMAGE|SKIPPED)/.test(String(f.value || "")) ? "" : String(f.value || "");
+const RX = {
+  num: /\d/, why: /\b(because|therefore|so that|this means|as a result|which (?:shows|means)|due to|since|this is why|so\b)/i,
+  eg: /\b(for example|for instance|such as|e\.g\.|like when)\b/i, src: /\b(19|20)\d\d\b|\bwww\.|\.(com|org|gov|net|ae|uk)\b|accessed|retrieved|“[^”]{3,}”|"[^"]{3,}"/i,
+  cmp: /\b(more than|less than|whereas|however|compared|cheaper|better|worse|most|least|than|on the other hand)\b/i,
+  judge: /\b(most|best|I (?:think|chose|choose|recommend|decided)|should|would|the strongest|the weakest|I will)\b/i,
+  eval: /\b(reliab|limitation|bias|valid|accura|trust|weakness|strength)/i };
+const wantsWhy = l => /justify|explain|why|evaluate|compare|reason/i.test(l), wantsNum = l => /evidence|research|finding|statistic|data|cost|measur|test|result/i.test(l), wantsSrc = l => /source|mla|reference|cite/i.test(l);
+const firstBit = (t, n) => { const w = String(t || "").replace(/\s+/g, " ").trim().split(" "); return w.slice(0, n).join(" ") + (w.length > n ? "…" : ""); };
+function fieldInfo(f){
+  const lab = String(f.label || ""), name = taskName(lab), txt = fText(f), w = wordsIn(txt);
+  let st = fieldState(f); if (f.t === "text" && st === "ok" && +f.min && w < +f.min) st = "thin";   // below the task's word minimum
+  const o = { f, lab, name, st, txt, w, min: +f.min || 0 };
+  if (f.t === "table"){ const rows = (Array.isArray(f.value) ? f.value : []).filter(r => Array.isArray(r) && r.slice(f.rowLabels ? 1 : 0).some(x => String(x || "").trim()));
+    const full = rows.filter(r => r.slice(f.rowLabels ? 1 : 0).every(x => String(x || "").trim()));
+    const cols = (f.cols || []).map((c, k) => ({ c, k })).filter(({ k }) => !(f.rowLabels && k === 0));
+    o.rows = rows.length; o.full = full.length; o.need = f.rowLabels ? f.rowLabels.length : Math.max(+f.min || 0, 2);
+    o.gapCol = cols.find(({ k }) => rows.length && rows.filter(r => !String(r[k] || "").trim()).length >= Math.ceil(rows.length / 2));
+    o.numCells = rows.flat().filter(x => /\d/.test(String(x || ""))).length; }
+  ["num","why","eg","src","cmp","judge","eval"].forEach(k => o[k] = RX[k].test(txt));
+  o.quote = f.t === "text" && w >= 6 ? firstBit(txt.split(/(?<=[.!?])\s+/)[0], 12) : "";
+  return o;
+}
+/* ---------- feedback writer (Nov 2026) ----------
+   Strengths, Improvements and Student developments, written to the student, strand by strand: each line names the
+   strand and the exact part of the task, and says what the student did (or still needs to do), with their own words
+   quoted where it helps. Grade 10–11: in depth, with MYP command terms. Grades 6–9: detailed, in easy words.
+   Worked examples and practice ("Exercise") questions are never assessed. */
 function designNotes(s, c){
   const W = s.ds && s.ds.work[c] && s.ds.work[c].w; if (!W) return { s:"", i:"", n:"" };
-  const S = [], I = [], N = [], strands = W.strands || [];
-  strands.forEach(x => {
-    const fs = x.fields || [], st = fs.map(fieldState), good = fs.filter((f, k) => st[k] === "ok"), words = fs.reduce((a, f) => a + (f.t === "sketch" ? 0 : wordsIn(f.value)), 0);
-    const tag = "Strand " + x.n;
-    if (x.done && good.length === fs.length && fs.length) S.push(`${tag}: you completed every part with clear detail (${words} words)${fs.some(f => f.t === "sketch" && f.value) ? ", including your sketch or image" : ""}.`);
-    else if (good.length) S.push(`${tag}: good work on ${good.slice(0, 2).map(f => "“" + shortLabel(f.label) + "”").join(" and ")}.`);
-    fs.forEach((f, k) => {
-      if (st[k] === "empty") I.push(`${tag}: “${shortLabel(f.label)}” is still empty${f.t === "sketch" ? ": add your sketch or a screenshot" : f.t === "table" ? ": fill in the table" : ""}.`);
-      else if (st[k] === "thin") I.push(`${tag}: add more detail to “${shortLabel(f.label)}”${f.t === "table" ? " (complete every row and column)" : " (" + wordsIn(f.value) + " words so far): explain why, with an example"}.`);
-    });
-    if (x.self && x.done && st.some(v => v !== "ok")) I.push(`${tag}: you rated yourself ${x.self}. Check the rubric: some parts still need more before that level is secure.`);
+  const g = parseInt(s.grade, 10) || (+W.myp >= 5 ? 10 : (+W.myp || 1) + 5), deep = g >= 10, L = levelFor(s, c);
+  const S = [], I = [], N = [], strands = W.strands || [], per = deep ? 3 : 2;
+  strands.forEach((x, si) => {
+    const tag = "Strand " + x.n, fs = assessed(x).map(fieldInfo), lvl = L && L.strands[si] ? L.strands[si].level : null;
+    if (!fs.length) return;
+    const done = fs.filter(o => o.st === "ok"), empty = fs.filter(o => o.st === "empty"), thin = fs.filter(o => o.st === "thin");
+    // ---- strengths: what exactly they did well, in which part of the strand
+    const ss = done.map(o => { const f = o.f, bits = [];
+      if (f.t === "table"){ bits.push(deep ? `you completed “${o.name}” with ${o.rows} detailed row${o.rows === 1 ? "" : "s"}` : `you filled in the “${o.name}” table (${o.rows} row${o.rows === 1 ? "" : "s"})`);
+        if (o.numCells >= 2) bits.push(deep ? "supported with measurable data" : "and used numbers"); if (o.src && wantsSrc(o.lab + " " + (f.cols || []).join(" "))) bits.push(deep ? "and recorded your sources" : "and wrote your sources"); }
+      else if (f.t === "sketch" || f.t === "shots") bits.push(deep ? `you provided clear visual evidence for “${o.name}”` : `you added your picture for “${o.name}”`);
+      else if (f.t === "choice" || f.t === "checklist") bits.push(deep ? `you made a clear decision in “${o.name}”` : `you chose your answer for “${o.name}”`);
+      else { bits.push(deep ? `in “${o.name}” you wrote a developed response (${o.w} words)` : `in “${o.name}” you wrote a full answer (${o.w} words)`);
+        const q = []; if (o.why) q.push(deep ? "justified your points with reasons" : "explained why");
+        if (o.num) q.push(deep ? "used data as evidence" : "used numbers to back it up"); if (o.eg) q.push(deep ? "illustrated with examples" : "gave examples");
+        if (o.src) q.push(deep ? "referred to sources" : "said where your facts came from"); if (deep && o.cmp && o.judge) q.push("reached a supported judgement"); if (deep && o.eval) q.push("evaluated reliability or limitations");
+        if (q.length) bits.push((q.length > 1 ? q.slice(0, -1).join(", ") + " and " + q[q.length - 1] : q[0])); if (o.quote) bits.push(`for example, “${o.quote}”`); }
+      return { score: (o.why ? 2 : 0) + (o.num ? 2 : 0) + (o.src ? 1 : 0) + (o.eg ? 1 : 0) + (f.t === "table" ? o.rows / 3 : f.t === "text" ? o.w / 60 : 0.5), t: `${tag}: ${bits.join(", ").replace(/, (for example)/, ". For example")}.` }; });
+    if (ss.length < per) thin.forEach(o => { const q = []; if (o.why) q.push(deep ? "began to justify your ideas" : "explained why"); if (o.num) q.push(deep ? "used data" : "used numbers"); if (o.eg) q.push("gave an example");
+      if (o.f.t === "table" && o.rows) ss.push({ score: o.rows / 3, t: `${tag}: you made a good start on “${o.name}” (${o.rows} row${o.rows === 1 ? "" : "s"} so far).` });
+      else if (o.w) ss.push({ score: o.w / 60 + q.length, t: `${tag}: you made a good start on “${o.name}”${q.length ? " and " + q.join(" and ") : ""}${o.quote ? `, for example “${o.quote}”` : ""}.` }); });
+    ss.sort((a, b) => b.score - a.score).slice(0, per).forEach(x => S.push(x.t));
+    // ---- improvements: what is missing or weak, in which part
+    const ii = [];
+    empty.forEach(o => { const f = o.f; ii.push({ p: 3, t: `${tag}: “${o.name}” is not done yet. ` + (f.t === "sketch" || f.t === "shots" ? (deep ? "Add the visual evidence (annotated sketch, photo or screenshot) the task asks for." : "Add your sketch, photo or screenshot.")
+      : f.t === "table" ? (deep ? `Complete the table: at least ${o.need} rows, every column filled.` : `Fill in the table: at least ${o.need} rows.`) : f.t === "choice" ? "Choose an answer." : (deep ? `Write a full response${o.min ? " of at least " + o.min + " words" : ""} that answers every part of the task.` : `Write your answer${o.min ? " (at least " + o.min + " words)" : ""}.`)) }); });
+    thin.forEach(o => { const f = o.f;
+      if (f.t === "table") ii.push({ p: 2, t: o.rows < o.need ? `${tag}: “${o.name}” has ${o.rows} of the ${o.need} rows needed. ${deep ? "Add the missing rows with the same level of detail." : "Add " + (o.need - o.rows) + " more row" + (o.need - o.rows === 1 ? "" : "s") + "."}`
+        : `${tag}: in “${o.name}”, ${o.gapCol ? `the “${taskName(o.gapCol.c)}” column is empty in some rows` : "some boxes are empty"}. ${deep ? "Complete every cell so each row is fully supported." : "Fill in every box."}` });
+      else ii.push({ p: 2, t: `${tag}: “${o.name}” is too short (${o.w}${o.min ? " of " + o.min : ""} words). ${deep ? "Develop it: explain, justify and give evidence." : "Write more: say why, and give an example."}` }); });
+    done.concat(thin).filter(o => o.f.t === "text").forEach(o => { const m = [];
+      if (wantsWhy(o.lab) && !o.why) m.push(deep ? "justify your points (use “because”, “therefore”, “this means”)" : "say why (use “because”)");
+      if (wantsNum(o.lab) && !o.num) m.push(deep ? "add specific data such as a statistic, measurement or survey result" : "add a number or fact");
+      if (wantsSrc(o.lab) && !o.src) m.push(deep ? "cite your source in MLA format" : "write where your information came from");
+      if (deep && /evaluate|reliab|critical/i.test(o.lab) && !o.eval) m.push("evaluate reliability and limitations, not only describe");
+      if (deep && /compare/i.test(o.lab) && !(o.cmp && o.judge)) m.push("compare directly and reach a clear judgement");
+      if (m.length) ii.push({ p: 1, t: `${tag}: in “${o.name}”, ${m.join("; ")}.` }); });
+    done.filter(o => o.f.t === "table" && o.gapCol).forEach(o => ii.push({ p: 1, t: `${tag}: in “${o.name}”, the “${taskName(o.gapCol.c)}” column is missing in some rows. ${deep ? "Complete it so every row is supported." : "Fill it in."}` }));
+    if (x.self && x.done && (empty.length || thin.length)) ii.push({ p: 1, t: `${tag}: you rated yourself ${x.self}, but ${empty.length + thin.length} part${empty.length + thin.length === 1 ? "" : "s"} still need${empty.length + thin.length === 1 ? "s" : ""} work. ${deep ? "Check your rating against the rubric descriptor." : "Check the rubric again."}` });
+    ii.sort((a, b) => b.p - a.p).slice(0, per).forEach(x => I.push(x.t));
+    // ---- student developments: the next step for this strand
+    const first = empty[0] || thin[0], weak = fs.filter(o => o.f.t === "text" && o.st !== "empty").find(o => (wantsWhy(o.lab) && !o.why) || (wantsNum(o.lab) && !o.num) || (wantsSrc(o.lab) && !o.src));
+    const lv = lvl ? (deep ? ` (currently around level ${lvl}/8)` : "") : "";
+    if (!x.done || first) N.push(`${tag}${lv}: ${deep ? "next, complete" : "next, finish"} “${(first || fs[0]).name}”${deep ? " and then review the strand against the level 7–8 descriptor" : ", then check the whole strand is finished"}.`);
+    else if (weak) N.push(`${tag}${lv}: ${deep ? "to move up a band, strengthen" : "to improve, go back to"} “${weak.name}”: ${weak.why ? "" : deep ? "justify every point, " : "say why, "}${weak.num ? "" : deep ? "add data, " : "add a number, "}${weak.src ? "" : deep ? "cite sources" : "add your source"}`.replace(/, $/, "") + ".");
+    else if (deep && lvl && lvl < 8) N.push(`${tag}${lv}: to reach the top band, make your answers more critical: weigh alternatives, explain limitations and link each decision to your research.`);
+    else if (!deep) N.push(`${tag}: well done. Keep this level of detail in the next strands.`);
   });
-  // practice questions are not assessed: feedback comes from the student's own task answers only
-  const next = strands.find(x => !x.done);
-  if (next) N.push(`Next, complete Strand ${next.n}: ${shortLabel(next.strand)}.`);
   const left = strands.filter(x => !x.done).length;
-  if (left > 1) N.push(`You have ${left} strands left in Criterion ${c}. Aim to finish one strand each lesson.`);
-  if (!left && strands.length && W.kind !== "submission") N.push(`All four strands are done: download your PDF and hand in Criterion ${c}.`);
-  if (!left && W.kind === "submission") N.push(`Criterion ${c} is handed in. Read your feedback, make the improvements, and get ready for the next criterion.`);
-  if (!S.length) S.push(`You've started Criterion ${c}${W.unit ? " for " + W.unit : ""}. Keep going: every strand you finish builds your evidence.`);
-  if (!I.length && left) I.push("Keep the same level of detail in the strands you haven't finished yet.");
-  return { s: S.slice(0, 4).join("\n"), i: I.slice(0, 5).join("\n"), n: N.slice(0, 3).join("\n") };
+  if (!left && strands.length && W.kind !== "submission") N.push(deep ? `All strands of Criterion ${c} are complete: proofread, check every strand against the rubric, then download your PDF and submit.` : `All strands are done: check your work, download your PDF and hand in Criterion ${c}.`);
+  if (W.kind === "submission") N.push(deep ? `Criterion ${c} is submitted. Act on these improvements in your ePortfolio before the final deadline.` : `Criterion ${c} is handed in. Read your feedback and make the improvements.`);
+  if (!S.length) S.push(deep ? `You have started Criterion ${c}${W.unit ? " (" + W.unit + ")" : ""}; build your evidence strand by strand.` : `You've started Criterion ${c}. Keep going!`);
+  if (!I.length) I.push(deep ? "Maintain this depth and keep checking each strand against the level 7–8 descriptors." : "Keep the same level of detail in all your work.");
+  const tidy = l => l.map(t => t.replace(/([.!?…])”\./g, "$1”").replace(/\s+/g, " ").trim().replace(/…”$/, "…”.")).join("\n");
+  return { s: tidy(S), i: tidy(I), n: tidy(N) };
 }
+
 /* ---------- automatic MYP level (1–8), strict best fit, from the course's own expectations ----------
    Each strand gets 0–8 from how complete and detailed its parts are, measured against the year's targets
    (designs, specification points, plan steps, tests, research questions, sources); the criterion level is the
@@ -1417,11 +1484,93 @@ function levelFor(s, c){
   const level = strands.length ? Math.floor(strands.reduce((a, x) => a + x.level, 0) / strands.length) : 0;
   return { level, strands, complete: strands.length > 0 && strands.every(x => x.done), submitted: W.kind === "submission", unit: W.unit || "", myp: W.myp };
 }
+/* ---------- academic integrity check (teacher only), run before every criterion feedback PDF ----------
+   No AI detector is fully reliable, so several independent methods are combined and each finding names the strand,
+   the task part and exactly why it was flagged:
+   1. how each answer was produced: characters typed vs pasted into that box (recorded by the course from 27 Nov 2026)
+   2. typing volume: characters typed on the platform vs characters of answers saved, across the course
+   3. AI writing patterns: words and phrases typical of AI text, and how dense they are
+   4. formatting left over from other tools: markdown (** ## bullets), em dashes, smart quotes, US spellings on a British-English course
+   5. sentence rhythm: long, very even sentences (low "burstiness") are typical of AI text
+   6. vocabulary for the grade: much longer, rarer words than expected for the student's grade
+   7. style shift: one answer written very differently from the rest of the student's own work
+   8. similarity with classmates: long word sequences shared with another student's answer to the same task (plagiarism)
+   9. copied task wording: long stretches repeated from the question itself */
+const AI_WORDS = ["delve","delves","furthermore","moreover","additionally","in conclusion","it is important to note","it's important to note","plays a crucial role","crucial role","pivotal","vital role","multifaceted","tapestry","seamless","seamlessly","leverage","leveraging","foster","fostering","holistic","robust","comprehensive","streamline","cutting-edge","in today's","ever-evolving","landscape","navigate","navigating","myriad","plethora","paramount","utilize","utilise","facilitate","underscore","underscores","a testament to","not only","stakeholders","significantly","enhance","enhancing","ensuring","optimal","furthermore,","overall,","in summary","notably","nuanced","realm","intricate","embark","resonate"];
+const AI_RARE = ["delve","tapestry","multifaceted","myriad","plethora","paramount","underscore","a testament to","realm","intricate","embark","nuanced","pivotal","holistic"];
+const US_SP = ["color","colors","favorite","organize","organized","organization","center","analyze","analyzed","realize","behavior","labor","recognize","prioritize","optimize","utilize","gray","defense","traveling","modeling","catalog","fiber","aluminum"];
+const sentencesOf = t => String(t || "").replace(/\s+/g, " ").split(/(?<=[.!?])\s+(?=[A-Z0-9“"])/).map(x => x.trim()).filter(x => wordsIn(x) >= 3);
+const wordsArr = t => (String(t || "").toLowerCase().match(/[a-z0-9\u00C0-\u024F']+/g) || []);
+const shingles = (t, n) => { const w = wordsArr(t), out = new Set(); for (let i = 0; i + n <= w.length; i++) out.add(w.slice(i, i + n).join(" ")); return out; };
+function styleOf(t){ const w = wordsArr(t), ss = sentencesOf(t).map(wordsIn); const m = ss.length ? ss.reduce((a, b) => a + b, 0) / ss.length : w.length;
+  const sd = ss.length > 1 ? Math.sqrt(ss.reduce((a, b) => a + (b - m) * (b - m), 0) / ss.length) : 0;
+  return { n: w.length, wl: w.length ? w.reduce((a, x) => a + x.length, 0) / w.length : 0, long: w.length ? w.filter(x => x.length >= 10).length / w.length : 0, sl: m, cv: m ? sd / m : 0, ns: ss.length }; }
+function sharedPassage(a, b, n){   // the longest run of words in a that also appears in b (as n-word sequences)
+  const wa = wordsArr(a), sb = shingles(b, n); let best = [0, 0], i = 0;
+  while (i + n <= wa.length){ if (sb.has(wa.slice(i, i + n).join(" "))){ let j = i; while (j + n <= wa.length && sb.has(wa.slice(j, j + n).join(" "))) j++; if (j - i + n - 1 > best[1] - best[0]) best = [i, j + n - 1]; i = j; } else i++; }
+  const orig = String(a || "").match(/[A-Za-z0-9\u00C0-\u024F']+/g) || [];   // same words, in the student's own capitals
+  return best[1] > best[0] ? { words: best[1] - best[0], text: (orig.length === wa.length ? orig : wa).slice(best[0], best[1]).join(" ") } : null;
+}
+function typedVsSaved(s){   // whole course: characters typed on the platform (pasted text never counts) vs characters of answers saved
+  const per = {}; ROWS.forEach(r => { if (r.type !== "work" || !r.acct || SDC.keyOf(r.acct.email, r.acct.name) !== s.key) return; const c = r.acct.course === "it" ? "it" : r.acct.course === "cs" ? "cs" : "design";
+    if (c !== s.course && !(s.course === "it" && c === "design")) return; const k = r.sid || r.when; per[k] = Math.max(per[k] || 0, +r.chars || 0); });
+  const typed = Object.values(per).reduce((a, b) => a + b, 0); let saved = 0;
+  if (s.ds) Object.values(s.ds.work).forEach(x => (x.w.strands || []).forEach(st => assessed(st).forEach(f => { saved += fText(f).length; })));
+  return { typed, saved };
+}
+function integrityCheck(s, c){
+  const W = s.ds && s.ds.work[c] && s.ds.work[c].w; if (!W) return null;
+  const g = parseInt(s.grade, 10) || 10, deep = g >= 10;
+  const answers = []; (W.strands || []).forEach(x => assessed(x).forEach(f => { const t = fText(f); if (wordsIn(t) >= 12) answers.push({ n: x.n, f, name: taskName(f.label), t, st: styleOf(t) }); }));
+  const med = k => { const v = answers.filter(a => a.st.n >= 30).map(a => a.st[k]).sort((a, b) => a - b); return v.length ? v[Math.floor(v.length / 2)] : 0; };
+  const mWl = med("wl"), mSl = med("sl");
+  const mates = students().filter(x => x.course === s.course && String(x.grade) === String(s.grade) && x.key !== s.key && x.ds && x.ds.work[c] && x.ds.work[c].w);
+  let pasteKnown = 0; const ai = [], plag = [];
+  answers.forEach(a => { const why = [], low = a.t.toLowerCase(); let pts = 0;
+    const ip = a.f.ip; if (ip) pasteKnown++;
+    if (ip && ip.p > 0){ const share = ip.p / Math.max(1, ip.p + ip.t);
+      if (ip.b >= 150 || share >= 0.6){ pts += 3; why.push(`${ip.p.toLocaleString()} characters pasted in ${ip.n} paste${ip.n === 1 ? "" : "s"} (biggest ${ip.b.toLocaleString()}), only ${ip.t.toLocaleString()} typed`); }
+      else if (ip.p >= 40){ pts += 1; why.push(`${ip.p.toLocaleString()} characters pasted, ${ip.t.toLocaleString()} typed`); } }
+    if (ip && ip.t + ip.p > 0 && a.t.length > (ip.t + ip.p) * 2.5 && a.t.length > 200){ pts += 2; why.push(`the answer is ${a.t.length.toLocaleString()} characters long but only ${(ip.t + ip.p).toLocaleString()} were entered in this box on the platform (may have come from another device or tool)`); }
+    const hits = [...new Set(AI_WORDS.filter(p => new RegExp("(^|[^a-z])" + p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/,$/, "") + "([^a-z]|$)").test(low)).map(p => p.replace(/,$/, "")))];
+    const rare = hits.filter(h => AI_RARE.includes(h)), dens = hits.length / Math.max(1, a.st.n / 100);
+    if (hits.length >= 4 || dens >= 3 || rare.length >= (deep ? 2 : 1)){ pts += hits.length >= 6 || rare.length >= 2 ? 2 : 1; why.push(`AI-typical wording: ${hits.slice(0, 6).map(h => "“" + h + "”").join(", ")}`); }
+    const fmt = []; if (/\*\*[^*]+\*\*|^#{1,4}\s|\n\s*[-*•]\s/m.test(a.t)) fmt.push("markdown formatting (** or ## or bullet symbols)"); if (/—/.test(a.t)) fmt.push("em dashes (—)");
+    if (/[“”‘’]/.test(a.t) && !/["']/.test(a.t)) fmt.push("smart quotes only"); const us = US_SP.filter(w => new RegExp("\\b" + w + "\\b").test(low)); if (us.length >= 2) fmt.push("US spellings (" + us.slice(0, 3).join(", ") + ")");
+    if (fmt.length){ pts += fmt.length >= 2 ? 2 : 1; why.push("formatting from another tool: " + fmt.join(", ")); }
+    if (a.st.ns >= 5 && a.st.cv < 0.28 && a.st.sl >= 17){ pts += 1; why.push(`very even, long sentences (average ${Math.round(a.st.sl)} words, little variation)`); }
+    if (!deep && a.st.n >= 40 && (a.st.wl >= 5.4 || a.st.long >= 0.12)){ pts += 1; why.push(`vocabulary well above what is expected in Grade ${g} (${Math.round(a.st.long * 100)}% long words)`); }
+    if (a.st.n >= 40 && mWl && answers.length >= 4 && (a.st.wl > mWl * 1.22 || (mSl && a.st.sl > mSl * 1.6))){ pts += 1; why.push("written very differently from the student's other answers (style shift)"); }
+    const qp = sharedPassage(a.t, a.f.label, 8); if (qp && qp.words >= 10) why.push(`repeats ${qp.words} words of the task wording`);
+    if (pts >= 2 || (pts >= 1 && why.length >= 2)) ai.push({ n: a.n, name: a.name, lvl: pts >= 4 ? "High" : pts >= 2 ? "Medium" : "Low", pts, why });
+    // plagiarism: the same task answered by classmates
+    const label = shingles(a.f.label, 7);
+    mates.forEach(m => { const mf = (m.ds.work[c].w.strands || []).flatMap(st => st.fields || []).find(x => x.id === a.f.id); if (!mf) return; const mt = fText(mf); if (wordsIn(mt) < 12) return;
+      const sp = sharedPassage(a.t, mt, 7); if (!sp || sp.words < 12) return; if ([...shingles(sp.text, 7)].every(x => label.has(x))) return;
+      plag.push({ n: a.n, name: a.name, with: m.name, words: sp.words, text: sp.text }); });
+  });
+  const tv = typedVsSaved(s), course = [];
+  if (tv.typed > 0 && tv.saved > 800 && tv.typed < tv.saved * 0.4) course.push(`Across the whole course, ${tv.typed.toLocaleString()} characters were typed on the platform but ${tv.saved.toLocaleString()} characters of answers are saved: most of the writing was not typed here.`);
+  const top = ai.reduce((a, x) => Math.max(a, x.pts), 0), pl = plag.reduce((a, x) => Math.max(a, x.words), 0);
+  const overall = top >= 4 || pl >= 40 || (course.length && top >= 2) ? "High" : top >= 2 || pl >= 18 || course.length ? "Medium" : "Low";
+  return { overall, ai: ai.sort((a, b) => b.pts - a.pts), plag: plag.sort((a, b) => b.words - a.words), course, answers: answers.length, mates: mates.length, pasteKnown, tv };
+}
+function integrityLines(R, c){
+  if (!R) return [`Criterion ${c}: no saved work to check.`];
+  const out = [`Overall concern for Criterion ${c}: ${R.overall}. ${R.answers} assessed answer${R.answers === 1 ? "" : "s"} checked, compared with ${R.mates} classmate${R.mates === 1 ? "" : "s"}.`];
+  out.push("Possible AI use (where):"); if (R.ai.length) R.ai.forEach(x => out.push(`  Strand ${x.n} · “${x.name}” [${x.lvl}]: ${x.why.join("; ")}.`)); else out.push("  No answer shows strong signs of AI use.");
+  R.course.forEach(t => out.push("  " + t));
+  out.push("Possible plagiarism (with whom, exactly what):"); if (R.plag.length) R.plag.slice(0, 8).forEach(x => out.push(`  Strand ${x.n} · “${x.name}”: ${x.words} words the same as ${x.with}'s answer: “${firstBit(x.text, 40)}”`)); else out.push("  No long passages shared with classmates' answers to the same tasks.");
+  out.push(`Methods: typed vs pasted per answer${R.pasteKnown ? "" : " (not recorded for this work: paste tracking began 27 Nov 2026)"}; typing volume vs saved work; AI-typical wording; formatting from other tools; sentence rhythm; vocabulary for the grade; style shift; similarity with classmates; copied task wording.`);
+  out.push("These are indicators, not proof. No AI detector is fully reliable. Before any decision, talk to the student and ask them to explain their answer and how they produced it.");
+  return out;
+}
+
 const critOf = (s, about) => { const crits = s.ds ? Object.keys(s.ds.work).sort() : []; return (String(about || "").match(/Criterion ([A-D])/) || [])[1] || crits[crits.length - 1] || ""; };
 /* ---------- feedback PDFs: one student's criterion, or a whole class ---------- */
 function jsPDFReady(){ return new Promise((res, rej) => { if (window.jspdf) return res(window.jspdf.jsPDF);
   const sc = document.createElement("script"); sc.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"; sc.onload = () => window.jspdf ? res(window.jspdf.jsPDF) : rej(new Error("PDF tool")); sc.onerror = () => rej(new Error("The PDF tool couldn't load. Check the internet connection.")); document.head.appendChild(sc); }); }
-function pdfFeedbackPage(doc, s, c, fb, first){
+function pdfFeedbackPage(doc, s, c, fb, first, integ){
   if (!first) doc.addPage();
   const W = 210, M = 16, NAVY = [27,45,78], RED = [220,43,62]; let y = 0;
   doc.setFillColor(...NAVY); doc.rect(0, 0, W, 24, "F"); doc.setFillColor(...RED); doc.rect(0, 24, W, 1.6, "F");
@@ -1436,11 +1585,21 @@ function pdfFeedbackPage(doc, s, c, fb, first){
     doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(...RED); doc.text(h, M, y); y += 6; doc.setTextColor(20); doc.setFont("helvetica", "normal"); doc.setFontSize(10.5);
     String(t).split("\n").filter(Boolean).forEach(line => { const ls = doc.splitTextToSize(line, W - 2 * M); if (y + ls.length * 5 > 285){ doc.addPage(); y = 20; } doc.text(ls, M, y); y += ls.length * 5 + 1.5; }); y += 3; };
   sec("Strengths", fb.s); sec("Improvements", fb.i); sec("Student developments", fb.n);
+  if (integ && integ.length){   // teacher only: the academic integrity brief, from the work that was assessed
+    if (y > 250){ doc.addPage(); y = 20; }
+    doc.setDrawColor(...NAVY); doc.setLineWidth(0.6); doc.line(M, y, W - M, y); y += 7;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(...NAVY); doc.text("Academic integrity brief (teacher only)", M, y); y += 5;
+    doc.setFont("helvetica", "italic"); doc.setFontSize(8.5); doc.setTextColor(110); doc.text("Remove this section before sharing the feedback with the student.", M, y); y += 5.5;
+    integ.forEach(line => { const ind = /^\s\s/.test(line), head = /^(Possible|Overall)/.test(line); doc.setFont("helvetica", head ? "bold" : "normal"); doc.setFontSize(head ? 10 : 9.5);
+      doc.setTextColor(...(/\[High\]|concern for Criterion [A-D]: High/.test(line) ? RED : [20, 20, 20]));
+      const ls = doc.splitTextToSize(line.trim(), W - 2 * M - (ind ? 5 : 0)); if (y + ls.length * 4.5 > 285){ doc.addPage(); y = 20; } doc.text(ls, M + (ind ? 5 : 0), y); y += ls.length * 4.5 + 1.2; });
+    doc.setTextColor(20); }
   doc.setFontSize(8.5); doc.setTextColor(110); doc.text(`Generated ${new Date().toLocaleString("en-GB")} from the work saved on the platform. Levels are a strict best-fit estimate; your teacher confirms the final level.`, M, 290);
 }
 async function downloadFeedbackPDF(items, name){   // items: [{ s, c, fb }]
   const jsPDF = await jsPDFReady(), doc = new jsPDF({ unit:"mm", format:"a4" });
-  items.forEach((it, i) => pdfFeedbackPage(doc, it.s, it.c, it.fb, i === 0));
+  // before any Design/IT criterion feedback is downloaded, run the integrity check on the work that was assessed
+  items.forEach((it, i) => pdfFeedbackPage(doc, it.s, it.c, it.fb, i === 0, it.c && it.s.course !== "cs" ? integrityLines(integrityCheck(it.s, it.c), it.c) : null));
   doc.save(name);
 }
 function autoNotes(s, about){   // a starting point the teacher edits before sending
@@ -1474,6 +1633,7 @@ async function openProgress(s){
       <p class="muted small" id="fAuto" style="margin-top:4px">${s.course === "cs" ? "" : "Filled in automatically from the work saved for this criterion, and updated when new work arrives (until you edit a box). Check and edit before sending."}</p>
       <label class="f">From<input class="t" id="fFrom" value="${esc(isSuper() ? (s.teacher || "Your teacher") : ME.name)}"></label>
       <div class="row" style="margin-top:12px"><button class="btn red" id="fGo">Send feedback</button>${s.course !== "cs" ? `<button class="btn ghost" id="fPdf" disabled title="Available once all four strands of this criterion are complete">⬇ Download criterion feedback (PDF)</button>` : ""}</div><div id="fMsg"></div>
+      ${s.course !== "cs" ? `<details id="fIntW" style="margin-top:12px"><summary style="cursor:pointer;font-weight:700">🔎 Academic integrity check (teacher only): <span id="fIntO"></span></summary><div id="fInt" class="small" style="margin-top:6px;white-space:pre-wrap"></div></details>` : ""}
       <h3 style="margin-top:16px">Feedback already sent</h3><div id="fHist" class="small muted">Loading…</div>
     </div></div>`;
   document.body.appendChild(bg);
@@ -1486,11 +1646,13 @@ async function openProgress(s){
     Object.keys(map).forEach(id => { const t = q("#" + id); if (t && (t.value === auto[id] || !t.value.trim())){ t.value = map[id]; auto[id] = map[id]; } }); };
   const paintLvl = (who) => { const sel = q("#fLvl"); if (!sel) return; const c = critOf(who, q("#fAbout").value), L = c ? levelFor(who, c) : null;
     sel.value = L ? String(L.level) : ""; q("#fLvlWhy").textContent = L ? L.strands.map(x => "Strand " + x.n + ": " + x.level).join(" · ") + (L.complete ? "" : " · still in progress") : "";
+    if (q("#fInt")){ const R = c ? integrityCheck(who, c) : null; q("#fIntO").innerHTML = R ? `<span class="pill ${R.overall === "High" ? "bad" : R.overall === "Medium" ? "warn" : "ok"}">${R.overall} concern</span>` : "<span class='muted'>no work yet</span>"; q("#fInt").textContent = integrityLines(R, c).join("\n"); }
     const b = q("#fPdf"); if (b){ b.disabled = !(L && (L.complete || L.submitted)); b.title = b.disabled ? "Available once all four strands of Criterion " + (c || "") + " are complete" : "Download this criterion's feedback"; } };
   paintLvl(s);
   const refill0 = refill;
   const iv = setInterval(() => { refill0(); paintLvl(students().find(x => x.key === s.key && x.course === s.course) || s); }, 30000);
   if (q("#fPdf")) q("#fPdf").onclick = async () => { const who = students().find(x => x.key === s.key && x.course === s.course) || s, c = critOf(who, q("#fAbout").value);
+    paintLvl(who); toast("Integrity check done: " + ((integrityCheck(who, c) || {}).overall || "no work") + " concern. It is at the bottom of the PDF.");
     try { await downloadFeedbackPDF([{ s:who, c, fb:{ s:q("#fS").value, i:q("#fI").value, n:q("#fN").value } }], `${who.name.replace(/\s+/g, "-")}-Criterion-${c}-feedback.pdf`); } catch(e){ toast(e.message); } };
   q("#fAbout").addEventListener("change", () => { auto = { fS:q("#fS").value, fI:q("#fI").value, fN:q("#fN").value }; refill(); paintLvl(students().find(x => x.key === s.key && x.course === s.course) || s); });
   if (q("#pinBtn")) q("#pinBtn").onclick = () => resetPin(s);
