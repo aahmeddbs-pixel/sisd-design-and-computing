@@ -46,3 +46,9 @@ One sign-in page for SISD's Computer Science (Python Pathways), Design and IT co
 - Computer Science is only for Grades 6–8 and 11–12: a Grade 9 or 10 account is stopped at sign-in and logged (`wronggrade`), both in `SDC.confirm` and straight away in Python Pathways.
 - Design/IT: "See what other grades are learning" is gone for students (test student only); a student can't open a unit outside their own grade and course, and the year group is never shown as a fallback.
 - Voice Studio opens only for 12 hours after a staff sign-in on the Staff dashboard (cleared by **Lock**).
+
+## 📍 Class progress, Design and IT (Nov 2026)
+- On the dashboard's **Students & progress** tab, **📍 Class progress** opens one view per grade (G6, G7, G8, G10 DES, G10 IT, with a class picker where a grade has more than one class).
+- It shows where every student is working (criterion and strand), a count of students at each place, and a grid of Criteria A–D, strands i–iv: ✓ complete, ● started, 📍 the strand they are on.
+- 🟢 means the student has that strand open right now (from live view); otherwise the place comes from their latest saved work. It refreshes by itself every 30 seconds.
+- The super admin sees every class; a teacher sees only the students who chose them.

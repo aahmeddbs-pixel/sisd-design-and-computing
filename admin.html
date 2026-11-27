@@ -155,6 +155,7 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
           <select class="t" id="stK" style="max-width:240px"><option value="">All classes</option></select>
           <select class="t" id="stCr" style="max-width:170px" title="Choose a class and a criterion to see the class's feedback"><option value="">Choose criterion</option><option>A</option><option>B</option><option>C</option><option>D</option></select>
           <button class="btn ghost sm" id="stPdf" title="One PDF with every listed student's feedback">📄 Class feedback (PDF)</button>
+          <button class="btn sm" id="stWhere" style="background:#1F6FEB;color:#fff;border-color:#1F6FEB" title="Design and IT: see where every student in a class is working (criterion and strand)">📍 Class progress</button>
           <button class="btn ghost sm" id="stLogins" title="Each student's username and password or PIN, class by class">🔐 Class logins</button>
           <button class="btn ghost sm" id="stAdd" data-super>＋ Set up a student by email</button></div>
         <div id="clsFb"></div>
@@ -1103,6 +1104,97 @@ function renderClassFeedback(list){
         ${has ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:6px" class="small"><div><b style="color:#1E8A55">Strengths</b><ul style="margin:4px 0 0;padding-left:18px">${lines(a.s)}</ul></div><div><b style="color:#B5651D">Improvements</b><ul style="margin:4px 0 0;padding-left:18px">${lines(a.i)}</ul></div><div><b style="color:#1B2D4E">Student developments</b><ul style="margin:4px 0 0;padding-left:18px">${lines(a.n)}</ul></div></div>` : ""}</div>`; }).join("")}</div></div>`;
   box.querySelectorAll("[data-cf]").forEach(b => b.onclick = () => openProgress(list[+b.dataset.cf]));
 }
+
+/* ---- 📍 Class progress (Design and IT): where every student in a grade is working, criterion by criterion and strand by strand.
+   Super admin sees every class; a teacher sees only their own students (students() already filters by teacher). ---- */
+const WH_RN = ["i","ii","iii","iv","v","vi"], WH_CR = ["A","B","C","D"];
+const whFilled = v => v == null ? false : Array.isArray(v) ? v.some(whFilled) : typeof v === "object" ? Object.values(v).some(whFilled) : !!String(v).trim();
+const whIsIT = g => /^10(IT|HH)$/.test(String(g || ""));
+function whWork(s, c){   // this course's saved record for a criterion (a G10 student taking both Design and IT keeps one record per criterion: use it only if it belongs to this course)
+  const w = s.ds && s.ds.work[c] && s.ds.work[c].w; if (!w) return null;
+  return whIsIT(w.g) === (s.course === "it") ? w : null;
+}
+function whLive(s){   // the live note: "G10 DES · Criterion A · Your task · Strand ii"
+  const L = s.live || LIVE[s.key]; if (!L || !L.w || Date.now() - (L.at || 0) > 12 * 60000) return null;
+  const isIT = /\bG\d+\s*IT\b|\bIT\b/.test(L.w); if (isIT !== (s.course === "it")) return null;
+  const c = (/Criterion ([A-D])/.exec(L.w) || [])[1], r = (/Strand (i{1,3}|iv|v|vi)\b/.exec(L.w) || [])[1];
+  const step = c ? L.w.split(" · ").slice(2).filter(x => !/^Strand /.test(x)).join(" · ") : "";
+  return c ? { c, i: r ? WH_RN.indexOf(r) : -1, step, now: liveState(s).k === "on" } : null;
+}
+function whRow(s){
+  const crit = {}; let last = null;
+  WH_CR.forEach(c => { const w = whWork(s, c), ev = s.ds ? s.ds.events.filter(e => e.crit === c) : [];
+    const n = w && w.strands && w.strands.length ? w.strands.length : 4, st = [];
+    for (let i = 0; i < n; i++){ const x = w && w.strands && w.strands[i];
+      const doneEv = !w && !s.both && ev.some(e => new RegExp("^Strand " + WH_RN[i] + " complete$").test(e.event));
+      st.push(x ? (x.done ? "done" : (x.fields || []).some(f => whFilled(f.value)) ? "started" : "") : doneEv ? "done" : ""); }
+    const evOk = !w && !s.both, sub = w ? (w.kind === "submission" || ev.some(e => /Criterion submitted/.test(e.event))) : evOk && ev.some(e => /Criterion submitted/.test(e.event));
+    crit[c] = { st, sub, any: st.some(Boolean) || sub };
+    if (crit[c].any) last = c; });
+  const L = whLive(s);
+  let at;
+  if (L && L.i >= 0) at = { c:L.c, i:L.i, live:true, now:L.now, txt:`Criterion ${L.c} · Strand ${WH_RN[L.i]}` };
+  else if (L) at = { c:L.c, i:-1, live:true, now:L.now, txt:`Criterion ${L.c}${L.step ? " · " + L.step : ""}` };
+  else if (last){ const k = crit[last], i = k.st.findIndex(x => x !== "done");
+    at = k.sub ? { c:last, i:-1, txt:`Criterion ${last} submitted ✓` } : i < 0 ? { c:last, i:-1, txt:`Criterion ${last}: all strands done, not submitted` } : { c:last, i, txt:`Criterion ${last} · Strand ${WH_RN[i]}` }; }
+  else at = { c:"", i:-1, txt:"Not started" };
+  return { s, crit, at };
+}
+function whGroups(){   // one button per grade and course: G6, G7, G8, G10 DES, G10 IT …
+  const g = {}; students().filter(s => s.course === "design" || s.course === "it").forEach(s => { const k = s.course + "|" + (s.grade || "?"); (g[k] = g[k] || []).push(s); });
+  return Object.entries(g).map(([k, list]) => { const [c, gr] = k.split("|"); return { k, c, gr, list, label: "G" + gr + (c === "it" ? " IT" : +gr >= 9 ? " DES" : "") }; })
+    .sort((a, b) => (+a.gr || 99) - (+b.gr || 99) || a.c.localeCompare(b.c));
+}
+let WH_IV = null;
+function openClassWhere(pick){
+  document.querySelectorAll(".whPop").forEach(x => x.remove()); clearInterval(WH_IV);
+  const bg = document.createElement("div"); bg.className = "modal-bg whPop"; bg.style.zIndex = 70;
+  bg.innerHTML = `<div class="modal" role="dialog" aria-label="Class progress" style="max-width:1180px;width:calc(100% - 24px)">
+    <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap"><div><h2 style="margin:0">📍 Class progress: where everyone is working</h2>
+      <div class="small muted" style="margin-top:2px">${isSuper() ? "All Design and IT classes." : "Your Design and IT students."} Choose a grade. 🟢 = working on it right now, from their screen; otherwise it is their latest saved work.</div></div>
+      <div class="row" style="gap:6px"><button class="btn ghost sm" id="whRf">↻ Refresh</button><button class="btn ghost sm" id="whX">Close</button></div></div>
+    <div class="tabs" id="whTabs" style="margin-top:10px;flex-wrap:wrap"></div>
+    <div class="row" id="whFil" style="margin-top:8px;gap:8px"></div>
+    <div id="whOut" style="margin-top:10px"></div><div class="small muted" id="whAt" style="margin-top:8px"></div></div>`;
+  document.body.appendChild(bg);
+  const close = () => { clearInterval(WH_IV); bg.remove(); };
+  bg.querySelector("#whX").onclick = close; bg.onclick = e => { if (e.target === bg) close(); };
+  let cur = pick || load("sdc_whpick", ""), cls = "";
+  const paint = () => {
+    const G = whGroups();
+    if (!G.length){ bg.querySelector("#whTabs").innerHTML = ""; bg.querySelector("#whFil").innerHTML = ""; bg.querySelector("#whOut").innerHTML = `<p class="muted">${isSuper() ? "No Design or IT students yet." : "No Design or IT students have chosen you as their teacher yet."}</p>`; return; }
+    if (!G.some(g => g.k === cur)) cur = G[0].k;
+    bg.querySelector("#whTabs").innerHTML = G.map(g => `<button role="tab" data-wg="${esc(g.k)}" aria-selected="${g.k === cur}">${esc(g.label)} <span class="n">${g.list.length}</span></button>`).join("");
+    bg.querySelectorAll("[data-wg]").forEach(b => b.onclick = () => { cur = b.dataset.wg; cls = ""; store("sdc_whpick", cur); paint(); });
+    const grp = G.find(g => g.k === cur), ks = {}; grp.list.forEach(s => { const k = [s.teacher || "", s.cls || ""].join("|"); ks[k] = s; });
+    if (cls && !ks[cls]) cls = "";
+    bg.querySelector("#whFil").innerHTML = Object.keys(ks).length > 1 ? `<label class="small">Class <select class="t" id="whCls" style="max-width:300px"><option value="">All ${esc(grp.label)} classes</option>${Object.entries(ks).map(([k, s]) => `<option value="${esc(k)}" ${k === cls ? "selected" : ""}>${esc((s.cls ? s.cls + " · " : "") + (s.teacher || "no teacher"))}</option>`).join("")}</select></label>` : "";
+    const sel = bg.querySelector("#whCls"); if (sel) sel.onchange = () => { cls = sel.value; paint(); };
+    const rows = grp.list.filter(s => !cls || [s.teacher || "", s.cls || ""].join("|") === cls).map(whRow)
+      .sort((a, b) => (WH_CR.indexOf(a.at.c) - WH_CR.indexOf(b.at.c)) || (a.at.i - b.at.i) || a.s.name.localeCompare(b.s.name));
+    // summary: how many students are at each place
+    const by = {}; rows.forEach(r => { const k = r.at.txt.replace(/ submitted ✓$/, " submitted"); (by[k] = by[k] || { n:0, names:[], now:0, o:r.at }).n++; by[k].names.push(r.s.name); if (r.at.now) by[k].now++; });
+    const sum = Object.entries(by).sort((a, b) => (WH_CR.indexOf(a[1].o.c) - WH_CR.indexOf(b[1].o.c)) || (a[1].o.i - b[1].o.i)).map(([k, v]) =>
+      `<div style="border:1px solid #DCE2EE;border-radius:12px;padding:8px 12px;min-width:150px" title="${esc(v.names.join(", "))}"><div style="font-weight:800">${esc(k)}</div><div class="small"><b style="font-size:1.25rem">${v.n}</b> student${v.n === 1 ? "" : "s"}${v.now ? ` · 🟢 ${v.now} now` : ""}</div></div>`).join("");
+    const cell = (r, c, i) => { const v = r.crit[c].st[i], here = r.at.c === c && r.at.i === i;
+      const bgc = v === "done" ? "#D6F0E0" : v === "started" ? "#FFF1CC" : "transparent", fg = v === "done" ? "#16623A" : v === "started" ? "#6B4A00" : "#9AA3B5";
+      return `<td style="text-align:center;padding:4px 2px;background:${bgc};color:${fg};${here ? "outline:3px solid #1F6FEB;outline-offset:-3px;font-weight:800;" : ""}" title="Criterion ${c} · Strand ${WH_RN[i]}: ${v === "done" ? "complete" : v === "started" ? "started" : "not started"}${here ? " (working here)" : ""}">${here ? "📍" : v === "done" ? "✓" : v === "started" ? "●" : "·"}</td>`; };
+    const nS = c => Math.max(4, ...rows.map(r => r.crit[c].st.length));
+    bg.querySelector("#whOut").innerHTML = `<div class="row" style="gap:8px;flex-wrap:wrap">${sum}</div>
+      <div class="scroll" style="margin-top:12px"><table class="tbl" style="font-size:13.5px"><tr><th rowspan="2">Student</th><th rowspan="2">Working at</th>${WH_CR.map(c => `<th colspan="${nS(c)}" style="text-align:center">Criterion ${c}</th>`).join("")}<th rowspan="2"></th></tr>
+        <tr>${WH_CR.map(c => Array.from({ length:nS(c) }, (_, i) => `<th style="text-align:center;padding:4px 6px">${WH_RN[i]}</th>`).join("")).join("")}</tr>
+        ${rows.map((r, n) => `<tr><td><b>${esc(r.s.name)}</b>${r.s.cls ? `<div class="em">${esc(r.s.cls)}</div>` : ""}${isSuper() && r.s.teacher ? `<div class="em">${esc(r.s.teacher)}</div>` : ""}</td>
+          <td>${r.at.live ? (r.at.now ? `<span class="pill ok">🟢 now</span> ` : `<span class="pill" style="background:#FFF4D6;color:#5A3D00">🟡 online</span> `) : ""}<b>${esc(r.at.txt)}</b>${!r.at.live ? `<div class="em">${esc(liveState(r.s).k === "off" ? "Last active " + (r.s.active ? fmtDT(r.s.active) : "—") : "")}</div>` : ""}</td>
+          ${WH_CR.map(c => Array.from({ length:nS(c) }, (_, i) => i < r.crit[c].st.length ? cell(r, c, i) : `<td></td>`).join("") ).join("")}
+          <td><div class="acts"><button class="btn sm ghost" data-wl="${n}" title="See this student's screen">👁 Live</button><button class="btn sm ghost" data-wp="${n}" title="Progress and feedback">📊</button></div></td></tr>`).join("") || `<tr><td colspan="20" class="muted">No students in this class.</td></tr>`}</table></div>
+      <p class="small muted" style="margin:8px 0 0">✓ strand complete · ● started · 📍 where they are working · a blue box around the strand they are on. Hover a summary box to see the names.</p>`;
+    bg.querySelectorAll("[data-wl]").forEach(b => b.onclick = () => openLive(rows[+b.dataset.wl].s));
+    bg.querySelectorAll("[data-wp]").forEach(b => b.onclick = () => openProgress(rows[+b.dataset.wp].s));
+    bg.querySelector("#whAt").textContent = "Updated " + new Date().toLocaleTimeString("en-GB") + " · refreshes by itself every 30 seconds";
+  };
+  bg.querySelector("#whRf").onclick = async () => { try { await loadLive(); } catch(e){} paint(); };
+  paint(); WH_IV = setInterval(() => { if (!bg.isConnected) return clearInterval(WH_IV); try { loadLive(); } catch(e){} paint(); }, 30000);
+}
 /* ---- deleting an account (super admin only, once the student hasn't been online for a month) ---- */
 const DELETE_AFTER_DAYS = 30;
 const idleDays = s => s.seen ? Math.floor((Date.now() - s.seen) / 86400000) : Infinity;
@@ -1683,6 +1775,7 @@ function classLogins(){
   paint();
 }
 $("stLogins").onclick = classLogins;
+$("stWhere").onclick = () => openClassWhere();
 $("stQ").oninput = renderStudents; $("stC").onchange = renderStudents; $("stK").onchange = renderStudents; $("stCr").onchange = renderStudents;
 /* one student's feedback: Computer Science on one page, Design / IT one page per criterion they have work in */
 async function studentPdf(s0, b){
