@@ -617,13 +617,13 @@ async function adminSetup(newPw, payload, code){
   // check it opens again before sending anything
   const back = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name:"AES-GCM", iv:unb64x(w.iv), additionalData:ADM_AAD }, await adminKek(newPw, w, half), unb64x(w.ct))));
   if (JSON.stringify(back) !== JSON.stringify(payload)) throw new Error("check");
-  let r; try { r = await jsonp({ a:"admset", h:b64x(half), w:JSON.stringify(w), d:adminDevice(), c:String(code || "") }, 20000); } catch(e){ throw new Error("reach"); }
+  let r; try { r = await jsonp({ a:"admset", h:b64x(half), w:JSON.stringify(w), d:adminDevice(), otp:String(code || "") }, 20000); } catch(e){ throw new Error("reach"); }
   if (!r || !r.ok) throw new Error(r && r.reason ? r.reason : "reach");
   return r;
 }
 /* set up (or move, with a current code) the authenticator app for super admin password changes: an email goes out */
 async function adminTotpBegin(code){
-  let r; try { r = await jsonp({ a:"admtotp", c:String(code || ""), d:adminDevice() }, 20000); } catch(e){ throw new Error("reach"); }
+  let r; try { r = await jsonp({ a:"admtotp", otp:String(code || ""), d:adminDevice() }, 20000); } catch(e){ throw new Error("reach"); }
   if (!r || !r.ok) throw new Error(r && r.reason ? r.reason : "reach");
   return r;
 }

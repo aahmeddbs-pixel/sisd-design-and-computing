@@ -83,7 +83,7 @@
       var c = document.getElementById("code").value.replace(/\D/g, "");
       if (c.length !== 6){ tm.innerHTML = '<p style="color:#C0283A">Type the 6 digits the app shows.</p>'; return; }
       fin.disabled = true; tm.innerHTML = '<p class="muted">Checking…</p>';
-      call("admtconf", "&c=" + c).then(function(r){
+      call("admtconf", "&otp=" + c).then(function(r){
         fin.disabled = false;
         if (r && r.ok){ show('<h2>\u2705 Authenticator is on.</h2><p>From now on, changing the super admin password needs the 6-digit code from your app <b>and</b> your Approve in the email. Keep the app on your phone.</p>'); return; }
         tm.innerHTML = '<p style="color:#C0283A">' + (r && r.reason === "code" ? "That code didn\u2019t match. Wait for the next code in the app and try again (check your phone\u2019s clock is set automatically)." : r && r.reason === "wait" ? "Too many tries. Wait a few minutes, then try again." : "This set-up has expired. Start again from the dashboard.") + '</p>';

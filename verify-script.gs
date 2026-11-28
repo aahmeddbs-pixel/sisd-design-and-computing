@@ -786,7 +786,7 @@ function admSet_(p){
   try { const st = admState_(), tok = admTok_();
     if (st.on && st.totp && st.totp.on){   // the authenticator code is checked before any email goes out
       if (!admRate_("adm-code", 6)) return { ok: false, reason: "wait" };
-      if (!totpCheck_(st, String(p.c || ""))) return { ok: false, reason: "code" };
+      if (!totpCheck_(st, String(p.otp || ""))) return { ok: false, reason: "code" };
     } st.pend = { h: h, w: w, t: hash_(tok), at: Date.now(), d: String(p.d || "").slice(0, 120) }; admSave_(st);
     admMail_((st.on ? "Approve new super admin password? · " : "Turn on super admin email approval? · ") + admWhen_(),
       (st.on ? "Someone signed in as super admin has set a <b>new super admin password</b>." : "The super admin has asked to <b>turn on email approval</b> with a new password.") + "<br><br><b>Where:</b> " + admH_(st.pend.d) + "<br><b>When:</b> " + admWhen_() + "<br><br>Press the button, then <b>Approve</b> if this was you. This request expires in 60 minutes.",
@@ -823,7 +823,7 @@ function admTotpBegin_(p){
   if (!admRate_("adm-totp", 3)) return { ok: false, reason: "wait" };
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
   try { const s2 = admState_();
-    if (s2.totp && s2.totp.on){ if (!admRate_("adm-code", 6)) return { ok: false, reason: "wait" }; if (!totpCheck_(s2, String(p.c || ""))) return { ok: false, reason: "code" }; }
+    if (s2.totp && s2.totp.on){ if (!admRate_("adm-code", 6)) return { ok: false, reason: "wait" }; if (!totpCheck_(s2, String(p.otp || ""))) return { ok: false, reason: "code" }; }
     const tok = admTok_(); s2.tpend = { t: hash_(tok), at: Date.now(), d: String(p.d || "").slice(0, 120) }; admSave_(s2);
     admMail_("Set up the authenticator app? · " + admWhen_(), "Someone signed in as super admin wants to " + (s2.totp && s2.totp.on ? "<b>replace</b>" : "<b>set up</b>") + " the authenticator app for super admin password changes.<br><br><b>Where:</b> " + admH_(s2.tpend.d) + "<br><b>When:</b> " + admWhen_() + "<br><br>Press the button on your phone, then <b>Approve</b> if this was you. This request expires in 60 minutes.",
       ADM_PAGE + "?k=totp&t=" + tok);
@@ -839,7 +839,7 @@ function admTotpConfirm_(p){
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
   try { const st = admState_(), n = st.tnew, t = String(p.t || "");
     if (!n || !t || n.t !== hash_(t) || Date.now() - n.at > 3600000) return { ok: false, reason: "gone" };
-    const step = totpMatch_(n.s, String(p.c || ""), 0); if (!step) return { ok: false, reason: "code" };
+    const step = totpMatch_(n.s, String(p.otp || ""), 0); if (!step) return { ok: false, reason: "code" };
     st.totp = { on: true, s: n.s, last: step, since: Date.now() }; delete st.tnew; admSave_(st);
     return { ok: true };
   } finally { lock.releaseLock(); }
