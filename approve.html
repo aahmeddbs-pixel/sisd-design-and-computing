@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<title>SISD Design and Computing · Security</title>
+<style>
+  body{margin:0;background:#F3F5F9;font:16px/1.5 Arial,Helvetica,sans-serif;color:#16223A}
+  .wrap{max-width:560px;margin:24px auto;padding:0 16px}
+  .bar{background:#1B2D4E;color:#fff;padding:12px 16px;border-bottom:4px solid #DC2B3E;font-weight:bold;border-radius:10px 10px 0 0}
+  .card{background:#fff;padding:18px 18px 22px;border-radius:0 0 10px 10px;box-shadow:0 2px 10px rgba(16,29,53,.08)}
+  h2{font-size:20px;margin:4px 0 12px}
+  .muted{color:#5B6782;font-size:14px}
+  .btns{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}
+  button{flex:1 1 140px;border:0;border-radius:10px;padding:15px 18px;font-size:17px;font-weight:bold;color:#fff;cursor:pointer}
+  .yes{background:#1E8A55}.no{background:#C0283A}
+  button:disabled{opacity:.5;cursor:default}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">SISD Design and Computing · Security</div>
+  <div class="card" id="box"><p class="muted">Checking the request…</p></div>
+</div>
+<script>
+(function(){
+  var API = "https://script.google.com/macros/s/AKfycbzYaxjHSKBzuhLJ3nkL7Qqb2BNL6nFHy7ojFnMTb_D2ZE5LbYRY2VnL5F_6gPGEbtqjsQ/exec";
+  var q = new URLSearchParams(location.search), k = q.get("k") || "", t = q.get("t") || "", i = q.get("i") || "";
+  var box = document.getElementById("box");
+  function esc(s){ return String(s || "").replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+  function show(h){ box.innerHTML = h; }
+  function call(a, extra){
+    var u = API + "?a=" + a + "&k=" + encodeURIComponent(k) + "&t=" + encodeURIComponent(t) + "&i=" + encodeURIComponent(i) + (extra || "") + "&_=" + Date.now();
+    return fetch(u, { credentials: "omit", cache: "no-store" }).then(function(r){ return r.json(); });
+  }
+  var GONE = '<h2>This approval link has expired or was already used.</h2><p>Nothing was changed. If you still need to sign in, start again on the dashboard to get a new email.</p>';
+  var FAIL = '<h2>Couldn’t reach the server.</h2><p>Check your internet connection, then reload this page. Nothing was changed.</p>';
+  if (!k || !t){ show(GONE); return; }
+  call("adminfo").then(function(r){
+    if (!r || !r.ok){ show(r && r.reason === "wait" ? '<h2>Too many tries.</h2><p>Wait a few minutes, then reload this page.</p>' : GONE); return; }
+    var title = r.k === "set" ? (r.on ? "Approve the new super admin password?" : "Turn on super admin email approval?") : "Approve this super admin sign-in?";
+    show('<h2>' + title + '</h2><p><b>Where:</b> ' + esc(r.d || "unknown") + '<br><b>Asked:</b> ' + esc(r.at) + '</p>' +
+      '<p class="muted">Only approve if this was you, just now.</p>' +
+      '<div class="btns"><button class="yes" id="yes">✓ Approve</button><button class="no" id="no">✕ Deny</button></div>');
+    function press(v){
+      document.getElementById("yes").disabled = document.getElementById("no").disabled = true;
+      call("admdo", "&v=" + v).then(function(d){
+        if (!d || !d.ok){ show(d && d.reason === "wait" ? '<h2>Too many tries.</h2><p>Wait a few minutes, then try again.</p>' : GONE); return; }
+        if (!d.yes){ show(d.k === "req" ? '<h2>Denied.</h2><p>Nobody was let in. If this wasn’t you, change the super admin password when you next sign in.</p>' : '<h2>Denied.</h2><p>Nothing was changed.</p>'); return; }
+        if (d.k === "req") show('<h2>✅ Approved.</h2><p>Go back to the dashboard: it opens in a few seconds. This approval works once, for the next ' + (d.minutes || 10) + ' minutes.</p>');
+        else if (d.change) show('<h2>✅ New password approved.</h2><p>From now on, sign in to the super admin dashboard with your <b>new password</b>.</p>');
+        else show('<h2>✅ Email approval is on.</h2><p>From now on, sign in to the super admin dashboard with your <b>new password</b>. Each time, you’ll get an email here to approve.</p>');
+      }).catch(function(){ show(FAIL); });
+    }
+    document.getElementById("yes").onclick = function(){ press(1); };
+    document.getElementById("no").onclick = function(){ press(0); };
+  }).catch(function(){ show(FAIL); });
+})();
+</script>
+</body>
+</html>

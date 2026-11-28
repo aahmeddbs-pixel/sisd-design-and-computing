@@ -46,6 +46,8 @@ function doGet(e){
   if (a === "admbad") return out_(e, admBad_(p));
   if (a === "admset") return out_(e, admSet_(p));
   if (a === "admok" || a === "admno") return admPage_(p, a === "admok");
+  if (a === "adminfo") return out_(e, admInfo_(p));
+  if (a === "admdo") return out_(e, admDo_(p));
   if (a === "hpsetup"){ hpTeachersIn_(String(p.tm || "")); return out_(e, hpSetup_(String(p.sheet || ""))); }
   if (a === "hpstatus") return out_(e, hpStatus_());
   if (a === "hptest") return out_(e, hpTest_());
@@ -729,6 +731,10 @@ function admState_(){ try { return JSON.parse(admProps_().getProperty("ADM") || 
 function admSave_(st){ admProps_().setProperty("ADM", JSON.stringify(st)); }
 function admTok_(){ return Utilities.getUuid().replace(/-/g, "") + Utilities.getUuid().replace(/-/g, ""); }
 function admUrl_(){ return ScriptApp.getService().getUrl(); }
+/* The email button opens this page on the GitHub site, which talks to this script in the background (like the
+   dashboard does). Opening the script's own link directly fails with "page not found" on phones and browsers that are
+   signed in to a Google account, so the approval page no longer lives here. */
+const ADM_PAGE = "https://aahmeddbs-pixel.github.io/sisd-design-and-computing/approve.html";
 function admH_(s){ return String(s || "").replace(/[&<>"']/g, function(c){ return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
 function admWhen_(){ return Utilities.formatDate(new Date(), "Asia/Dubai", "EEE d MMM yyyy, HH:mm") + " (Dubai time)"; }
 function admRate_(key, max){ const c = CacheService.getScriptCache(), n = +(c.get(key) || 0); if (n >= max) return false; c.put(key, String(n + 1), 3600); return true; }
@@ -749,7 +755,7 @@ function admReq_(p){
   const tok = admTok_(), dev = String(p.d || "").slice(0, 120);
   CacheService.getScriptCache().put("admq:" + id, JSON.stringify({ st: "wait", t: hash_(tok), at: Date.now(), d: dev }), ADM_MINUTES * 60 + 300);
   admMail_("Approve super admin sign-in? · " + admWhen_(), "Someone has typed the super admin password and wants to sign in.<br><br><b>Where:</b> " + admH_(dev) + "<br><b>When:</b> " + admWhen_() + "<br><br>Press the button, check the details, then choose <b>Approve</b> or <b>Deny</b>. The request expires in " + ADM_MINUTES + " minutes.",
-    admUrl_() + "?a=admok&k=req&i=" + encodeURIComponent(id) + "&t=" + tok);
+    ADM_PAGE + "?k=req&i=" + encodeURIComponent(id) + "&t=" + tok);
   return { ok: true };
 }
 /* 2. the waiting browser asks whether it was approved (the second key is given once, then forgotten) */
@@ -778,7 +784,7 @@ function admSet_(p){
   try { const st = admState_(), tok = admTok_(); st.pend = { h: h, w: w, t: hash_(tok), at: Date.now(), d: String(p.d || "").slice(0, 120) }; admSave_(st);
     admMail_((st.on ? "Approve new super admin password? · " : "Turn on super admin email approval? · ") + admWhen_(),
       (st.on ? "Someone signed in as super admin has set a <b>new super admin password</b>." : "The super admin has asked to <b>turn on email approval</b> with a new password.") + "<br><br><b>Where:</b> " + admH_(st.pend.d) + "<br><b>When:</b> " + admWhen_() + "<br><br>Press the button, then <b>Approve</b> if this was you. This request expires in 60 minutes.",
-      admUrl_() + "?a=admok&k=set&t=" + tok);
+      ADM_PAGE + "?k=set&t=" + tok);
   } finally { lock.releaseLock(); }
   return { ok: true, sent: true };
 }
@@ -802,6 +808,28 @@ function admLook_(k, t, id){
     return q.st === "wait" && q.t === hash_(t) && Date.now() - q.at < ADM_MINUTES * 60000 ? q : null; }
   if (k === "set"){ const st = admState_(); return st.pend && st.pend.t === hash_(t) && Date.now() - st.pend.at < 3600000 ? st.pend : null; }
   return null;
+}
+/* for the GitHub approval page: what is being asked (looking changes nothing) */
+function admInfo_(p){
+  const k = String(p.k || ""), info = admLook_(k, String(p.t || ""), String(p.i || ""));
+  if (!info) return { ok: false, reason: "gone" };
+  return { ok: true, k: k, on: !!admState_().on, d: String(info.d || ""), at: Utilities.formatDate(new Date(info.at), "Asia/Dubai", "EEE d MMM, HH:mm") + " (Dubai time)" };
+}
+/* for the GitHub approval page: the Approve / Deny press */
+function admDo_(p){
+  if (!admRate_("adm-do", 20)) return { ok: false, reason: "wait" };
+  const k = String(p.k || ""), t = String(p.t || ""), id = String(p.i || ""), yes = String(p.v) === "1";
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const info = admLook_(k, t, id);
+    if (!info) return { ok: false, reason: "gone" };
+    if (k === "req"){ info.st = yes ? "ok" : "no"; info.ok = Date.now(); CacheService.getScriptCache().put("admq:" + id, JSON.stringify(info), ADM_MINUTES * 60 + 300);
+      return { ok: true, k: k, yes: yes, minutes: ADM_MINUTES }; }
+    const st = admState_();
+    if (!yes){ delete st.pend; admSave_(st); return { ok: true, k: k, yes: false }; }
+    const wasOn = !!st.on; st.on = true; st.h = info.h; st.w = info.w; st.since = Date.now(); delete st.pend; admSave_(st);
+    return { ok: true, k: k, yes: true, change: wasOn };
+  } finally { lock.releaseLock(); }
 }
 function admYes_(p){
   const k = String(p.k || ""), t = String(p.t || ""), id = String(p.i || ""), yes = String(p.v) === "1";
