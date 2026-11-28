@@ -10,7 +10,7 @@
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
 <script src="/python-pathways/pp-sync.js?v=20261126auto"></script>
 <script src="/python-pathways/answers-view.js?v=20261112all"></script>
-<script src="sdc.js?v=20261128sec"></script>
+<script src="sdc.js?v=20261128totp"></script>
 <script src="/python-pathways/game-dev-data.js?v=20261116gd"></script>
 <style>
 :root{
@@ -556,22 +556,40 @@ async function admSecurityCard(){
       <label class="f">New super admin password<input class="t" id="secPw1" type="password" autocomplete="new-password"></label>
       <label class="f">Type it again<input class="t" id="secPw2" type="password" autocomplete="new-password"></label></div>
     <p class="muted small" style="margin:6px 0 0">At least 14 characters, mixing 3 of: small letters, CAPITALS, numbers, symbols. A short sentence works well, e.g. <i>Camels-like-cold-mint-tea-7</i> (don't use this one). Don't use it anywhere else.</p>
+    ${on && as.totp ? `<label class="f" style="margin-top:10px;max-width:260px">6-digit code from your authenticator app<input class="t" id="secCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></label>` : ""}
     <div id="secMsg"></div><button class="btn" id="secGo" style="margin-top:10px">${on ? "Change the super admin password" : "Turn on email approval"}</button>`}
+    ${on ? `<hr style="border:0;border-top:1px solid var(--line);margin:16px 0 10px">
+    <b>📱 Authenticator app ${as.totp ? "is on" : "(recommended)"}</b>
+    <p class="muted small" style="margin:6px 0">${as.totp ? "Changing the super admin password needs a 6-digit code from the app on your phone <b>as well as</b> your Approve in the email. New phone? Type a current code below to move it. Lost the phone? Open your Google email script and run <b>resetAuthenticator</b>."
+      : "Add a second lock to password changes: a 6-digit code from Google Authenticator or Microsoft Authenticator on your phone. Then even someone who gets into your email can't change the super admin password."}</p>
+    ${as.totp ? `<label class="f" style="max-width:260px">Current 6-digit code<input class="t" id="totpCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></label>` : ""}
+    <div id="totpMsg"></div><button class="btn" id="totpGo" style="margin-top:8px">${as.totp ? "Move to a new phone" : "Set up the authenticator app"}</button>` : ""}
     </details></div>`;
+  if ($("totpGo")) $("totpGo").onclick = async () => {
+    const m = (k, h) => $("totpMsg").innerHTML = `<div class="notice ${k}" style="margin-top:8px">${h}</div>`, c = $("totpCode") ? $("totpCode").value.replace(/\D/g, "") : "";
+    if ($("totpCode") && c.length !== 6) return m("bad", "Type the 6-digit code your authenticator app shows now.");
+    $("totpGo").disabled = true;
+    try { await SDC.adminTotpBegin(c); if ($("totpCode")) $("totpCode").value = "";
+      m("ok", `An email has been sent to <b>${esc(SDC.ADMIN_APPROVER)}</b>. Open it <b>on your phone</b>, press <b>Approve</b>, then follow the steps to add it to your authenticator app (within 60 minutes).`); }
+    catch(e){ m("bad", e.message === "code" ? "That code didn't match. Wait for the next code in the app and try again." : e.message === "wait" ? "Too many tries. Try again later." : e.message === "off" ? "Turn on email approval first." : "That didn't work: the approval service couldn't be reached. Check the internet connection and try again."); }
+    $("totpGo").disabled = false;
+  };
   if (!$("secGo")) return;
   $("secGo").onclick = async () => {
     const a = $("secPw1").value, b = $("secPw2").value, m = (k, h) => $("secMsg").innerHTML = `<div class="notice ${k}" style="margin-top:8px">${h}</div>`;
     const bad = SDC.adminPwProblem(a); if (bad) return m("bad", esc(bad)); if (a !== b) return m("bad", "The two passwords don't match.");
     if (a === ADMPW) return m("bad", "Choose a new password, not the one you use now.");
+    const code = $("secCode") ? $("secCode").value.replace(/\D/g, "") : "";
+    if ($("secCode") && code.length !== 6) return m("bad", "Type the 6-digit code your authenticator app shows now.");
     const payload = PRIV ? { sig: PRIV.sig, enc: PRIV.enc, ak: AKEY || "" } : null;
     if (!payload && !ADM2) return m("bad", "Sign out and sign in again first.");
     $("secGo").disabled = true; m("ok", "Locking the keys with your new password… (a few seconds)");
     try {
       const pl = payload || await (async () => { throw new Error("relog"); })();
-      await SDC.adminSetup(a, pl);
+      await SDC.adminSetup(a, pl, code); if ($("secCode")) $("secCode").value = "";
       m("ok", `Nearly done. An email has been sent to <b>${esc(SDC.ADMIN_APPROVER)}</b>. Open it and press <b>Approve</b> (within 60 minutes). After that, sign in with your <b>new password</b>: each time you'll get an email to approve.`);
       $("secPw1").value = ""; $("secPw2").value = "";
-    } catch(e){ m("bad", e.message === "relog" ? "To change the password, sign out and sign in again, then change it straight away." : e.message === "wait" ? "Too many tries this hour. Try again later." : "That didn't work: the approval service couldn't be reached. Check the internet connection and try again."); }
+    } catch(e){ m("bad", e.message === "relog" ? "To change the password, sign out and sign in again, then change it straight away." : e.message === "wait" ? "Too many tries this hour. Try again later." : e.message === "code" ? "That authenticator code didn't match. Wait for the next code in the app and try again." : "That didn't work: the approval service couldn't be reached. Check the internet connection and try again."); }
     $("secGo").disabled = false;
   };
 }

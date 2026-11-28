@@ -48,6 +48,8 @@ function doGet(e){
   if (a === "admok" || a === "admno") return admPage_(p, a === "admok");
   if (a === "adminfo") return out_(e, admInfo_(p));
   if (a === "admdo") return out_(e, admDo_(p));
+  if (a === "admtotp") return out_(e, admTotpBegin_(p));
+  if (a === "admtconf") return out_(e, admTotpConfirm_(p));
   if (a === "hpsetup"){ hpTeachersIn_(String(p.tm || "")); return out_(e, hpSetup_(String(p.sheet || ""))); }
   if (a === "hpstatus") return out_(e, hpStatus_());
   if (a === "hptest") return out_(e, hpTest_());
@@ -738,7 +740,7 @@ const ADM_PAGE = "https://aahmeddbs-pixel.github.io/sisd-design-and-computing/ap
 function admH_(s){ return String(s || "").replace(/[&<>"']/g, function(c){ return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
 function admWhen_(){ return Utilities.formatDate(new Date(), "Asia/Dubai", "EEE d MMM yyyy, HH:mm") + " (Dubai time)"; }
 function admRate_(key, max){ const c = CacheService.getScriptCache(), n = +(c.get(key) || 0); if (n >= max) return false; c.put(key, String(n + 1), 3600); return true; }
-function admStat_(){ const st = admState_(); return { on: !!st.on, pending: !!st.pend }; }
+function admStat_(){ const st = admState_(); return { on: !!st.on, pending: !!st.pend, totp: !!(st.totp && st.totp.on) }; }
 function admMail_(subject, intro, link, extra){
   const btn = link ? '<p style="margin:22px 0"><a href="' + link + '" style="background:#1B2D4E;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:bold;display:inline-block">Open the approval page</a></p>' : "";
   MailApp.sendEmail({ to: ADM_TO, name: "SISD Design and Computing security", subject: subject,
@@ -781,13 +783,70 @@ function admSet_(p){
   try { const o = JSON.parse(w); if (!o.ct || !o.iv || !o.salt) return { ok: false, reason: "bad" }; } catch(err){ return { ok: false, reason: "bad" }; }
   if (!admRate_("adm-set", 3)) return { ok: false, reason: "wait" };
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
-  try { const st = admState_(), tok = admTok_(); st.pend = { h: h, w: w, t: hash_(tok), at: Date.now(), d: String(p.d || "").slice(0, 120) }; admSave_(st);
+  try { const st = admState_(), tok = admTok_();
+    if (st.on && st.totp && st.totp.on){   // the authenticator code is checked before any email goes out
+      if (!admRate_("adm-code", 6)) return { ok: false, reason: "wait" };
+      if (!totpCheck_(st, String(p.c || ""))) return { ok: false, reason: "code" };
+    } st.pend = { h: h, w: w, t: hash_(tok), at: Date.now(), d: String(p.d || "").slice(0, 120) }; admSave_(st);
     admMail_((st.on ? "Approve new super admin password? · " : "Turn on super admin email approval? · ") + admWhen_(),
       (st.on ? "Someone signed in as super admin has set a <b>new super admin password</b>." : "The super admin has asked to <b>turn on email approval</b> with a new password.") + "<br><br><b>Where:</b> " + admH_(st.pend.d) + "<br><b>When:</b> " + admWhen_() + "<br><br>Press the button, then <b>Approve</b> if this was you. This request expires in 60 minutes.",
       ADM_PAGE + "?k=set&t=" + tok);
   } finally { lock.releaseLock(); }
   return { ok: true, sent: true };
 }
+/* ---------- Authenticator app for super admin password changes (28 Nov 2026) ----------
+   Once set up, changing the super admin password needs a 6-digit code from the authenticator app on Mr Ahmed's phone
+   AND the Approve press in the email. Setting it up needs the email Approve. Replacing it later needs a current code;
+   if the phone is lost, open this script and run resetAuthenticator (only someone signed in to this Google account can). */
+const B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+function b32enc_(bytes){ let bits = 0, val = 0, out = ""; for (let i = 0; i < bytes.length; i++){ val = (val << 8) | (bytes[i] & 255); bits += 8; while (bits >= 5){ out += B32[(val >>> (bits - 5)) & 31]; bits -= 5; } } if (bits > 0) out += B32[(val << (5 - bits)) & 31]; return out; }
+function b32dec_(str){ const out = []; let bits = 0, val = 0; String(str).toUpperCase().replace(/[^A-Z2-7]/g, "").split("").forEach(c => { val = (val << 5) | B32.indexOf(c); bits += 5; if (bits >= 8){ out.push(((val >>> (bits - 8)) & 255) << 24 >> 24); bits -= 8; } }); return out; }
+function totpCode_(secret, step){
+  const msg = []; let x = step; for (let i = 7; i >= 0; i--){ msg[i] = (x % 256) << 24 >> 24; x = Math.floor(x / 256); }
+  const h = Utilities.computeHmacSignature(Utilities.MacAlgorithm.HMAC_SHA_1, msg, b32dec_(secret)), o = h[h.length - 1] & 15;
+  const n = ((h[o] & 127) << 24) | ((h[o + 1] & 255) << 16) | ((h[o + 2] & 255) << 8) | (h[o + 3] & 255);
+  return ("000000" + (n % 1000000)).slice(-6);
+}
+/* a code is good for its 30 seconds and one step either side, and each code works only once */
+function totpMatch_(secret, code, last){
+  code = String(code || "").replace(/\D/g, ""); if (code.length !== 6) return 0;
+  const now = Math.floor(Date.now() / 30000);
+  for (let d = -1; d <= 1; d++){ const step = now + d; if (step > (last || 0) && totpCode_(secret, step) === code) return step; }
+  return 0;
+}
+function totpCheck_(st, code){ const step = totpMatch_(st.totp.s, code, st.totp.last); if (!step) return false; st.totp.last = step; admSave_(st); return true; }
+function totpSecret_(){ return b32enc_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_1, Utilities.getUuid() + Utilities.getUuid() + Date.now())); }
+/* 1. the dashboard asks to set it up (or replace it, with a current code): an email goes out */
+function admTotpBegin_(p){
+  const st = admState_();
+  if (!st.on) return { ok: false, reason: "off" };
+  if (!admRate_("adm-totp", 3)) return { ok: false, reason: "wait" };
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try { const s2 = admState_();
+    if (s2.totp && s2.totp.on){ if (!admRate_("adm-code", 6)) return { ok: false, reason: "wait" }; if (!totpCheck_(s2, String(p.c || ""))) return { ok: false, reason: "code" }; }
+    const tok = admTok_(); s2.tpend = { t: hash_(tok), at: Date.now(), d: String(p.d || "").slice(0, 120) }; admSave_(s2);
+    admMail_("Set up the authenticator app? · " + admWhen_(), "Someone signed in as super admin wants to " + (s2.totp && s2.totp.on ? "<b>replace</b>" : "<b>set up</b>") + " the authenticator app for super admin password changes.<br><br><b>Where:</b> " + admH_(s2.tpend.d) + "<br><b>When:</b> " + admWhen_() + "<br><br>Press the button on your phone, then <b>Approve</b> if this was you. This request expires in 60 minutes.",
+      ADM_PAGE + "?k=totp&t=" + tok);
+  } finally { lock.releaseLock(); }
+  return { ok: true, sent: true };
+}
+/* 2. after Approve on the approval page: the new key is made and shown once (on that page only) */
+function admTotpKey_(st, info){ const s = totpSecret_(); st.tnew = { s: s, t: info.t, at: Date.now() }; delete st.tpend; admSave_(st);
+  return { secret: s, uri: "otpauth://totp/" + encodeURIComponent("SISD Design and Computing:super admin") + "?secret=" + s + "&issuer=" + encodeURIComponent("SISD Design and Computing") + "&algorithm=SHA1&digits=6&period=30" }; }
+/* 3. the approval page sends the first code from the app: only then is it switched on */
+function admTotpConfirm_(p){
+  if (!admRate_("adm-tconf", 10)) return { ok: false, reason: "wait" };
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try { const st = admState_(), n = st.tnew, t = String(p.t || "");
+    if (!n || !t || n.t !== hash_(t) || Date.now() - n.at > 3600000) return { ok: false, reason: "gone" };
+    const step = totpMatch_(n.s, String(p.c || ""), 0); if (!step) return { ok: false, reason: "code" };
+    st.totp = { on: true, s: n.s, last: step, since: Date.now() }; delete st.tnew; admSave_(st);
+    return { ok: true };
+  } finally { lock.releaseLock(); }
+}
+/* RUN THIS from the editor (▶) only if the phone with the authenticator app is lost: it switches the authenticator off */
+function resetAuthenticator(){ const st = admState_(); delete st.totp; delete st.tnew; delete st.tpend; admSave_(st); Logger.log("Authenticator switched off. Set it up again from the dashboard."); }
+
 /* the approval page (opening the link changes nothing: the owner must press a button, so email link scanners can't approve) */
 function admPage_(p, yes){
   const k = String(p.k || ""), t = String(p.t || ""), id = String(p.i || "");
@@ -807,13 +866,14 @@ function admLook_(k, t, id){
   if (k === "req"){ const raw = CacheService.getScriptCache().get("admq:" + id); if (!raw) return null; const q = JSON.parse(raw);
     return q.st === "wait" && q.t === hash_(t) && Date.now() - q.at < ADM_MINUTES * 60000 ? q : null; }
   if (k === "set"){ const st = admState_(); return st.pend && st.pend.t === hash_(t) && Date.now() - st.pend.at < 3600000 ? st.pend : null; }
+  if (k === "totp"){ const st = admState_(); return st.tpend && st.tpend.t === hash_(t) && Date.now() - st.tpend.at < 3600000 ? st.tpend : null; }
   return null;
 }
 /* for the GitHub approval page: what is being asked (looking changes nothing) */
 function admInfo_(p){
   const k = String(p.k || ""), info = admLook_(k, String(p.t || ""), String(p.i || ""));
   if (!info) return { ok: false, reason: "gone" };
-  return { ok: true, k: k, on: !!admState_().on, d: String(info.d || ""), at: Utilities.formatDate(new Date(info.at), "Asia/Dubai", "EEE d MMM, HH:mm") + " (Dubai time)" };
+  const s0 = admState_(); return { ok: true, k: k, on: !!s0.on, totp: !!(s0.totp && s0.totp.on), d: String(info.d || ""), at: Utilities.formatDate(new Date(info.at), "Asia/Dubai", "EEE d MMM, HH:mm") + " (Dubai time)" };
 }
 /* for the GitHub approval page: the Approve / Deny press */
 function admDo_(p){
@@ -826,6 +886,8 @@ function admDo_(p){
     if (k === "req"){ info.st = yes ? "ok" : "no"; info.ok = Date.now(); CacheService.getScriptCache().put("admq:" + id, JSON.stringify(info), ADM_MINUTES * 60 + 300);
       return { ok: true, k: k, yes: yes, minutes: ADM_MINUTES }; }
     const st = admState_();
+    if (k === "totp"){ if (!yes){ delete st.tpend; admSave_(st); return { ok: true, k: k, yes: false }; }
+      return Object.assign({ ok: true, k: k, yes: true }, admTotpKey_(st, info)); }
     if (!yes){ delete st.pend; admSave_(st); return { ok: true, k: k, yes: false }; }
     const wasOn = !!st.on; st.on = true; st.h = info.h; st.w = info.w; st.since = Date.now(); delete st.pend; admSave_(st);
     return { ok: true, k: k, yes: true, change: wasOn };
@@ -840,6 +902,7 @@ function admYes_(p){
     if (k === "req"){ const c = CacheService.getScriptCache(); info.st = yes ? "ok" : "no"; info.ok = Date.now(); c.put("admq:" + id, JSON.stringify(info), ADM_MINUTES * 60 + 300);
       return admHtml_(yes ? '<h2>✅ Approved.</h2><p>Go back to the dashboard: it opens in a few seconds. This approval works once, for the next ' + ADM_MINUTES + ' minutes.</p>' : '<h2>Denied.</h2><p>Nobody was let in. If this wasn\'t you, change the super admin password when you next sign in.</p>'); }
     const st = admState_();
+    if (k === "totp") return admHtml_('<h2>Please use the new approval page.</h2><p>Nothing was changed.</p>');
     if (!yes){ delete st.pend; admSave_(st); return admHtml_('<h2>Denied.</h2><p>Nothing was changed.</p>'); }
     st.on = true; st.h = info.h; st.w = info.w; st.since = Date.now(); delete st.pend; admSave_(st);
     return admHtml_('<h2>✅ Email approval is on.</h2><p>From now on, sign in to the super admin dashboard with your <b>new password</b>. Each time, you\'ll get an email here to approve.</p>');

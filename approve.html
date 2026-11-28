@@ -17,6 +17,12 @@
   button{flex:1 1 140px;border:0;border-radius:10px;padding:15px 18px;font-size:17px;font-weight:bold;color:#fff;cursor:pointer}
   .yes{background:#1E8A55}.no{background:#C0283A}
   button:disabled{opacity:.5;cursor:default}
+  .go{background:#1B2D4E}
+  .app{display:block;text-align:center;background:#1B2D4E;color:#fff;text-decoration:none;font-weight:bold;padding:14px;border-radius:10px;margin:12px 0}
+  .key{font:600 17px/1.5 ui-monospace,Menlo,Consolas,monospace;letter-spacing:1px;background:#E9EDF5;padding:10px;border-radius:8px;word-break:break-all;text-align:center}
+  #qr{text-align:center;margin:12px 0} #qr img{width:200px;height:200px;image-rendering:pixelated}
+  input.code{width:100%;box-sizing:border-box;font-size:26px;letter-spacing:6px;text-align:center;padding:12px;border:2px solid #D8DEEA;border-radius:10px;margin-top:8px}
+  ol{padding-left:20px} li{margin:6px 0}
 </style>
 </head>
 <body>
@@ -24,6 +30,7 @@
   <div class="bar">SISD Design and Computing · Security</div>
   <div class="card" id="box"><p class="muted">Checking the request…</p></div>
 </div>
+<script src="qrcode.min.js"></script>
 <script>
 (function(){
   var API = "https://script.google.com/macros/s/AKfycbzYaxjHSKBzuhLJ3nkL7Qqb2BNL6nFHy7ojFnMTb_D2ZE5LbYRY2VnL5F_6gPGEbtqjsQ/exec";
@@ -40,7 +47,7 @@
   if (!k || !t){ show(GONE); return; }
   call("adminfo").then(function(r){
     if (!r || !r.ok){ show(r && r.reason === "wait" ? '<h2>Too many tries.</h2><p>Wait a few minutes, then reload this page.</p>' : GONE); return; }
-    var title = r.k === "set" ? (r.on ? "Approve the new super admin password?" : "Turn on super admin email approval?") : "Approve this super admin sign-in?";
+    var title = r.k === "totp" ? (r.totp ? "Replace the authenticator app?" : "Set up the authenticator app?") : r.k === "set" ? (r.on ? "Approve the new super admin password?" : "Turn on super admin email approval?") : "Approve this super admin sign-in?";
     show('<h2>' + title + '</h2><p><b>Where:</b> ' + esc(r.d || "unknown") + '<br><b>Asked:</b> ' + esc(r.at) + '</p>' +
       '<p class="muted">Only approve if this was you, just now.</p>' +
       '<div class="btns"><button class="yes" id="yes">✓ Approve</button><button class="no" id="no">✕ Deny</button></div>');
@@ -48,6 +55,7 @@
       document.getElementById("yes").disabled = document.getElementById("no").disabled = true;
       call("admdo", "&v=" + v).then(function(d){
         if (!d || !d.ok){ show(d && d.reason === "wait" ? '<h2>Too many tries.</h2><p>Wait a few minutes, then try again.</p>' : GONE); return; }
+        if (d.k === "totp" && d.yes){ totpSetup(d); return; }
         if (!d.yes){ show(d.k === "req" ? '<h2>Denied.</h2><p>Nobody was let in. If this wasn’t you, change the super admin password when you next sign in.</p>' : '<h2>Denied.</h2><p>Nothing was changed.</p>'); return; }
         if (d.k === "req") show('<h2>✅ Approved.</h2><p>Go back to the dashboard: it opens in a few seconds. This approval works once, for the next ' + (d.minutes || 10) + ' minutes.</p>');
         else if (d.change) show('<h2>✅ New password approved.</h2><p>From now on, sign in to the super admin dashboard with your <b>new password</b>.</p>');
@@ -57,6 +65,31 @@
     document.getElementById("yes").onclick = function(){ press(1); };
     document.getElementById("no").onclick = function(){ press(0); };
   }).catch(function(){ show(FAIL); });
+
+  /* authenticator set-up: shown once, only after Approve */
+  function totpSetup(d){
+    var phone = /iPhone|iPad|Android/i.test(navigator.userAgent);
+    show('<h2>Add it to your authenticator app</h2>' +
+      '<p class="muted">Use Google Authenticator, Microsoft Authenticator or similar. This page shows the key only once.</p>' +
+      '<ol>' + (phone ? '<li>Press the button below: your authenticator app opens and adds it.</li>' : '<li>Open the authenticator app on your phone, choose <b>Add</b> / <b>+</b> and scan this code.</li>') +
+      '<li>Or type the key into the app by hand (time-based).</li><li>Type the 6-digit code the app shows, then press <b>Finish</b>.</li></ol>' +
+      (phone ? '<a class="app" href="' + esc(d.uri) + '">Open in authenticator app</a>' : '') +
+      '<div id="qr"></div><div class="key">' + esc(d.secret.replace(/(.{4})/g, "$1 ").trim()) + '</div>' +
+      '<input class="code" id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456">' +
+      '<div id="tmsg"></div><div class="btns"><button class="go" id="fin">Finish</button></div>');
+    try { var q = qrcode(0, "M"); q.addData(d.uri); q.make(); document.getElementById("qr").innerHTML = q.createImgTag(6, 8, "QR code for the authenticator app"); } catch(e){}
+    var fin = document.getElementById("fin"), tm = document.getElementById("tmsg");
+    fin.onclick = function(){
+      var c = document.getElementById("code").value.replace(/\D/g, "");
+      if (c.length !== 6){ tm.innerHTML = '<p style="color:#C0283A">Type the 6 digits the app shows.</p>'; return; }
+      fin.disabled = true; tm.innerHTML = '<p class="muted">Checking…</p>';
+      call("admtconf", "&c=" + c).then(function(r){
+        fin.disabled = false;
+        if (r && r.ok){ show('<h2>\u2705 Authenticator is on.</h2><p>From now on, changing the super admin password needs the 6-digit code from your app <b>and</b> your Approve in the email. Keep the app on your phone.</p>'); return; }
+        tm.innerHTML = '<p style="color:#C0283A">' + (r && r.reason === "code" ? "That code didn\u2019t match. Wait for the next code in the app and try again (check your phone\u2019s clock is set automatically)." : r && r.reason === "wait" ? "Too many tries. Wait a few minutes, then try again." : "This set-up has expired. Start again from the dashboard.") + '</p>';
+      }).catch(function(){ fin.disabled = false; tm.innerHTML = '<p style="color:#C0283A">Couldn\u2019t reach the server. Try again.</p>'; });
+    };
+  }
 })();
 </script>
 </body>

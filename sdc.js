@@ -610,14 +610,20 @@ async function adminUnlock(pw, onWait, stop){
 }
 /* switch email approval on: lock { sig, enc, ak } with the NEW password + a fresh second key, and send both to the
    script, which only keeps them after Approve is pressed in the email */
-async function adminSetup(newPw, payload){
+async function adminSetup(newPw, payload, code){
   const half = crypto.getRandomValues(new Uint8Array(32)), w = { v:2, iter:600000, salt:b64x(crypto.getRandomValues(new Uint8Array(16))), iv:b64x(crypto.getRandomValues(new Uint8Array(12))) };
   const key = await adminKek(newPw, w, half);
   w.ct = b64x(new Uint8Array(await crypto.subtle.encrypt({ name:"AES-GCM", iv:unb64x(w.iv), additionalData:ADM_AAD }, key, TE.encode(JSON.stringify(payload)))));
   // check it opens again before sending anything
   const back = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name:"AES-GCM", iv:unb64x(w.iv), additionalData:ADM_AAD }, await adminKek(newPw, w, half), unb64x(w.ct))));
   if (JSON.stringify(back) !== JSON.stringify(payload)) throw new Error("check");
-  let r; try { r = await jsonp({ a:"admset", h:b64x(half), w:JSON.stringify(w), d:adminDevice() }, 20000); } catch(e){ throw new Error("reach"); }
+  let r; try { r = await jsonp({ a:"admset", h:b64x(half), w:JSON.stringify(w), d:adminDevice(), c:String(code || "") }, 20000); } catch(e){ throw new Error("reach"); }
+  if (!r || !r.ok) throw new Error(r && r.reason ? r.reason : "reach");
+  return r;
+}
+/* set up (or move, with a current code) the authenticator app for super admin password changes: an email goes out */
+async function adminTotpBegin(code){
+  let r; try { r = await jsonp({ a:"admtotp", c:String(code || ""), d:adminDevice() }, 20000); } catch(e){ throw new Error("reach"); }
   if (!r || !r.ok) throw new Error(r && r.reason ? r.reason : "reach");
   return r;
 }
@@ -1735,7 +1741,7 @@ const watch = (() => {
   document.addEventListener("visibilitychange", () => { if (!document.hidden) setTimeout(check, 2000); });
   return { on: f => { fn = f; setTimeout(check, 20000); }, check };
 })();
-return { adminStatus, adminUnlock, adminSetup, adminPwProblem, ADMIN_APPROVER, jsonp, PORTAL, COURSES, g10Pair, gradeOK, studyPlusOK, studyPlusEmail, studyReport, STUDY_PLUS, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
+return { adminStatus, adminUnlock, adminSetup, adminTotpBegin, adminPwProblem, ADMIN_APPROVER, jsonp, PORTAL, COURSES, g10Pair, gradeOK, studyPlusOK, studyPlusEmail, studyReport, STUDY_PLUS, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
   log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, forgot, forgotDialog, resetDone, unlockRequest, unlockedAt, lockHelp, lockIds, emailCode, checkCode, usernameOf, isUsername, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, gloss, listen, stopReading, speak, slow, live, watchAssign: f => watch.on(f), rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();
 
