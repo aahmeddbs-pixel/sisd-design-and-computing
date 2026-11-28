@@ -40,6 +40,12 @@ function doGet(e){
     return out_(e, m);
   }
   if (a === "notify") return out_(e, notify_(p));
+  if (a === "admstat") return out_(e, admStat_());
+  if (a === "admreq") return out_(e, admReq_(p));
+  if (a === "admkey") return out_(e, admKey_(p));
+  if (a === "admbad") return out_(e, admBad_(p));
+  if (a === "admset") return out_(e, admSet_(p));
+  if (a === "admok" || a === "admno") return admPage_(p, a === "admok");
   if (a === "hpsetup"){ hpTeachersIn_(String(p.tm || "")); return out_(e, hpSetup_(String(p.sheet || ""))); }
   if (a === "hpstatus") return out_(e, hpStatus_());
   if (a === "hptest") return out_(e, hpTest_());
@@ -58,6 +64,7 @@ function doGet(e){
 const VIDEO_FOLDER = "SISD student videos";
 const VIDEO_MAX = 300 * 1024 * 1024;
 function doPost(e){
+  if (e && e.parameter && e.parameter.a === "admyes") return admYes_(e.parameter);   // the Approve / Deny button on the approval page
   let p = null; try { p = JSON.parse(e.postData.contents); } catch(err){ return out_(null, { ok: false, reason: "bad" }); }
   if (p && p.a === "vchunk") return out_(null, vchunk_(p));
   if (p && p.a === "study") return out_(null, study_(p));
@@ -586,13 +593,14 @@ function hpEmail_(L){
 const HP_FROM_NAME = "Mr. Ahmed", HP_REPLY_TO = "abdulaziz.ahmed@sisd.ae";
 const hpSurname_ = n => String(n || "").toLowerCase().replace(/[^a-z\s'-]/g, " ").trim().split(/\s+/).pop() || "";
 function hpTeachers_(){ let m = {}; try { m = JSON.parse(hpProps_().getProperty("HP_TEACHERS") || "{}"); } catch(err){} return Object.assign({}, m, STAFF_EMAILS); }
+const HP_TEACHER_ALLOW = ["abdulaziz.ahmed@sisd.ae", "ciaran.french@sisd.ae", "sahar.abdelaziz@sisd.ae"];   // 28 Nov 2026: only these can receive lesson summaries
 function hpTeachersIn_(json){
   if (!json) return;
   let m = null; try { m = JSON.parse(json); } catch(err){ return; }
   if (!m || typeof m !== "object") return;
   const out = {};
   Object.keys(m).slice(0, 40).forEach(name => { const em = String(m[name] || "").trim().toLowerCase(), sn = hpSurname_(name);
-    if (sn.length >= 3 && DOMAIN.test(em) && em.split("@")[0].replace(/[^a-z]/g, "").indexOf(sn.replace(/[^a-z]/g, "")) >= 0) out[sn] = em; });
+    if (sn.length >= 3 && DOMAIN.test(em) && HP_TEACHER_ALLOW.indexOf(em) >= 0 && em.split("@")[0].replace(/[^a-z]/g, "").indexOf(sn.replace(/[^a-z]/g, "")) >= 0) out[sn] = em; });
   if (Object.keys(out).length) hpProps_().setProperty("HP_TEACHERS", JSON.stringify(out));
 }
 /* the account this script sends from (cached): only a school account may send the teachers' copies */
@@ -707,3 +715,111 @@ function hpTick(){
     P.setProperty("HP_SENT", JSON.stringify(sent));
   } finally { lock.releaseLock(); }
 }
+
+
+/* ---------- Super admin email approval (28 Nov 2026) ----------
+   The super admin keys are locked with the password AND a second key kept here. This script gives the second key
+   to a browser only after the owner presses Approve in an email sent to ADM_TO, so a stolen password alone opens
+   nothing. If you ever lose that mailbox, change ADM_TO below and deploy a new version (only you can, from your
+   Google account). */
+const ADM_TO = "send2abdul@hotmail.com";
+const ADM_MINUTES = 10;   // an approval works for 10 minutes and only once
+function admProps_(){ return PropertiesService.getScriptProperties(); }
+function admState_(){ try { return JSON.parse(admProps_().getProperty("ADM") || "null") || {}; } catch(err){ return {}; } }
+function admSave_(st){ admProps_().setProperty("ADM", JSON.stringify(st)); }
+function admTok_(){ return Utilities.getUuid().replace(/-/g, "") + Utilities.getUuid().replace(/-/g, ""); }
+function admUrl_(){ return ScriptApp.getService().getUrl(); }
+function admH_(s){ return String(s || "").replace(/[&<>"']/g, function(c){ return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+function admWhen_(){ return Utilities.formatDate(new Date(), "Asia/Dubai", "EEE d MMM yyyy, HH:mm") + " (Dubai time)"; }
+function admRate_(key, max){ const c = CacheService.getScriptCache(), n = +(c.get(key) || 0); if (n >= max) return false; c.put(key, String(n + 1), 3600); return true; }
+function admStat_(){ const st = admState_(); return { on: !!st.on, pending: !!st.pend }; }
+function admMail_(subject, intro, link, extra){
+  const btn = link ? '<p style="margin:22px 0"><a href="' + link + '" style="background:#1B2D4E;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:bold;display:inline-block">Open the approval page</a></p>' : "";
+  MailApp.sendEmail({ to: ADM_TO, name: "SISD Design and Computing security", subject: subject,
+    htmlBody: '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;color:#16223A"><div style="background:#1B2D4E;color:#fff;padding:12px 16px;border-bottom:4px solid #DC2B3E;font-weight:bold">SISD Design and Computing · Security</div>' +
+      '<p style="margin-top:18px">' + intro + '</p>' + btn + (extra || "") +
+      '<p style="color:#5B6782;font-size:13px;margin-top:20px">If this wasn\'t you, don\'t approve it: nobody can get in without your approval. Then change the super admin password when you next sign in.</p></div>' });
+}
+/* 1. a sign-in asks for approval */
+function admReq_(p){
+  const st = admState_(), id = String(p.i || "");
+  if (!st.on) return { ok: false, reason: "off" };
+  if (!/^[A-Za-z0-9_-]{20,40}$/.test(id)) return { ok: false, reason: "bad" };
+  if (!admRate_("adm-req", 8)) return { ok: false, reason: "wait" };
+  const tok = admTok_(), dev = String(p.d || "").slice(0, 120);
+  CacheService.getScriptCache().put("admq:" + id, JSON.stringify({ st: "wait", t: hash_(tok), at: Date.now(), d: dev }), ADM_MINUTES * 60 + 300);
+  admMail_("Approve super admin sign-in? · " + admWhen_(), "Someone has typed the super admin password and wants to sign in.<br><br><b>Where:</b> " + admH_(dev) + "<br><b>When:</b> " + admWhen_() + "<br><br>Press the button, check the details, then choose <b>Approve</b> or <b>Deny</b>. The request expires in " + ADM_MINUTES + " minutes.",
+    admUrl_() + "?a=admok&k=req&i=" + encodeURIComponent(id) + "&t=" + tok);
+  return { ok: true };
+}
+/* 2. the waiting browser asks whether it was approved (the second key is given once, then forgotten) */
+function admKey_(p){
+  const id = String(p.i || ""); if (!/^[A-Za-z0-9_-]{20,40}$/.test(id)) return { st: "gone" };
+  const c = CacheService.getScriptCache(), raw = c.get("admq:" + id); if (!raw) return { st: "gone" };
+  const q = JSON.parse(raw);
+  if (q.st === "ok"){
+    if (Date.now() - (q.ok || 0) > ADM_MINUTES * 60000){ c.remove("admq:" + id); return { st: "gone" }; }
+    c.remove("admq:" + id); const st = admState_(); if (!st.on) return { st: "gone" };
+    return { st: "ok", h: st.h, w: st.w };
+  }
+  return { st: q.st === "no" ? "no" : "wait" };
+}
+/* approved, but the password was wrong: tell the owner */
+function admBad_(p){ if (!admRate_("adm-bad", 5)) return { ok: true };
+  admMail_("Wrong super admin password after approval · " + admWhen_(), "A super admin sign-in you approved then failed because the password was wrong. Nothing was opened. If this wasn't you, change the super admin password.", "");
+  return { ok: true }; }
+/* 3. switching approval on (or changing the password later): kept only after Approve is pressed */
+function admSet_(p){
+  const h = String(p.h || ""), w = String(p.w || "");
+  if (!/^[A-Za-z0-9+/=]{40,60}$/.test(h) || w.length < 100 || w.length > 6000) return { ok: false, reason: "bad" };
+  try { const o = JSON.parse(w); if (!o.ct || !o.iv || !o.salt) return { ok: false, reason: "bad" }; } catch(err){ return { ok: false, reason: "bad" }; }
+  if (!admRate_("adm-set", 3)) return { ok: false, reason: "wait" };
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try { const st = admState_(), tok = admTok_(); st.pend = { h: h, w: w, t: hash_(tok), at: Date.now(), d: String(p.d || "").slice(0, 120) }; admSave_(st);
+    admMail_((st.on ? "Approve new super admin password? · " : "Turn on super admin email approval? · ") + admWhen_(),
+      (st.on ? "Someone signed in as super admin has set a <b>new super admin password</b>." : "The super admin has asked to <b>turn on email approval</b> with a new password.") + "<br><br><b>Where:</b> " + admH_(st.pend.d) + "<br><b>When:</b> " + admWhen_() + "<br><br>Press the button, then <b>Approve</b> if this was you. This request expires in 60 minutes.",
+      admUrl_() + "?a=admok&k=set&t=" + tok);
+  } finally { lock.releaseLock(); }
+  return { ok: true, sent: true };
+}
+/* the approval page (opening the link changes nothing: the owner must press a button, so email link scanners can't approve) */
+function admPage_(p, yes){
+  const k = String(p.k || ""), t = String(p.t || ""), id = String(p.i || "");
+  const info = admLook_(k, t, id);
+  let body;
+  if (!info) body = '<h2>This approval link has expired or was already used.</h2><p>Nothing was changed.</p>';
+  else body = '<h2>' + (k === "set" ? (admState_().on ? "Approve the new super admin password?" : "Turn on super admin email approval?") : "Approve this super admin sign-in?") + '</h2>' +
+    '<p><b>Where:</b> ' + admH_(info.d || "unknown") + '<br><b>Asked:</b> ' + Utilities.formatDate(new Date(info.at), "Asia/Dubai", "EEE d MMM, HH:mm") + ' (Dubai time)</p>' +
+    '<form method="post" action="' + admUrl_() + '" target="_top" style="display:inline"><input type="hidden" name="a" value="admyes"><input type="hidden" name="k" value="' + admH_(k) + '"><input type="hidden" name="t" value="' + admH_(t) + '"><input type="hidden" name="i" value="' + admH_(id) + '"><input type="hidden" name="v" value="1">' +
+    '<button style="background:#1E8A55;color:#fff;border:0;padding:12px 22px;border-radius:8px;font-weight:bold;font-size:16px;margin-right:10px">✓ Approve</button></form>' +
+    '<form method="post" action="' + admUrl_() + '" target="_top" style="display:inline"><input type="hidden" name="a" value="admyes"><input type="hidden" name="k" value="' + admH_(k) + '"><input type="hidden" name="t" value="' + admH_(t) + '"><input type="hidden" name="i" value="' + admH_(id) + '"><input type="hidden" name="v" value="0">' +
+    '<button style="background:#C0283A;color:#fff;border:0;padding:12px 22px;border-radius:8px;font-weight:bold;font-size:16px">✕ Deny</button></form>';
+  return admHtml_(body);
+}
+function admLook_(k, t, id){
+  if (!t) return null;
+  if (k === "req"){ const raw = CacheService.getScriptCache().get("admq:" + id); if (!raw) return null; const q = JSON.parse(raw);
+    return q.st === "wait" && q.t === hash_(t) && Date.now() - q.at < ADM_MINUTES * 60000 ? q : null; }
+  if (k === "set"){ const st = admState_(); return st.pend && st.pend.t === hash_(t) && Date.now() - st.pend.at < 3600000 ? st.pend : null; }
+  return null;
+}
+function admYes_(p){
+  const k = String(p.k || ""), t = String(p.t || ""), id = String(p.i || ""), yes = String(p.v) === "1";
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const info = admLook_(k, t, id);
+    if (!info) return admHtml_('<h2>This approval link has expired or was already used.</h2><p>Nothing was changed.</p>');
+    if (k === "req"){ const c = CacheService.getScriptCache(); info.st = yes ? "ok" : "no"; info.ok = Date.now(); c.put("admq:" + id, JSON.stringify(info), ADM_MINUTES * 60 + 300);
+      return admHtml_(yes ? '<h2>✅ Approved.</h2><p>Go back to the dashboard: it opens in a few seconds. This approval works once, for the next ' + ADM_MINUTES + ' minutes.</p>' : '<h2>Denied.</h2><p>Nobody was let in. If this wasn\'t you, change the super admin password when you next sign in.</p>'); }
+    const st = admState_();
+    if (!yes){ delete st.pend; admSave_(st); return admHtml_('<h2>Denied.</h2><p>Nothing was changed.</p>'); }
+    st.on = true; st.h = info.h; st.w = info.w; st.since = Date.now(); delete st.pend; admSave_(st);
+    return admHtml_('<h2>✅ Email approval is on.</h2><p>From now on, sign in to the super admin dashboard with your <b>new password</b>. Each time, you\'ll get an email here to approve.</p>');
+  } finally { lock.releaseLock(); }
+}
+function admHtml_(inner){
+  return HtmlService.createHtmlOutput('<meta name="viewport" content="width=device-width,initial-scale=1"><div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:30px auto;padding:0 16px;color:#16223A"><div style="background:#1B2D4E;color:#fff;padding:12px 16px;border-bottom:4px solid #DC2B3E;font-weight:bold">SISD Design and Computing · Security</div>' + inner + '</div>')
+    .setTitle("SISD Design and Computing security").setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
+}
+/* RUN THIS once from the editor (▶) to check the approval emails reach your Hotmail */
+function testAdminApprovalEmail(){ admMail_("Test: super admin approval emails work", "This is a test. Approval emails for the SISD Design and Computing super admin will arrive here.", ""); }

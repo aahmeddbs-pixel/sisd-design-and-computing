@@ -559,6 +559,68 @@ function jsonp(params, timeout){
     document.head.appendChild(sc);
   });
 }
+/* ---------- Super admin email approval (28 Nov 2026) ----------
+   The super admin keys are locked with the password AND a second key kept by the email script. The script only
+   hands that second key to a browser after Mr Ahmed presses Approve in an email to ADMIN_APPROVER, so a stolen
+   password on its own opens nothing. Every attempt sends that email, which is also the sign-in alert. */
+const ADMIN_APPROVER = "send2abdul@hotmail.com";
+const b64x = u8 => btoa(String.fromCharCode(...u8)), unb64x = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+async function adminStatus(){ try { const r = await jsonp({ a:"admstat" }, 9000); return r && typeof r.on === "boolean" ? r : null; } catch(e){ return null; } }
+function adminDevice(){ const ua = navigator.userAgent || "", os = /Windows/.test(ua) ? "Windows" : /Mac OS X/.test(ua) ? (/iPhone|iPad/.test(ua) ? "iPhone/iPad" : "Mac") : /Android/.test(ua) ? "Android" : /CrOS/.test(ua) ? "Chromebook" : /Linux/.test(ua) ? "Linux" : "Unknown";
+  const br = /Edg\//.test(ua) ? "Edge" : /Chrome\//.test(ua) ? "Chrome" : /Firefox\//.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : "Browser";
+  return (br + " on " + os + " · " + location.pathname.replace(/^\//, "") + " · " + (Intl.DateTimeFormat().resolvedOptions().timeZone || "")).slice(0, 120); }
+async function adminKek(pw, w, half){
+  const base = await crypto.subtle.importKey("raw", TE.encode(pw), "PBKDF2", false, ["deriveBits"]);
+  const bits = new Uint8Array(await crypto.subtle.deriveBits({ name:"PBKDF2", salt:unb64x(w.salt), iterations:w.iter, hash:"SHA-256" }, base, 256));
+  const mix = new Uint8Array(bits.length + half.length); mix.set(bits); mix.set(half, bits.length);
+  return crypto.subtle.importKey("raw", await crypto.subtle.digest("SHA-256", mix), "AES-GCM", false, ["encrypt", "decrypt"]);
+}
+const ADM_AAD = TE.encode("sdc-admin-v2");
+/* the rules for the super admin password */
+function adminPwProblem(pw){
+  if (String(pw).length < 14) return "Use at least 14 characters (a short sentence is easiest to remember).";
+  const classes = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].filter(r => r.test(pw)).length;
+  if (classes < 3) return "Mix at least 3 of: small letters, CAPITALS, numbers, symbols.";
+  if (/password|python|sisd|design|computing|ahmed|abdul|12345|qwerty|admin/i.test(pw)) return "Too easy to guess: avoid your name, the school, the platform or words like password and admin.";
+  return "";
+}
+/* sign in with approval: asks for the email, waits for the Approve press (up to 10 minutes), then opens the keys.
+   onWait(text) shows progress; stop() returning true gives up. Resolves with { sig, enc, ak } or throws. */
+async function adminUnlock(pw, onWait, stop){
+  const id = b64x(crypto.getRandomValues(new Uint8Array(18))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  let r; try { r = await jsonp({ a:"admreq", i:id, d:adminDevice() }, 20000); } catch(e){ throw new Error("reach"); }
+  if (!r || !r.ok) throw new Error(r && r.reason === "wait" ? "busy" : r && r.reason === "off" ? "off" : "reach");
+  if (onWait) onWait(`An approval email has been sent to <b>${esc(ADMIN_APPROVER)}</b>. Open it (on your phone is fine) and press <b>Approve</b>. Waiting for you…`);
+  const end = Date.now() + 10 * 60000;
+  while (Date.now() < end){
+    await new Promise(res => setTimeout(res, 4000));
+    if (stop && stop()) throw new Error("stopped");
+    let k; try { k = await jsonp({ a:"admkey", i:id }, 12000); } catch(e){ continue; }
+    if (!k) continue;
+    if (k.st === "no") throw new Error("denied");
+    if (k.st === "gone") throw new Error("expired");
+    if (k.st === "ok"){
+      const w = typeof k.w === "string" ? JSON.parse(k.w) : k.w;
+      try { const key = await adminKek(pw, w, unb64x(k.h));
+        return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name:"AES-GCM", iv:unb64x(w.iv), additionalData:ADM_AAD }, key, unb64x(w.ct))));
+      } catch(e){ try { jsonp({ a:"admbad", i:id }, 8000).catch(() => {}); } catch(x){} throw new Error("password"); }
+    }
+  }
+  throw new Error("expired");
+}
+/* switch email approval on: lock { sig, enc, ak } with the NEW password + a fresh second key, and send both to the
+   script, which only keeps them after Approve is pressed in the email */
+async function adminSetup(newPw, payload){
+  const half = crypto.getRandomValues(new Uint8Array(32)), w = { v:2, iter:600000, salt:b64x(crypto.getRandomValues(new Uint8Array(16))), iv:b64x(crypto.getRandomValues(new Uint8Array(12))) };
+  const key = await adminKek(newPw, w, half);
+  w.ct = b64x(new Uint8Array(await crypto.subtle.encrypt({ name:"AES-GCM", iv:unb64x(w.iv), additionalData:ADM_AAD }, key, TE.encode(JSON.stringify(payload)))));
+  // check it opens again before sending anything
+  const back = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name:"AES-GCM", iv:unb64x(w.iv), additionalData:ADM_AAD }, await adminKek(newPw, w, half), unb64x(w.ct))));
+  if (JSON.stringify(back) !== JSON.stringify(payload)) throw new Error("check");
+  let r; try { r = await jsonp({ a:"admset", h:b64x(half), w:JSON.stringify(w), d:adminDevice() }, 20000); } catch(e){ throw new Error("reach"); }
+  if (!r || !r.ok) throw new Error(r && r.reason ? r.reason : "reach");
+  return r;
+}
 const VKEY = e => "sdc_ver_" + normEmail(e);
 async function isVerified(email, timeout){
   try { if (localStorage.getItem(VKEY(email)) === "1") return true; } catch(e){}
@@ -1673,7 +1735,7 @@ const watch = (() => {
   document.addEventListener("visibilitychange", () => { if (!document.hidden) setTimeout(check, 2000); });
   return { on: f => { fn = f; setTimeout(check, 20000); }, check };
 })();
-return { jsonp, PORTAL, COURSES, g10Pair, gradeOK, studyPlusOK, studyPlusEmail, studyReport, STUDY_PLUS, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
+return { adminStatus, adminUnlock, adminSetup, adminPwProblem, ADMIN_APPROVER, jsonp, PORTAL, COURSES, g10Pair, gradeOK, studyPlusOK, studyPlusEmail, studyReport, STUDY_PLUS, course, courseLabel, gate, setGate, patchGate, clearGate, require, leave, ay, rolled, freshSwitches, confirm, canSignUp, isDeleted, isTester, testerPw, TESTERS, DELETED, lookup, register,
   log, task, strip, setSignedIn, signedOutNotice, VERIFY, verifyOn, isVerified, verifyStatuses, startVerify, notifyRequest, forgot, forgotDialog, resetDone, unlockRequest, unlockedAt, lockHelp, lockIds, emailCode, checkCode, usernameOf, isUsername, verifyMsg, verifyGate, sinceMs, work, WORK_GOAL_MIN, CONTROL, canon, verifyState, loadState, csvRows, surname, sameTeacher, teacherNames, hiddenTeacherNames, sendFeedback, getFeedback, showFeedbackButton, LANGS, getLang, setLang, langPicker, gloss, listen, stopReading, speak, slow, live, watchAssign: f => watch.on(f), rank, saveBadge, narrate, stopNarrating, narrator, setNarrator, idOf, keyOf, rows, sendRow, verify, flush, esc, offline, _internal:{ e64, d64, u8ToB64Text, b64ToText, SYNC, LOG } };
 })();
 

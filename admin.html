@@ -10,7 +10,7 @@
 <script>try{if(window.top!==window.self){window.top.location=window.self.location}}catch(e){document.documentElement.style.display="none"}</script>
 <script src="/python-pathways/pp-sync.js?v=20261126auto"></script>
 <script src="/python-pathways/answers-view.js?v=20261112all"></script>
-<script src="sdc.js?v=20261126auto"></script>
+<script src="sdc.js?v=20261128sec"></script>
 <script src="/python-pathways/game-dev-data.js?v=20261116gd"></script>
 <style>
 :root{
@@ -125,6 +125,7 @@ details.blk{border:1px solid var(--line);border-radius:10px;padding:8px 12px;mar
 
   <!-- UNLOCKED -->
   <div id="app" class="hidden">
+    <div id="secBox"></div>
     <div class="row" style="justify-content:space-between;margin-bottom:4px"><div><h1 id="whoTitle">Admin</h1><div class="muted small" id="whoSub"></div></div><div class="row"><span class="muted small" id="loadState"></span><button class="btn ghost sm" id="refresh">↻ Refresh</button></div></div>
     <div class="tabs" role="tablist">
       <button data-t="students" aria-selected="true">👥 Students &amp; progress</button><button data-t="hp">🏠 House Points</button><button data-t="log">📋 Sign-in log</button><button data-t="answers">📘 CS answers</button><button data-t="teachers" data-super>🧑‍🏫 Teachers</button><button data-t="gamedev">🎮 G7 Game Dev</button><button data-t="switches" data-super>🔀 Switches</button><button data-t="study" data-super>✦ Study Plus</button><button data-t="setup" data-super>⚙️ Setup</button>
@@ -303,8 +304,10 @@ async function unlock(pw){
   const key = await crypto.subtle.deriveKey({ name:"PBKDF2", salt:unb64(WRAP.salt), iterations:WRAP.iter, hash:"SHA-256" }, base, { name:"AES-GCM", length:256 }, false, ["decrypt"]);
   const priv = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name:"AES-GCM", iv:unb64(WRAP.iv) }, key, unb64(WRAP.ct))));
   RKEY = priv.enc || null;   // the PIN reset key (only this part is ever passed to teachers, never the signing key)
+  PRIV = { sig: priv.sig, enc: priv.enc || null };   // memory only: needed once, to switch on email approval
   return { sig: await crypto.subtle.importKey("jwk", priv.sig, { name:"ECDSA", namedCurve:"P-256" }, false, ["sign"]) };
 }
+let PRIV = null, ADM2 = false;   // ADM2: signed in through email approval
 const canSee = teacher => ROLE === "super" || (!!ME && (ME.names || [ME.name]).some(n => SDC.sameTeacher(n, teacher)));
 const isSuper = () => ROLE === "super";
 
@@ -435,14 +438,38 @@ document.querySelectorAll("#lgTabs button").forEach(b => b.onclick = () => {
 });
 $("knownTeachers").innerHTML = [...new Set(Object.values(TEACHERS).flat())].map(n => `<option value="${esc(n)}">`).join("");
 
+let admWaiting = false;
 $("pwGo").onclick = async () => {
+  if (admWaiting){ admWaiting = false; return; }   // "Cancel" while waiting for the approval email
   const f = fails("super"); if (f.until > Date.now()) return note("pwMsg", "bad", `Too many wrong tries. Wait ${Math.ceil((f.until - Date.now()) / 60000)} minute(s).`);
-  $("pwGo").disabled = true; note("pwMsg", "ok", "Checking…"); const pwTyped = $("pw").value;
-  try { KEYS = await unlock(pwTyped); store("sdc_admin_fail_super", { n:0, until:0 }); }
-  catch(e){ KEYS = null; failNote("super", f); SDC.log("adminfail", { name:"(unknown)", course:"" }, { tries:f.n }); note("pwMsg", "bad", "That password is not right."); }
-  $("pwGo").disabled = false; $("pw").value = "";
+  const pwTyped = $("pw").value; if (!pwTyped) return;
+  $("pwGo").disabled = true; note("pwMsg", "ok", "Checking…");
+  /* 28 Nov 2026: when email approval is on, the password alone opens nothing: the keys come after Approve is pressed */
+  const as = await SDC.adminStatus();
+  if (as && as.on){
+    admWaiting = true; $("pwGo").disabled = false; $("pwGo").textContent = "Cancel"; $("pw").value = "";
+    let pl = null, why = "";
+    try { pl = await SDC.adminUnlock(pwTyped, html => note("pwMsg", "ok", html), () => !admWaiting); } catch(e){ why = e.message; }
+    admWaiting = false; $("pwGo").textContent = "Unlock";
+    if (!pl){
+      if (why === "password"){ failNote("super", f); SDC.log("adminfail", { name:"(unknown)", course:"" }, { tries:f.n, approved:true }); }
+      return note("pwMsg", why === "stopped" ? "warn" : "bad", ({ password:"Approved, but that password is not right.", denied:"The sign-in was denied in the approval email.", expired:"No approval in 10 minutes. Press Unlock to try again.",
+        busy:"Too many sign-in attempts this hour. Try again later.", stopped:"Cancelled.", reach:"The approval service couldn't be reached. Check the internet connection and try again." })[why] || "Couldn't sign in. Try again."); }
+    try { KEYS = { sig: await crypto.subtle.importKey("jwk", pl.sig, { name:"ECDSA", namedCurve:"P-256" }, false, ["sign"]) }; } catch(e){ KEYS = null; return note("pwMsg", "bad", "The keys couldn't be opened. Try again."); }
+    RKEY = pl.enc || null; PRIV = { sig: pl.sig, enc: pl.enc || null }; ADM2 = true; window.__admPl = { ak: pl.ak || "" }; store("sdc_admin_fail_super", { n:0, until:0 });
+  } else {
+    try { KEYS = await unlock(pwTyped); store("sdc_admin_fail_super", { n:0, until:0 }); }
+    catch(e){ KEYS = null; failNote("super", f); SDC.log("adminfail", { name:"(unknown)", course:"" }, { tries:f.n });
+      note("pwMsg", "bad", as ? "That password is not right." : "That password is not right, or the approval service couldn't be reached. Check the internet connection and try again."); }
+    $("pwGo").disabled = false; $("pw").value = "";
+    if (!KEYS) return;
+  }
+  $("pwGo").disabled = false;
   if (KEYS){ ROLE = "super"; ME = { name:"Super admin" }; ADMPW = pwTyped;
-    try { AKEY = await vaultKeyFromPassword(pwTyped); await openAnswers(AKEY); } catch(e){ AKEY = ""; }
+    if (ADM2){ AKEY = (window.__admPl && window.__admPl.ak) || ""; }
+    try { if (!ADM2) AKEY = await vaultKeyFromPassword(pwTyped); } catch(e){ AKEY = ""; }
+    try { if (AKEY) await openAnswers(AKEY); } catch(e){}
+    setTimeout(admSecurityCard, 400);
     // a computer that has never been set up: bring in the Setup links saved from another computer
     let pulled = false;
     try { await loadCourseState(); if (STATE.acfg && !(sheetLink() || load(DS_KEY, ""))){ const c = await openAdmin(STATE.acfg); if (c.py) store(SHEET_KEY, c.py); if (c.ds) store(DS_KEY, c.ds); if (c.n) store(NOTIFY_KEY, c.n); pulled = true; } } catch(e){}
@@ -513,6 +540,41 @@ $("rGo").onclick = async () => {
   finally { $("rGo").disabled = false; }
 };
 
+/* the super admin security card: switch on email approval (once), or change the super admin password later */
+async function admSecurityCard(){
+  if (!isSuper() || !$("secBox")) return;
+  const as = await SDC.adminStatus(), box = $("secBox");
+  if (!as) { box.innerHTML = ""; return; }
+  if (as.on && !ADM2){ box.innerHTML = `<div class="card" style="border-left:6px solid #C0283A;margin-bottom:12px"><b>⚠️ You signed in with the old password.</b> <span class="muted small">Email approval is on: sign out and sign in again with your new password.</span></div>`; return; }
+  const on = as.on;
+  box.innerHTML = `<div class="card" style="border-left:6px solid ${on ? "#1E8A55" : "#C0283A"};margin-bottom:12px">
+    <details ${on ? "" : "open"}><summary style="cursor:pointer;font-weight:900">${on ? "🔐 Email approval is on" : "🔐 Protect the super admin account: turn on email approval"}</summary>
+    <p class="muted small" style="margin-top:8px">${on ? `Every super admin sign-in needs your password <b>and</b> your Approve in an email to <b>${esc(SDC.ADMIN_APPROVER)}</b>. You can change the super admin password here (it also needs approval).`
+      : `Right now the password alone opens the super admin dashboard. Turn this on and every sign-in also needs you to press <b>Approve</b> in an email to <b>${esc(SDC.ADMIN_APPROVER)}</b>, so a stolen password gets nobody in. Choose a <b>new</b> password: the old one stops working here.`}</p>
+    ${!on && !PRIV ? `<p class="notice warn small">Sign out and sign in again to switch this on.</p>` : !on && !AKEY ? `<p class="notice warn small">The CS answer key isn't open on this computer, so it can't be protected yet. Sign out and sign in again, then try.</p>` : `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:6px">
+      <label class="f">New super admin password<input class="t" id="secPw1" type="password" autocomplete="new-password"></label>
+      <label class="f">Type it again<input class="t" id="secPw2" type="password" autocomplete="new-password"></label></div>
+    <p class="muted small" style="margin:6px 0 0">At least 14 characters, mixing 3 of: small letters, CAPITALS, numbers, symbols. A short sentence works well, e.g. <i>Camels-like-cold-mint-tea-7</i> (don't use this one). Don't use it anywhere else.</p>
+    <div id="secMsg"></div><button class="btn" id="secGo" style="margin-top:10px">${on ? "Change the super admin password" : "Turn on email approval"}</button>`}
+    </details></div>`;
+  if (!$("secGo")) return;
+  $("secGo").onclick = async () => {
+    const a = $("secPw1").value, b = $("secPw2").value, m = (k, h) => $("secMsg").innerHTML = `<div class="notice ${k}" style="margin-top:8px">${h}</div>`;
+    const bad = SDC.adminPwProblem(a); if (bad) return m("bad", esc(bad)); if (a !== b) return m("bad", "The two passwords don't match.");
+    if (a === ADMPW) return m("bad", "Choose a new password, not the one you use now.");
+    const payload = PRIV ? { sig: PRIV.sig, enc: PRIV.enc, ak: AKEY || "" } : null;
+    if (!payload && !ADM2) return m("bad", "Sign out and sign in again first.");
+    $("secGo").disabled = true; m("ok", "Locking the keys with your new password… (a few seconds)");
+    try {
+      const pl = payload || await (async () => { throw new Error("relog"); })();
+      await SDC.adminSetup(a, pl);
+      m("ok", `Nearly done. An email has been sent to <b>${esc(SDC.ADMIN_APPROVER)}</b>. Open it and press <b>Approve</b> (within 60 minutes). After that, sign in with your <b>new password</b>: each time you'll get an email to approve.`);
+      $("secPw1").value = ""; $("secPw2").value = "";
+    } catch(e){ m("bad", e.message === "relog" ? "To change the password, sign out and sign in again, then change it straight away." : e.message === "wait" ? "Too many tries this hour. Try again later." : "That didn't work: the approval service couldn't be reached. Check the internet connection and try again."); }
+    $("secGo").disabled = false;
+  };
+}
 function enter(){
   try { localStorage.setItem("sdc_staff_until", String(Date.now() + 12 * 3600e3)); } catch(e){}   // staff-only pages (Voice Studio) open for 12 hours after a staff sign-in
   $("locked").classList.add("hidden"); $("app").classList.remove("hidden"); $("outBtn").classList.remove("hidden");
